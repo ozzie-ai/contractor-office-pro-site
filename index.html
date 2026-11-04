@@ -177,6 +177,16 @@ if(unique.length){lines.push(tr('scopeIntro'));unique.forEach(x=>lines.push('•
 else lines.push(tr('scopeNoItems'));
 const notes=$('description').value;
 const specific=[];
+if(job==='kitchen'){
+ const island=notes.match(/(?:isla|island)[\s\S]{0,65}?(\d+(?:[.,]\d+)?)\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)/i);
+ if(island)specific.push(lang==='es'?'Conservar o construir isla central de aproximadamente '+island[1]+' × '+island[2]+' pies, según distribución aprobada.':'Retain or build central island approximately '+island[1]+' × '+island[2]+' ft, subject to approved layout.');
+ if(/europe|europeo|frameless/i.test(notes))specific.push(lang==='es'?'Instalar gabinetes de estilo europeo / sin marco, sujeto a selección final.':'Install European-style / frameless cabinets, subject to final selection.');
+ if(/back.?splash/i.test(notes)&&/no vamos a cambiar|mantener|keep|retain|existing|existente/i.test(notes))specific.push(lang==='es'?'Conservar el backsplash existente y protegerlo durante la obra.':'Retain and protect the existing backsplash.');
+ if(/(?:mantener|conservar|keep|retain)[\s\S]{0,75}?(?:estufa|stove|range|exhaust|hood|campana)|(?:estufa|stove|range|exhaust|hood|campana)[\s\S]{0,40}?(?:mantener|conservar|keep|retain)/i.test(notes))specific.push(lang==='es'?'Conservar estufa y campana extractora existentes, con protección durante la obra.':'Retain existing stove and exhaust hood; protect during work.');
+ const lights=notes.match(/(?:cinco|five|5)\s*(?:recess|luces empotradas|recessed lights?)/i);
+ if(lights)specific.push(lang==='es'?'Instalar cinco luces empotradas en reemplazo de luminarias existentes.':'Install five recessed lights to replace existing fixtures.');
+ if(/(?:ocho|8)\s*(?:pies|feet|ft)\s*(?:de alto|de altura|high|tall)/i.test(notes))specific.push(lang==='es'?'Altura de muros indicada: aproximadamente 8 pies; verificar en obra.':'Stated wall height approximately 8 feet; verify on site.');
+}
 if(job==='bathroom'){
  const shower=notes.match(/(?:shower|regadera|ducha)[\s\S]{0,65}?(\d+(?:\.\d+)?)\s*(?:[x×]|por|by)\s*(\d+(?:\.\d+)?)/i);
  if(shower)specific.push(lang==='es'?'Instalar regadera de aproximadamente '+shower[1]+' × '+shower[2]+' pies.':'Install shower approximately '+shower[1]+' × '+shower[2]+' feet.');
