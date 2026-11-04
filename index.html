@@ -37,7 +37,7 @@
 </div>
 <p id="handymanCountSummary" class="notice" aria-live="polite"></p>
 </div>
-<div class="grid" id="finishLayoutFields"><div class="field"><label id="finishLabel" for="finish">Finish level</label><select id="finish"><option value="unknown">Not sure</option><option value="basic">Basic</option><option value="mid">Mid-range</option><option value="high">High-end</option></select></div><div class="field"><label id="layoutLabel" for="layout">Any layout changes?</label><select id="layout"><option value="unknown">Not sure</option><option value="no">No</option><option value="yes">Yes</option></select></div></div>
+<div class="panel hidden" id="concretePanel" style="box-shadow:none;border-color:#b8d9d6"><h2 id="concreteHeading">Concrete patio quantities & costs</h2><p id="concreteHelpText" class="help">Editable Santa Clarita planning allowances. Confirm site conditions and supplier rates.</p><div class="grid"><div class="field"><label data-en="Length" data-es="Largo" for="cLength">Length</label><input id="cLength" type="number" min="0" step="any" value="20"></div><div class="field"><label data-en="Width" data-es="Ancho" for="cWidth">Width</label><input id="cWidth" type="number" min="0" step="any" value="20"></div><div class="field"><label data-en="Thickness (in)" data-es="Grosor (pulgadas)" for="cThick">Thickness (in)</label><input id="cThick" type="number" min="0" step="any" value="4"></div><div class="field"><label data-en="Extra (%)" data-es="Extra (%)" for="cExtra">Extra (%)</label><input id="cExtra" type="number" min="0" step="any" value="10"></div><div class="field"><label data-en="Ready-mix ($/yd³)" data-es="Concreto ($/yd³)" for="cReady">Ready-mix ($/yd³)</label><input id="cReady" type="number" min="0" step="any" value="180"></div><div class="field"><label data-en="Delivery ($)" data-es="Entrega ($)" for="cDeliver">Delivery ($)</label><input id="cDeliver" type="number" min="0" step="any" value="325"></div><div class="field"><label data-en="Grading ($/sf)" data-es="Nivelación ($/pie²)" for="cGrade">Grading ($/sf)</label><input id="cGrade" type="number" min="0" step="any" value="2.25"></div><div class="field"><label data-en="Plants / hauling ($)" data-es="Plantas / retiro ($)" for="cPlants">Plants / hauling ($)</label><input id="cPlants" type="number" min="0" step="any" value="250"></div><div class="field"><label data-en="Base prep ($/sf)" data-es="Base compactada ($/pie²)" for="cBase">Base prep ($/sf)</label><input id="cBase" type="number" min="0" step="any" value="1.25"></div><div class="field"><label data-en="Forms ($/lf)" data-es="Formaleta ($/pie lineal)" for="cForms">Forms ($/lf)</label><input id="cForms" type="number" min="0" step="any" value="5"></div><div class="field"><label data-en="Mesh / rebar ($/sf)" data-es="Malla / varilla ($/pie²)" for="cReinfCost">Mesh / rebar ($/sf)</label><input id="cReinfCost" type="number" min="0" step="any" value="1.25"></div><div class="field"><label data-en="Pour / finish labor ($/sf)" data-es="Colocación / acabado ($/pie²)" for="cLabor">Pour / finish labor ($/sf)</label><input id="cLabor" type="number" min="0" step="any" value="4.25"></div><div class="field"><label data-en="Cleanup ($)" data-es="Juntas / limpieza ($)" for="cCleanup">Cleanup ($)</label><input id="cCleanup" type="number" min="0" step="any" value="300"></div><div class="field"><label id="cReinfLabel" for="cReinf">Reinforcement</label><select id="cReinf"><option value="mesh">Wire mesh</option><option value="rebar">Rebar</option><option value="none">None (verify)</option></select></div></div><p class="notice" id="concreteVolume"></p></div><div class="grid" id="finishLayoutFields"><div class="field"><label id="finishLabel" for="finish">Finish level</label><select id="finish"><option value="unknown">Not sure</option><option value="basic">Basic</option><option value="mid">Mid-range</option><option value="high">High-end</option></select></div><div class="field"><label id="layoutLabel" for="layout">Any layout changes?</label><select id="layout"><option value="unknown">Not sure</option><option value="no">No</option><option value="yes">Yes</option></select></div></div>
 <div class="actions"><button class="btn secondary" type="button" id="back2">← Back</button><button class="btn" type="button" id="next2">Review project →</button></div>
 </section>
 <section id="step3" class="panel hidden"><h2 id="summaryTitle">Your project request is ready</h2><p class="small" id="summaryIntro">Review it, then save or share it. We still need to connect a secure submission system before we can receive requests online.</p><div class="preview" id="summary"></div><div class="actions"><button class="btn secondary" type="button" id="back3">← Edit details</button><button class="btn" type="button" id="download">Download request</button></div><button class="btn secondary wide" id="copy" type="button">Copy project request</button><button class="btn secondary wide" id="print" type="button">Print / Save as PDF</button><p class="notice" id="honesty">This is a project request, not an estimate or submitted order. No pricing or automated blueprint analysis is available yet.</p><button class="btn wide" id="startEstimate" type="button">Continue to estimate →</button></section>
@@ -144,6 +144,46 @@ function initializeHandymanReview(){
  updateHandymanReview();
 }
 for(const id of ['sinkCount','kitchenCount','tubCount'])$(id).oninput=updateHandymanReview;
+function concreteMetrics(){
+ const l=safeNum($('cLength').value),w=safeNum($('cWidth').value),thick=safeNum($('cThick').value),area=l*w,volume=area*thick/324;
+ return {l,w,thick,area,volume,order:Math.ceil(volume*(1+safeNum($('cExtra').value)/100)*10)/10,perimeter:2*(l+w)};
+}
+function refreshConcretePanel(){
+ $('concretePanel').classList.toggle('hidden',job!=='concrete');
+ if(job!=='concrete')return;
+ const m=concreteMetrics(),es=lang==='es';
+ $('concreteHeading').textContent=es?'Patio de concreto — cantidades y costos':'Concrete patio quantities & costs';
+ $('concreteHelpText').textContent=es?'Costos de ejemplo editables para Santa Clarita; verifica la obra y el proveedor.':'Editable Santa Clarita planning allowances; confirm site and supplier.';
+ $('cReinfLabel').textContent=es?'Refuerzo':'Reinforcement';
+ for(const label of $('concretePanel').querySelectorAll('label[data-en]'))label.textContent=label.getAttribute(es?'data-es':'data-en');
+ const v=$('cReinf').value;$('cReinf').replaceChildren(new Option(es?'Malla metálica':'Wire mesh','mesh'),new Option(es?'Varilla':'Rebar','rebar'),new Option(es?'Ninguno (confirmar)':'None (verify)','none'));$('cReinf').value=v;
+ $('concreteVolume').textContent=m.area.toFixed(0)+' ft² · '+(es?'Volumen':'Volume')+' '+m.volume.toFixed(2)+' yd³ · '+(es?'Para pedir':'Order')+' '+m.order.toFixed(1)+' yd³'+(m.thick<3.5?(es?' · Revisar grosor de 3 pulg con requisitos del lugar.':' · Verify 3-inch slab thickness for site requirements.'):'') ;
+}
+function initializeConcrete(){
+ if(job!=='concrete'){$('concretePanel').classList.add('hidden');return}
+ const d=$('description').value,dimension=d.match(/(\d+(?:[.,]\d+)?)\s*(?:ft|pies|feet)?\s*(?:×|x|por|by)\s*(\d+(?:[.,]\d+)?)/i);
+ if(dimension){$('cLength').value=dimension[1].replace(',','.');$('cWidth').value=dimension[2].replace(',','.')}
+ const t=d.match(/(\d+(?:[.,]\d+)?)\s*(?:pulgadas?|inches|inch)/i);
+ if(t)$('cThick').value=t[1].replace(',','.');
+ $('cReinf').value=/malla|mesh/i.test(d)?'mesh':/varilla|rebar/i.test(d)?'rebar':'mesh';
+ $('cPlants').value=/plantas?|plants?|shrubs?|arbustos?/i.test(d)?250:0;
+ refreshConcretePanel();
+}
+for(const id of [...["cLength","cWidth","cThick","cExtra","cReady","cDeliver","cGrade","cPlants","cBase","cForms","cReinfCost","cLabor","cCleanup"],'cReinf'])$(id).oninput=refreshConcretePanel;
+function concreteEstimateItems(){
+ const es=lang==='es',m=concreteMetrics(),items=[];const rate=id=>safeNum($(id).value);
+ const add=(en,spanish,qty,unit,price)=>{if(qty>0&&price>0)items.push({description:es?spanish:en,quantity:qty,unit,rate:price})};
+ add('Site clearing / grading','Limpieza y nivelación',m.area,'sf',rate('cGrade'));
+ add('Plant removal / hauling','Retiro de plantas / escombros',1,'job',rate('cPlants'));
+ add('Base preparation / compaction','Preparación de base / compactación',m.area,'sf',rate('cBase'));
+ add('Perimeter forms','Formaleta perimetral',m.perimeter,'lf',rate('cForms'));
+ if($('cReinf').value!=='none')add($('cReinf').value==='mesh'?'Wire mesh installed':'Rebar installed',$('cReinf').value==='mesh'?'Malla metálica instalada':'Varilla instalada',m.area,'sf',rate('cReinfCost'));
+ add('Ready-mix concrete material','Concreto premezclado (material)',m.order,'yd3',rate('cReady'));
+ add('Concrete delivery / short load','Entrega de concreto / carga pequeña',1,'job',rate('cDeliver'));
+ add('Concrete placement and finishing labor','Colocación y acabado (mano de obra)',m.area,'sf',rate('cLabor'));
+ add('Control joints / final cleanup','Juntas y limpieza final',1,'job',rate('cCleanup'));
+ return items;
+}
 function detect(){
 const text=$('description').value.toLowerCase();
 const matched=scopeDefs.filter(([id,en,es,re])=>re.test(text)).map(x=>x[0]);
@@ -159,7 +199,7 @@ if(!$('size').value && dimensions)$('size').value=(Number(dimensions[1].replace(
 else if(!$('size').value&&area)$('size').value=area[1].replace(',','.');
 document.querySelectorAll('[data-job]').forEach(x=>x.classList.toggle('selected',x.dataset.job===job));
 $('sizeField').classList.toggle('hidden',job==='handyman');$('finishLayoutFields').classList.toggle('hidden',job==='handyman');if(job==='handyman')$('size').value='';
-initializeHandymanReview();drawChecks();
+initializeHandymanReview();initializeConcrete();drawChecks();
 }
 function stop(){if(recognition&&recording)try{recognition.stop()}catch(e){}recording=false;$('mic').classList.remove('recording');$('mic').textContent=tr('start');}
 function render(){document.documentElement.lang=lang;$('en').classList.toggle('active',lang==='en');$('es').classList.toggle('active',lang==='es');for(const k of ['slogan','headline','intro','projectTitle','descLabel','voiceLabel','voiceActionLabel','attachmentsLabel','attachmentsHelp','next1','confirmTitle','confirmIntro','optionalTitle','optionalHelp','cityLabel','sizeLabel','finishLabel','layoutLabel','back2','next2','summaryTitle','summaryIntro','back3','download','copy','print','honesty','foot','estimateTitle','estimateHelp','contractorLabel','clientLabel','estimateHint','itemHeading','qtyHeading','unitHeading','rateHeading','amountHeading','addItem','overheadLabel','profitLabel','subtotalLabel','overheadAmountLabel','profitAmountLabel','totalLabel','back4','next4','proposalTitle','proposalHelp','back5','printEstimate','downloadCSV','saveDraft','proposalNotice','startEstimate','detailsToggle','visitIntro','visitModeLabel','permissionLabel','permissionHelp','photosLabel','takePhoto','customerScopeLabel','customerScopeHelp','refreshScope','takeoffHeading','takeoffHelp','takeoffRecalc','takeoffSave','handymanConfirmTitle','handymanConfirmHelp','sinkCountLabel','kitchenCountLabel','tubCountLabel','laborRateLabel','tubRateLabel','supplyLabel','conditionLabel','countryLabel','cabinetTitle','cabinetHelp','islandLabel','cabinetFinishLabel','cabinetItemHeading','cabinetCountHeading','cabinetPriceHeading','cabinetCostHeading','cabinetTotalLabel','cabinetDisclaimer','applyCabinets','wallHeightLabel','wallCountLabel','takeoffApply','shareTitle','shareHelp','emailLabel','emailEstimate','gmailEstimate','shareEstimate','copyEstimate','shareNote','downloadProposal','exportReview','homeButton','newProjectButton'])$(k).textContent=tr(k);for(const k of ['kitchen','bathroom','handyman','adu','concrete','other'])document.querySelector('[data-k="'+k+'"]').textContent=tr(k);$('description').placeholder=tr('descPlaceholder');$('mic').textContent=recording?tr('stop'):tr('start');const oldFinish=$('finish').value,oldLayout=$('layout').value;$('finish').replaceChildren();['unknown','basic','mid','high'].forEach((v,i)=>{const o=new Option(tr('finish')[i],v);$('finish').add(o)});$('finish').value=oldFinish;$('layout').replaceChildren();['unknown','no','yes'].forEach((v,i)=>$('layout').add(new Option(tr('layout')[i],v)));$('layout').value=oldLayout;document.querySelectorAll('[data-job]').forEach(b=>b.classList.toggle('selected',b.dataset.job===job));$('visitMode').options[0].textContent=lang==='es'?'Solo observaciones del contratista':'Contractor’s own observations only';$('visitMode').options[1].textContent=lang==='es'?'Conversación con el cliente (requiere permiso)':'Conversation with customer (permission required)';drawChecks();updateHandymanReview();showStep(step);}
@@ -222,6 +262,11 @@ if(job==='handyman'&&faucetRequest($('description').value)){
  $('estimateHint').textContent=lang==='es'?'SERVICIO DE HANDYMAN · Solo mano de obra. Tarifas de ejemplo para editar; no incluyen llaves ni accesorios. Confirma acceso a la instalación de tina antes de cotizar.':'HANDYMAN SERVICE · Labor only. Rates are editable examples, not verified quotes. Faucets and fixtures excluded; confirm bathtub valve access.';
  return;
 }
+if(job==='concrete'){
+ estimateItems=concreteEstimateItems();initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
+ const m=concreteMetrics();$('estimateHint').textContent=(lang==='es'?'CONCRETO · ':'CONCRETE · ')+m.area+' ft² · '+m.order+' yd³. '+(lang==='es'?'Tarifas de ejemplo: revisa y ajusta.':'Example planning rates; review and adjust.');
+ return;
+}
 const keys=selected;
 let chosen=full||keys.size===0?list:list.filter(x=>keys.has(x[0])||x[0]==='other');
 if(job==='kitchen'&&/(?:mantener|conservar|keep|retain|same|misma)[\s\S]{0,50}?(?:stove|estufa|range|exhaust|hood|campana)|(?:stove|estufa|range|exhaust|hood|campana)[\s\S]{0,35}?(?:mantener|conservar|keep|retain)/i.test($('description').value))chosen=chosen.filter(x=>x[0]!=='appliances');
@@ -241,6 +286,14 @@ const unique=[...new Set(estimateItems.map(x=>x.description.trim()).filter(Boole
 if(unique.length){lines.push(tr('scopeIntro'));unique.forEach(x=>lines.push('• '+x+'.'))}
 else lines.push(tr('scopeNoItems'));
 const notes=$('description').value;
+if(job==='concrete'){
+ const m=concreteMetrics();
+ lines.push(lang==='es'?'Patio de '+m.l+' × '+m.w+' pies, '+m.area+' pies cuadrados, grosor propuesto '+m.thick+' pulgadas.':'Patio '+m.l+' × '+m.w+' ft, '+m.area+' sq ft, proposed thickness '+m.thick+' inches.');
+ lines.push(lang==='es'?'Retiro de vegetación, nivelación, preparación de base, formaleta, refuerzo, concreto y acabado según partidas.':'Vegetation removal, grading, base prep, forms, reinforcement, concrete and finish per line items.');
+ lines.push(lang==='es'?'Volumen neto '+m.volume.toFixed(2)+' yardas cúbicas; cantidad para pedido '+m.order.toFixed(1)+' yardas cúbicas, sujeto a verificación.':'Net volume '+m.volume.toFixed(2)+' cubic yards; order '+m.order.toFixed(1)+' cubic yards, pending confirmation.');
+ lines.push(lang==='es'?'Confirmar pendiente, drenaje, acceso, grosor y especificaciones antes de construir.':'Confirm slope, drainage, access, thickness and specifications before construction.');
+ $('customerScope').value=lines.join('\n');return;
+}
 if(job==='handyman'&&faucetRequest(notes)){
   const totalFaucets=safeNum($('sinkCount').value)+safeNum($('kitchenCount').value)+safeNum($('tubCount').value);const owner=$('supplyMode').value==='owner';
   lines.push(lang==='es'?'Total de grifos confirmados: '+totalFaucets+'.':'Confirmed faucet count: '+totalFaucets+'.');
@@ -351,6 +404,7 @@ function calculateTakeoff(){
   for(const [re,english,spanish] of [[/toilet|inodoro|sanitario/i,'Toilet','Inodoro'],[/vanity|tocador|mueble de baño/i,'Vanity','Mueble de baño'],[/mirror|espejo/i,'Mirror','Espejo'],[/recess|empotrada/i,'Recessed light','Luz empotrada'],[/glass|vidrio/i,'Glass door (confirm)','Puerta de vidrio (confirmar)']])if(re.test(notes))push('fixture',es?spanish:english,1,'ea',es?'Según descripción; confirmar':'Mentioned; confirm');
  }
  if(job==='handyman'&&faucetRequest(notes)){const c={sink:safeNum($('sinkCount').value),kitchen:safeNum($('kitchenCount').value),tub:safeNum($('tubCount').value)};if(c.sink)push('sink-faucet',es?'Cambio de grifo de lavamanos':'Bathroom sink faucet replacement',c.sink,'ea',es?'Solo mano de obra; grifos del dueño':'Labor only; customer supplies fixtures');if(c.kitchen)push('kitchen-faucet',es?'Cambio grifo fregadero cocina':'Kitchen sink faucet replacement',c.kitchen,'ea',es?'Mano de obra; confirmar suministro':'Labor; verify supplier');if(c.tub)push('tub-faucet',es?'Cambio de grifo de tina':'Bathtub faucet replacement',c.tub,'ea',es?'Solo mano de obra; verificar acceso':'Labor only; check access');}
+ if(job==='concrete'){const m=concreteMetrics();if(m.area){push('concrete',es?'Concreto premezclado':'Ready-mix concrete',m.order,'yd³',m.area+' ft² × '+m.thick+' in + '+$('cExtra').value+'%');push('forms',es?'Formaleta':'Forms',m.perimeter,'lf',m.l+' × '+m.w);if($('cReinf').value!=='none')push('reinforcement',es?'Refuerzo':'Reinforcement',m.area,'sf',$('cReinf').value)}}
  if(job==='kitchen'){if(selected.has('cabinets'))warnings.push(es?'Faltan pies lineales de gabinetes.':'Cabinet linear footage missing.');if(selected.has('countertops'))warnings.push(es?'Falta área de cubierta.':'Countertop area missing.')}
  takeoffItems=result;const wrap=$('takeoffContent');wrap.replaceChildren();const table=document.createElement('table');table.className='estimate-table';for(const item of result){const row=document.createElement('tr');for(const value of [item.name,item.qty+' '+item.unit,item.basis]){const td=document.createElement('td');td.textContent=value;row.append(td)}table.append(row)}wrap.append(table);
  $('takeoffWarnings').textContent=warnings.join(' • ')||(es?'Cantidades para revisión antes de comprar.':'Quantities require verification before ordering.');
