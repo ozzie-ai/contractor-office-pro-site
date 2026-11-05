@@ -20,6 +20,12 @@
 <section id="step2" class="panel hidden">
 <h2 id="confirmTitle">Here's what we understood</h2><p class="small" id="confirmIntro">We selected the work mentioned in your description. Change anything that's incorrect.</p>
 <div id="detected" class="chips"></div><div id="checks"></div>
+<div class="panel hidden" id="tradePanel" style="box-shadow:none;border-color:#cbdad8;margin-top:16px">
+<h2 id="tradePanelTitle">Trade-specific work review</h2>
+<p id="tradePanelHelp" class="help">Check only the tasks being performed. Review quantities and separate labor/material costs before estimating. Example rates are not local quotes.</p>
+<div style="overflow-x:auto"><table class="estimate-table"><thead><tr><th id="tradeTaskHeading">Task</th><th id="tradeQtyHeading">Quantity</th><th id="tradeUnitHeading">Unit</th><th id="tradeMaterialHeading">Material / unit ($)</th><th id="tradeLaborHeading">Labor / unit ($)</th></tr></thead><tbody id="tradeTaskRows"></tbody></table></div>
+<p id="tradeReviewStatus" class="notice"></p>
+</div>
 <h2 id="optionalTitle" style="margin-top:22px">A few optional details</h2><p class="small" id="optionalHelp">Leave unknown measurements blank. We won't make you repeat the description.</p>
 <div class="grid"><div class="field"><label id="cityLabel" for="city">City / ZIP (no address)</label><input id="city" placeholder="Santa Clarita, CA"></div><div class="field" id="sizeField"><label id="sizeLabel" for="size">Approximate project area (sq ft)</label><input id="size" type="number" inputmode="decimal" min="0" placeholder="Optional"></div></div>
 <div class="panel hidden" id="handymanConfirm" style="border-color:#9ecbc2;background:#f4fbf9;box-shadow:none">
@@ -92,7 +98,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v21 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v22 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -113,10 +119,99 @@ const scopeDefs=[
 ['appliances','Appliances','Electrodomésticos',/appliance|electrodom|estufa|horno|dishwasher|lavavajillas/i]
 ];
 let lang='en',job='kitchen',step=1,recognition=null,recording=false,selected=new Set(),report='';
+let tradeRows=[],tradeSetupKey='';
 const tr=k=>copy[lang][k];
 function showStep(n){step=n;for(let i=1;i<=5;i++)$('step'+i).classList.toggle('hidden',i!==n);const current=({1:1,2:2,4:3,5:4})[n]||1;$('progress').textContent=(lang==='es'?'Paso ':'Step ')+current+(lang==='es'?' de ':' of ')+'4 · '+tr('steps')[current-1];$('progressbar').style.width=(current/4*100)+'%';window.scrollTo({top:0,behavior:'smooth'});}
-function drawChecks(){const parent=$('checks');parent.replaceChildren();for(const [id,en,es] of scopeDefs){const l=document.createElement('label');l.className='checkrow';const c=document.createElement('input');c.type='checkbox';c.checked=selected.has(id);c.onchange=()=>c.checked?selected.add(id):selected.delete(id);l.append(c,document.createTextNode(lang==='es'?es:en));parent.append(l)}drawChips();}
+function drawChecks(){const parent=$('checks');parent.replaceChildren();for(const [id,en,es] of scopeDefs){const l=document.createElement('label');l.className='checkrow';const c=document.createElement('input');c.type='checkbox';c.checked=selected.has(id);c.onchange=()=>{if(c.checked)selected.add(id);else selected.delete(id);drawChips();prepareTradeRows(true)};l.append(c,document.createTextNode(lang==='es'?es:en));parent.append(l)}drawChips();}
 function drawChips(){const container=$('detected');container.replaceChildren();for(const [id,en,es] of scopeDefs.filter(x=>selected.has(x[0]))){const span=document.createElement('span');span.className='chip';span.textContent='✓ '+(lang==='es'?es:en);container.append(span)}if(!selected.size){const s=document.createElement('span');s.className='small';s.textContent=tr('none');container.append(s)}}
+// A deterministic cross-trade cost schedule. Rates are illustrative inputs, NOT verified market prices.
+// Explicit quantities are reviewed by the contractor; missing quantities remain zero and cannot imply coverage.
+const tradeCatalog=[
+ ['demolition','Selective demolition','Demolición selectiva','sf',0,3.5,'area'],
+ ['demolition','Debris container / haul-out','Contenedor / disposición','job',125,225,'one'],
+ ['cabinets','Cabinet removal and disposal','Retiro de gabinetes','lf',0,35,'manual'],
+ ['cabinets','Cabinet installation','Instalación de gabinetes','lf',0,95,'manual'],
+ ['cabinets','Cabinet material allowance','Material de gabinetes','lf',280,0,'manual'],
+ ['countertops','Countertop fabrication / materials','Cubiertas: fabricación y material','sf',65,0,'manual'],
+ ['countertops','Countertop installation','Instalación de cubiertas','sf',0,25,'manual'],
+ ['tile','Flooring substrate preparation','Preparación de base de piso','sf',1.5,2.5,'area'],
+ ['tile','Flooring material','Material de piso','sf',4.5,0,'area'],
+ ['tile','Flooring installation labor','Mano de obra instalación piso','sf',0,7.5,'area'],
+ ['tile','Shower waterproofing','Impermeabilización de ducha','sf',4,7,'manual'],
+ ['tile','Shower wall tile','Azulejo de pared en ducha','sf',5.5,14,'manual'],
+ ['plumbing','Water supply / drain modification','Modificación de tubería / drenaje','job',175,425,'one'],
+ ['plumbing','Sink / faucet connection labor','Conexión de lavamanos o fregadero','ea',25,175,'manual'],
+ ['plumbing','Toilet installation','Instalación de sanitario','ea',25,225,'manual'],
+ ['electrical','Recessed light installation','Instalación de luz empotrada','ea',55,175,'countlight'],
+ ['electrical','Outlet / switch replacement','Cambio de enchufe / interruptor','ea',30,125,'manual'],
+ ['electrical','New circuit / wiring (verify)','Circuito / cableado nuevo (confirmar)','job',275,600,'one'],
+ ['paint','Wall preparation and painting','Preparación y pintura de muros','sf',0.5,2,'wall'],
+ ['paint','Ceiling preparation and painting','Preparación y pintura de cielo','sf',0.5,2.25,'area'],
+ ['drywall','Drywall sheets / installation','Paneles drywall y montaje','sf',1.5,2.75,'wall'],
+ ['drywall','Tape, mud, texture finish','Cinta, compuesto y textura','sf',0.75,2.25,'wall'],
+ ['roofing','Roof tear-off and disposal','Retiro de techo y disposición','sq',85,125,'roof'],
+ ['roofing','Underlayment / flashing materials','Membrana y tapajuntas','sq',175,0,'roof'],
+ ['roofing','Roof covering and installation','Cubierta de techo e instalación','sq',260,300,'roof'],
+ ['framing','Wall framing lumber / fasteners','Madera y fijaciones de entramado','lf',38,0,'manual'],
+ ['framing','Wall framing installation labor','Mano de obra de entramado','lf',0,48,'manual'],
+ ['other','General repairs — describe scope','Reparaciones generales — describir','job',0,0,'one']
+];
+const tradeTasksForProject=()=>job==='concrete'||job==='handyman'&&faucetRequest($('description').value)?[]:tradeCatalog.filter(x=>selected.has(x[0]));
+function inferTradeQty(row){
+ const notes=$('description').value;const area=safeNum($('size').value);
+ if(row[6]==='area')return area;
+ if(row[6]==='one')return 1;
+ if(row[6]==='countlight'){
+  const match=notes.match(/(?:cinco|5|five|cuatro|4|four|tres|3|three|dos|2|two|una?|1|one)\s+(?:luces|l[aá]mparas|recess(?:ed)?\s*lights?|spots?|lights?)/i);
+  if(match){const k=match[0].split(/\s+/)[0].toLowerCase();return ({cinco:5,five:5,cuatro:4,four:4,tres:3,three:3,dos:2,two:2,una:1,uno:1,un:1,one:1})[k]||Number(k)||0}
+  return 0;
+ }
+ // Walls, ceiling and roofing areas cannot be derived safely from floor area.
+ return 0;
+}
+function prepareTradeRows(keepValues=false){
+ const rows=tradeTasksForProject();
+ $('tradePanel').classList.toggle('hidden',!rows.length||job==='adu');
+ if(job==='adu'||!rows.length){tradeRows=[];tradeSetupKey='';return;}
+ const key=job+'|'+[...selected].sort().join(',');
+ const previous=keepValues?new Map(tradeRows.map(x=>[x.id,x])):new Map();
+ tradeRows=rows.map((task,i)=>{const id=task[0]+':'+task[1];const old=previous.get(id);return old||{id,scope:task[0],en:task[1],es:task[2],unit:task[3],material:task[4],labor:task[5],quantity:inferTradeQty(task),checked:task[0]!=='other'}});
+ tradeSetupKey=key;drawTradeRows();
+}
+function drawTradeRows(){
+ const es=lang==='es';const wrap=$('tradeTaskRows');wrap.replaceChildren();
+ $('tradePanelTitle').textContent=es?'Revisión de partidas por oficio':'Trade-specific task review';
+ $('tradePanelHelp').textContent=es?'Marca solo trabajos incluidos. Confirma cantidades y costos separados de materiales y mano de obra. Tarifas de ejemplo; NO cotizaciones locales.':'Check only included tasks; confirm quantities and separate material/labor inputs. Illustrative rates, NOT local quotes.';
+ const headers=es?['Trabajo','Cantidad','Unidad','Material / unidad ($)','Mano de obra / unidad ($)']:['Task','Quantity','Unit','Material / unit ($)','Labor / unit ($)'];
+ ['tradeTaskHeading','tradeQtyHeading','tradeUnitHeading','tradeMaterialHeading','tradeLaborHeading'].forEach((id,i)=>$(id).textContent=headers[i]);
+ for(const task of tradeRows){
+  const row=document.createElement('tr'),cell=document.createElement('td'),label=document.createElement('label');label.style.cssText='display:flex;gap:6px;align-items:center;min-width:150px';
+  const cb=document.createElement('input');cb.type='checkbox';cb.checked=task.checked;cb.onchange=()=>{task.checked=cb.checked;updateTradeStatus()};
+  label.append(cb,document.createTextNode(es?task.es:task.en));cell.append(label);row.append(cell);
+  for(const field of ['quantity','unit','material','labor']){
+   const td=document.createElement('td');const input=document.createElement('input');input.value=task[field];input.setAttribute('aria-label',(es?task.es:task.en)+' '+field);
+   if(field!=='unit'){input.type='number';input.min='0';input.step='any';input.inputMode='decimal';}
+   input.style.minWidth=field==='unit'?'50px':'76px';input.oninput=()=>{task[field]=input.value;updateTradeStatus()};td.append(input);row.append(td);
+  }
+  wrap.append(row);
+ }
+ updateTradeStatus();
+}
+function updateTradeStatus(){
+ const es=lang==='es',included=tradeRows.filter(x=>x.checked),missing=included.filter(x=>!(safeNum(x.quantity)>0));
+ $('tradeReviewStatus').textContent=(es?'Partidas incluidas: ':'Included tasks: ')+included.length+' · '+(es?'Cantidades sin confirmar: ':'Missing quantities: ')+missing.length+(missing.length?' — '+missing.map(x=>es?x.es:x.en).slice(0,3).join(', '):'');
+}
+function tradeEstimateItems(){
+ const es=lang==='es',out=[];
+ for(const task of tradeRows.filter(x=>x.checked)){
+  const qty=safeNum(task.quantity),title=es?task.es:task.en;
+  if(!(qty>0))continue;
+  if(safeNum(task.material)>0)out.push({description:title+(es?' — materiales':' — materials'),quantity:qty,unit:task.unit,rate:safeNum(task.material)});
+  if(safeNum(task.labor)>0)out.push({description:title+(es?' — mano de obra':' — labor'),quantity:qty,unit:task.unit,rate:safeNum(task.labor)});
+  if(!(safeNum(task.material)>0)&&!(safeNum(task.labor)>0))out.push({description:title+(es?' — requiere precio':' — pricing required'),quantity:qty,unit:task.unit,rate:0});
+ }
+ return out;
+}
 function faucetRequest(text){
  const fixture=/\b(?:faucets?|fasset|fassett|fasces|fases?|grifos?|grifer[ií]as?|llaves?|chorros?|mezcladoras?)\b/i.test(text);
  const swap=/reemplaz|cambiar|cambio|sustitu|instalar|poner|replace|swap|install/i.test(text);
@@ -246,18 +341,18 @@ $('sizeField').classList.toggle('hidden',job==='handyman');$('finishLayoutFields
 initializeHandymanReview();initializeConcrete();drawChecks();
 }
 function stop(){if(recognition&&recording)try{recognition.stop()}catch(e){}recording=false;$('mic').classList.remove('recording');$('mic').textContent=tr('start');}
-function render(){document.documentElement.lang=lang;$('en').classList.toggle('active',lang==='en');$('es').classList.toggle('active',lang==='es');for(const k of ['slogan','headline','intro','projectTitle','descLabel','voiceLabel','voiceActionLabel','attachmentsLabel','attachmentsHelp','next1','confirmTitle','confirmIntro','optionalTitle','optionalHelp','cityLabel','sizeLabel','finishLabel','layoutLabel','back2','next2','summaryTitle','summaryIntro','back3','download','copy','print','honesty','foot','estimateTitle','estimateHelp','contractorLabel','clientLabel','estimateHint','itemHeading','qtyHeading','unitHeading','rateHeading','amountHeading','addItem','overheadLabel','profitLabel','subtotalLabel','overheadAmountLabel','profitAmountLabel','totalLabel','back4','next4','proposalTitle','proposalHelp','back5','printEstimate','downloadCSV','saveDraft','proposalNotice','startEstimate','detailsToggle','visitIntro','visitModeLabel','permissionLabel','permissionHelp','photosLabel','takePhoto','customerScopeLabel','customerScopeHelp','refreshScope','takeoffHeading','takeoffHelp','takeoffRecalc','takeoffSave','handymanConfirmTitle','handymanConfirmHelp','sinkCountLabel','kitchenCountLabel','tubCountLabel','laborRateLabel','tubRateLabel','supplyLabel','conditionLabel','countryLabel','cabinetTitle','cabinetHelp','islandLabel','cabinetFinishLabel','cabinetItemHeading','cabinetCountHeading','cabinetPriceHeading','cabinetCostHeading','cabinetTotalLabel','cabinetDisclaimer','applyCabinets','wallHeightLabel','wallCountLabel','takeoffApply','shareTitle','shareHelp','emailLabel','emailEstimate','gmailEstimate','shareEstimate','copyEstimate','shareNote','downloadProposal','exportReview','copyPrivateReview','homeButton','newProjectButton'])$(k).textContent=tr(k);for(const k of ['kitchen','bathroom','handyman','adu','concrete','other'])document.querySelector('[data-k="'+k+'"]').textContent=tr(k);$('description').placeholder=tr('descPlaceholder');$('mic').textContent=recording?tr('stop'):tr('start');const oldFinish=$('finish').value,oldLayout=$('layout').value;$('finish').replaceChildren();['unknown','basic','mid','high'].forEach((v,i)=>{const o=new Option(tr('finish')[i],v);$('finish').add(o)});$('finish').value=oldFinish;$('layout').replaceChildren();['unknown','no','yes'].forEach((v,i)=>$('layout').add(new Option(tr('layout')[i],v)));$('layout').value=oldLayout;document.querySelectorAll('[data-job]').forEach(b=>b.classList.toggle('selected',b.dataset.job===job));$('visitMode').options[0].textContent=lang==='es'?'Solo observaciones del contratista':'Contractor’s own observations only';$('visitMode').options[1].textContent=lang==='es'?'Conversación con el cliente (requiere permiso)':'Conversation with customer (permission required)';drawChecks();updateHandymanReview();showStep(step);}
+function render(){document.documentElement.lang=lang;$('en').classList.toggle('active',lang==='en');$('es').classList.toggle('active',lang==='es');for(const k of ['slogan','headline','intro','projectTitle','descLabel','voiceLabel','voiceActionLabel','attachmentsLabel','attachmentsHelp','next1','confirmTitle','confirmIntro','optionalTitle','optionalHelp','cityLabel','sizeLabel','finishLabel','layoutLabel','back2','next2','summaryTitle','summaryIntro','back3','download','copy','print','honesty','foot','estimateTitle','estimateHelp','contractorLabel','clientLabel','estimateHint','itemHeading','qtyHeading','unitHeading','rateHeading','amountHeading','addItem','overheadLabel','profitLabel','subtotalLabel','overheadAmountLabel','profitAmountLabel','totalLabel','back4','next4','proposalTitle','proposalHelp','back5','printEstimate','downloadCSV','saveDraft','proposalNotice','startEstimate','detailsToggle','visitIntro','visitModeLabel','permissionLabel','permissionHelp','photosLabel','takePhoto','customerScopeLabel','customerScopeHelp','refreshScope','takeoffHeading','takeoffHelp','takeoffRecalc','takeoffSave','handymanConfirmTitle','handymanConfirmHelp','sinkCountLabel','kitchenCountLabel','tubCountLabel','laborRateLabel','tubRateLabel','supplyLabel','conditionLabel','countryLabel','cabinetTitle','cabinetHelp','islandLabel','cabinetFinishLabel','cabinetItemHeading','cabinetCountHeading','cabinetPriceHeading','cabinetCostHeading','cabinetTotalLabel','cabinetDisclaimer','applyCabinets','wallHeightLabel','wallCountLabel','takeoffApply','shareTitle','shareHelp','emailLabel','emailEstimate','gmailEstimate','shareEstimate','copyEstimate','shareNote','downloadProposal','exportReview','copyPrivateReview','homeButton','newProjectButton'])$(k).textContent=tr(k);for(const k of ['kitchen','bathroom','handyman','adu','concrete','other'])document.querySelector('[data-k="'+k+'"]').textContent=tr(k);$('description').placeholder=tr('descPlaceholder');$('mic').textContent=recording?tr('stop'):tr('start');const oldFinish=$('finish').value,oldLayout=$('layout').value;$('finish').replaceChildren();['unknown','basic','mid','high'].forEach((v,i)=>{const o=new Option(tr('finish')[i],v);$('finish').add(o)});$('finish').value=oldFinish;$('layout').replaceChildren();['unknown','no','yes'].forEach((v,i)=>$('layout').add(new Option(tr('layout')[i],v)));$('layout').value=oldLayout;document.querySelectorAll('[data-job]').forEach(b=>b.classList.toggle('selected',b.dataset.job===job));$('visitMode').options[0].textContent=lang==='es'?'Solo observaciones del contratista':'Contractor’s own observations only';$('visitMode').options[1].textContent=lang==='es'?'Conversación con el cliente (requiere permiso)':'Conversation with customer (permission required)';drawChecks();if(tradeRows.length)drawTradeRows();updateHandymanReview();showStep(step);}
 function setLanguage(next,changeVoice=true){stop();lang=next;if(changeVoice)$('voiceLocale').value=next==='es'?'es-MX':'en-US';try{sessionStorage.setItem('cop-language',next)}catch(e){}render();}
 $('en').onclick=()=>setLanguage('en');
 $('es').onclick=()=>setLanguage('es');
 $('voiceLocale').onchange=()=>{const next=$('voiceLocale').value.startsWith('es-')?'es':'en';if(lang!==next)setLanguage(next,false)};
 document.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>{job=b.dataset.job;document.querySelectorAll('[data-job]').forEach(x=>x.classList.toggle('selected',x===b))});
 $('mic').onclick=()=>{if(recording){stop();return}if($('visitMode').value==='conversation'&&!$('customerConsent').checked){$('micStatus').textContent=tr('permissionNeeded');return}const Engine=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Engine){$('micStatus').textContent=tr('unsupported');return}recognition=new Engine();recognition.lang=$('voiceLocale').value;recognition.continuous=true;recognition.interimResults=false;recognition.onresult=e=>{const words=Array.from(e.results).slice(e.resultIndex).map(r=>r[0].transcript).join(' ');$('description').value=($('description').value.trim()+' '+words).trim();$('micStatus').textContent=tr('captured')};recognition.onerror=()=>{$('micStatus').textContent=tr('error');stop()};recognition.onend=()=>{recording=false;$('mic').classList.remove('recording');$('mic').textContent=tr('start')};try{recognition.start();recording=true;$('mic').classList.add('recording');$('mic').textContent=tr('stop');$('micStatus').textContent=tr('listening')}catch(e){$('micStatus').textContent=tr('unsupported')}};
-$('next1').onclick=()=>{stop();detect();showStep(2)};
+$('next1').onclick=()=>{stop();detect();prepareTradeRows();showStep(2)};
 $('back2').onclick=()=>showStep(1);
 $('back3').onclick=()=>showStep(2);
 function makeReport(){const scopes=scopeDefs.filter(x=>selected.has(x[0])).map(x=>lang==='es'?x[2]:x[1]);const projectName=tr(job);const lines=[tr('report'),'—',tr('job')+': '+projectName,tr('description')+': '+($('description').value.trim()||tr('unspecified')),tr('city')+': '+($('city').value.trim()||tr('unspecified')),tr('area')+': '+($('size').value?$('size').value+' ft²':tr('unspecified')),tr('scopes')+': '+(scopes.join(', ')||tr('unspecified')),tr('finishField')+': '+$('finish').selectedOptions[0].textContent,tr('layoutField')+': '+$('layout').selectedOptions[0].textContent,tr('files')+': '+visitFiles.map(x=>x.name).join(', '),'',tr('note')];report=lines.join('\n');$('summary').textContent=report;}
-$('next2').onclick=()=>{if(job==='concrete'&&(!safeNum($('cLength').value)||!safeNum($('cWidth').value)||!safeNum($('cThick').value))){alert(lang==='es'?'Confirma largo, ancho y grosor del concreto. La voz puede confundir tres y cuatro pulgadas.':'Confirm concrete length, width and thickness; voice recognition may confuse three and four inches.');return;}if(job==='handyman'&&faucetRequest($('description').value)&&['sinkCount','kitchenCount','tubCount'].every(id=>safeNum($(id).value)===0)){alert(lang==='es'?'Confirma cuántos grifos se van a reemplazar antes de cotizar.':'Confirm the faucet quantities before estimating.');return;}makeReport();$('estimateProjectNotes').textContent=report;suggestedItems();showStep(4)};
+$('next2').onclick=()=>{if(job==='concrete'&&(!safeNum($('cLength').value)||!safeNum($('cWidth').value)||!safeNum($('cThick').value))){alert(lang==='es'?'Confirma largo, ancho y grosor del concreto. La voz puede confundir tres y cuatro pulgadas.':'Confirm concrete length, width and thickness; voice recognition may confuse three and four inches.');return;}if(job!=='concrete'&&job!=='adu'&&tradeRows.some(x=>x.checked&&!(safeNum(x.quantity)>0))){const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0));if(!confirm((lang==='es'?'Hay '+missing.length+' trabajos sin cantidad. No se cobrarán en el total. ¿Continuar con estimado incompleto?':'There are '+missing.length+' tasks without quantities. These will not be priced. Continue with incomplete estimate?')))return;}if(job==='handyman'&&faucetRequest($('description').value)&&['sinkCount','kitchenCount','tubCount'].every(id=>safeNum($(id).value)===0)){alert(lang==='es'?'Confirma cuántos grifos se van a reemplazar antes de cotizar.':'Confirm the faucet quantities before estimating.');return;}makeReport();$('estimateProjectNotes').textContent=report;suggestedItems();showStep(4)};
 $('download').onclick=()=>{const b=new Blob([report],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='contractor-office-pro-project-request.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(report);$('copy').textContent=tr('copied')}catch(e){$('copy').textContent=lang==='es'?'Selecciona el texto del resumen para copiarlo':'Select the report text to copy it'}};
 $('print').onclick=()=>window.print();
@@ -309,6 +404,17 @@ if(job==='handyman'&&faucetRequest($('description').value)){
 if(job==='concrete'){
  estimateItems=concreteEstimateItems();initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
  const m=concreteMetrics();$('estimateHint').textContent=(lang==='es'?'CONCRETO · ':'CONCRETE · ')+m.area+' ft² · '+m.order+' yd³. '+(lang==='es'?'Tarifas de ejemplo: revisa y ajusta.':'Example planning rates; review and adjust.');
+ return;
+}
+if(job==='adu'){
+ estimateItems=[{description:lang==='es'?'ADU: cotización pendiente de planos, permisos y especificaciones':'ADU: pricing pending plans, permits and specifications',quantity:1,unit:'job',rate:0}];initialized=true;renderItems();buildCustomerScope();calculateTakeoff();$('estimateHint').textContent=lang==='es'?'ADU: Este documento es solo alcance preliminar. No es presupuesto de construcción.':'ADU: scope-only review, not a construction bid.';return;
+}
+if(tradeRows.length){
+ estimateItems=tradeEstimateItems();
+ if(!estimateItems.length)estimateItems=[{description:lang==='es'?'No hay partidas cuantificadas — revisar alcance':'No quantified tasks — review scope',quantity:1,unit:'job',rate:0}];
+ initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
+ const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0)).length;
+ $('estimateHint').textContent=(lang==='es'?'PARTIDAS POR OFICIO — costos de ejemplo, no precios verificados. ':'TRADE-BASED ESTIMATE — illustrative, not verified rates. ')+(missing?(lang==='es'?'FALTAN '+missing+' CANTIDADES; los trabajos sin cantidad NO se incluyen en el total.':'MISSING '+missing+' QUANTITIES; unmeasured work is NOT included in total.'):lang==='es'?'Revisar costos antes de enviar.':'Review rates before sending.');
  return;
 }
 const keys=selected;
@@ -595,7 +701,7 @@ try{await navigator.clipboard.writeText(estimateShareText());$('shareStatus').te
 catch(e){$('shareStatus').textContent=tr('shareFallback')}
 };
 function resetProject(){
-job='kitchen';selected=new Set();estimateItems=[];initialized=false;report='';
+job='kitchen';selected=new Set();estimateItems=[];tradeRows=[];tradeSetupKey='';initialized=false;report='';
 for(const id of ['description','city','size','contractor','client','recipientEmail','customerScope'])$(id).value='';
 $('attachments').value='';$('overhead').value='0';$('profit').value='0';$('finish').value='unknown';$('layout').value='unknown';$('shareStatus').textContent='';
 drawChecks();showStep(1);document.querySelectorAll('[data-job]').forEach(b=>b.classList.toggle('selected',b.dataset.job===job));
