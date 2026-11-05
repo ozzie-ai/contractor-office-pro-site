@@ -111,7 +111,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v28 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v29 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -332,7 +332,12 @@ function paintingEstimateItems(){
  if($('pCeilings').checked){add('Ceiling paint — materials','Pintura de cielos — material',m.ceilingGallons,'gal',paint);add('Ceiling painting labor','Pintura de cielos — mano de obra',m.ceiling,'sf',labor*1.125)}
  return items;
 }
-function evIsProject(d){return /ev\s*charg|electric\s+(?:vehicle\s+)?charg|cargador\s+(?:de\s+)?(?:carro|auto|veh[ií]culo)\s+el[eé]ctrico|cargador\s+(?:ev|el[eé]ctrico)|wall\s*connector|tesla\s*charger/i.test(d)}
+function evIsProject(d){
+ const charger=/ev\s*charg|electric\s+(?:vehicle\s+)?charg|cargador\s+(?:de\s+)?(?:carro|auto|veh[ií]culo)\s+el[eé]ctrico|cargador\s+(?:ev|el[eé]ctrico)|wall\s*connector|tesla\s*charger|cargador\s+de\s+auto|cargador\s+de\s+carro/i.test(d);
+ const circuit=/240\s*(?:voltios?|volts?|v\b)|(?:breaker|interruptor)\s+(?:de\s+)?(?:\d+\s*)?(?:amperios?|amps?)|(?:40|50|60)\s*(?:amperios?|amps?)/i.test(d);
+ const install=/instalar|instalaci[oó]n|correr|cable|alambre|tuber[ií]a|conduit|wire|install/i.test(d);
+ return charger||circuit&&install&&/carg|charg|veh[ií]culo|carro|auto|breaker/i.test(d);
+}
 function evData(){return {run:safeNum($('evRun').value),volts:safeNum($('evVolts').value),breaker:safeNum($('evBreaker').value),current:safeNum($('evCurrent').value),permit:safeNum($('evPermit').value)}}
 function evInit(){
  evActive=evIsProject($('description').value);
@@ -512,7 +517,7 @@ $('es').onclick=()=>setLanguage('es');
 $('voiceLocale').onchange=()=>{const next=$('voiceLocale').value.startsWith('es-')?'es':'en';if(lang!==next)setLanguage(next,false)};
 document.querySelectorAll('[data-job]').forEach(b=>b.onclick=()=>{job=b.dataset.job;document.querySelectorAll('[data-job]').forEach(x=>x.classList.toggle('selected',x===b))});
 $('mic').onclick=()=>{if(recording){stop();return}if($('visitMode').value==='conversation'&&!$('customerConsent').checked){$('micStatus').textContent=tr('permissionNeeded');return}const Engine=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Engine){$('micStatus').textContent=tr('unsupported');return}recognition=new Engine();recognition.lang=$('voiceLocale').value;recognition.continuous=true;recognition.interimResults=false;recognition.onresult=e=>{const words=Array.from(e.results).slice(e.resultIndex).map(r=>r[0].transcript).join(' ');$('description').value=($('description').value.trim()+' '+words).trim();$('micStatus').textContent=tr('captured')};recognition.onerror=()=>{$('micStatus').textContent=tr('error');stop()};recognition.onend=()=>{recording=false;$('mic').classList.remove('recording');$('mic').textContent=tr('start')};try{recognition.start();recording=true;$('mic').classList.add('recording');$('mic').textContent=tr('stop');$('micStatus').textContent=tr('listening')}catch(e){$('micStatus').textContent=tr('unsupported')}};
-$('next1').onclick=()=>{stop();detect();prepareTradeRows();showStep(2)};
+$('next1').onclick=()=>{stop();if(!$('description').value.trim()){alert(lang==='es'?'Describe el trabajo antes de continuar.':'Describe the job before continuing.');return;}detect();prepareTradeRows();showStep(2)};
 $('back2').onclick=()=>showStep(1);
 $('back3').onclick=()=>showStep(2);
 function makeReport(){const scopes=scopeDefs.filter(x=>selected.has(x[0])).map(x=>lang==='es'?x[2]:x[1]);const projectName=tr(job);const lines=[tr('report'),'—',tr('job')+': '+projectName,tr('description')+': '+($('description').value.trim()||tr('unspecified')),tr('city')+': '+($('city').value.trim()||tr('unspecified')),tr('area')+': '+($('size').value?$('size').value+' ft²':tr('unspecified')),tr('scopes')+': '+(scopes.join(', ')||tr('unspecified')),tr('finishField')+': '+$('finish').selectedOptions[0].textContent,tr('layoutField')+': '+$('layout').selectedOptions[0].textContent,tr('files')+': '+visitFiles.map(x=>x.name).join(', '),'',tr('note')];report=lines.join('\n');$('summary').textContent=report;}
@@ -585,6 +590,12 @@ if(tradeRows.length){
  initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
  const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0)).length;
  $('estimateHint').textContent=(lang==='es'?'PARTIDAS POR OFICIO — costos de ejemplo, no precios verificados. ':'TRADE-BASED ESTIMATE — illustrative, not verified rates. ')+(missing?(lang==='es'?'FALTAN '+missing+' CANTIDADES; los trabajos sin cantidad NO se incluyen en el total.':'MISSING '+missing+' QUANTITIES; unmeasured work is NOT included in total.'):lang==='es'?'Revisar costos antes de enviar.':'Review rates before sending.');
+ return;
+}
+if(job==='other'&&!selected.size){
+ estimateItems=[{description:lang==='es'?'Alcance no identificado — falta información':'Scope not identified — more information required',quantity:1,unit:'job',rate:0}];
+ initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
+ $('estimateHint').textContent=lang==='es'?'NO COTIZABLE: el trabajo no fue reconocido. Vuelve y describe el oficio o confirma las partidas.':'NOT READY TO QUOTE: the trade was not recognized. Go back and confirm work items.';
  return;
 }
 const keys=selected;
@@ -797,7 +808,7 @@ const root=$('proposalDocument');root.replaceChildren();
 root.append(elem('h2',tr('proposalHeader')));
 root.append(elem('p',tr('preparedBy')+': '+($('contractor').value.trim()||tr('unspecified'))));
 root.append(elem('p',tr('preparedFor')+': '+($('client').value.trim()||tr('unspecified'))));
-root.append(elem('p',tr('job')+': '+tr(job)+' · '+($('city').value.trim()||tr('unspecified'))));
+root.append(elem('p',tr('job')+': '+(evActive?(lang==='es'?'Cargador EV / Eléctrico':'EV Charger / Electrical'):tr(job))+' · '+($('city').value.trim()||tr('unspecified'))));
 root.append(elem('h3',tr('scopeHeading')));
 root.append(elem('p',$('customerScope').value.trim()||tr('scopeNoItems')));
 const table=elem('table',undefined,'estimate-table'),head=document.createElement('thead'),hr=document.createElement('tr');
@@ -807,7 +818,7 @@ const v=calculate();for(const [label,num] of [[tr('subtotalLabel'),v.subtotal],[
 const row=elem('div',undefined,'totalrow grand');row.append(elem('strong',tr('footerTotal')),elem('strong',currency(v.total)));root.append(row);
 root.append(elem('h3',tr('assumptions')));root.append(elem('p',tr('disclaimer'),'small'));
 }
-$('next4').onclick=()=>{buildProposal();showStep(5)};
+$('next4').onclick=()=>{const missing=estimateItems.length===0||estimateItems.every(x=>!(safeNum(x.quantity)*safeNum(x.rate)>0));if(missing){alert(lang==='es'?'Este estimado está en $0 y no contiene partidas con precio. Regresa para confirmar el oficio, cantidades y tarifas.':'This estimate contains no priced work. Go back and confirm the trade, quantities and rates.');return;}buildProposal();showStep(5)};
 $('printEstimate').onclick=()=>window.print();
 function saveText(filename,data,type){const blob=new Blob([data],{type});const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 $('downloadCSV').onclick=()=>{const rows=[['Description','Quantity','Unit','Unit price','Amount'],...estimateItems.map(x=>[x.description,x.quantity,x.unit,x.rate,safeNum(x.quantity)*safeNum(x.rate)])];const csv=rows.map(r=>r.map(x=>'"'+String(x??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');saveText('contractor-office-pro-estimate.csv',csv,'text/csv;charset=utf-8')};
@@ -816,7 +827,7 @@ $('saveDraft').onclick=()=>{const data={version:4,project:job,language:lang,desc
 function estimateShareText(){
 const v=calculate();
 const work=estimateItems.map(x=>'- '+(x.description||tr('unnamed'))+' | '+safeNum(x.quantity)+' '+(x.unit||tr('unitDefault'))+' x '+currency(safeNum(x.rate))+' = '+currency(safeNum(x.quantity)*safeNum(x.rate))).join('\n');
-return [tr('proposalHeader'),tr('preparedBy')+': '+($('contractor').value.trim()||tr('unspecified')),tr('preparedFor')+': '+($('client').value.trim()||tr('unspecified')),tr('job')+': '+tr(job),tr('city')+': '+($('city').value.trim()||tr('unspecified')),'',tr('scopeHeading')+':',$('customerScope').value.trim()||tr('scopeNoItems'),'',work,'',tr('subtotalLabel')+': '+currency(v.subtotal),tr('overheadAmountLabel')+': '+currency(v.overhead),tr('profitAmountLabel')+': '+currency(v.profit),tr('footerTotal')+': '+currency(v.total),'',tr('disclaimer')].join('\n');
+return [tr('proposalHeader'),tr('preparedBy')+': '+($('contractor').value.trim()||tr('unspecified')),tr('preparedFor')+': '+($('client').value.trim()||tr('unspecified')),tr('job')+': '+(evActive?(lang==='es'?'Cargador EV / Eléctrico':'EV Charger / Electrical'):tr(job)),tr('city')+': '+($('city').value.trim()||tr('unspecified')),'',tr('scopeHeading')+':',$('customerScope').value.trim()||tr('scopeNoItems'),'',work,'',tr('subtotalLabel')+': '+currency(v.subtotal),tr('overheadAmountLabel')+': '+currency(v.overhead),tr('profitAmountLabel')+': '+currency(v.profit),tr('footerTotal')+': '+currency(v.total),'',tr('disclaimer')].join('\n');
 }
 $('emailEstimate').onclick=()=>{
 const email=$('recipientEmail').value.trim();
@@ -866,7 +877,7 @@ $('copyPrivateReview').onclick=async()=>{
  const calc=calculate();
  const part=(label,val)=>label+': '+val;
  const rows=estimateItems.map(x=>'- '+x.description+' | '+x.quantity+' '+x.unit+' × '+currency(safeNum(x.rate))+' = '+currency(safeNum(x.quantity)*safeNum(x.rate)));
- const data=[section,part('Trade / Servicio',job),part('Location / Ubicación',$('city').value||'Not entered'),part('Voice / Dictado',$('description').value),part('Scope / Alcance',$('customerScope').value),...rows,part('Overhead',$('overhead').value+'%'),part('Profit',$('profit').value+'%'),part('Total',currency(calc.total))];
+ const data=[section,part('Trade / Servicio',evActive?'ev-charger-electrical':job),part('Location / Ubicación',$('city').value||'Not entered'),part('Voice / Dictado',$('description').value),part('Scope / Alcance',$('customerScope').value),...rows,part('Overhead',$('overhead').value+'%'),part('Profit',$('profit').value+'%'),part('Total',currency(calc.total))];
  if(job==='concrete'){const m=concreteMetrics();data.push(part('Dimensions',m.l+' × '+m.w+' ft; '+m.thick+' in'),part('Finish type',concreteFinishName()),part('Finish labor / sf',$('cFinishLabor').value),part('Finish material / sf',$('cFinishMaterial').value),part('Concrete net / order',m.volume.toFixed(2)+' / '+m.order.toFixed(1)+' yd3'),part('Truck access',$('cAccess').value),part('Equipment allowance',currency(safeNum($('cEquipment').value))),part('Excavation yd3',$('cExcavation').value));}
  const out=data.join('\n\n');
  try{await navigator.clipboard.writeText(out);$('shareStatus').textContent=lang==='es'?'Reporte copiado. Pégalo en ChatGPT.':'Report copied. Paste into ChatGPT.';}
