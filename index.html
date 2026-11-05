@@ -98,7 +98,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v23 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v24 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -160,6 +160,8 @@ const tradeCatalog=[
  ['roofing','Roof covering and installation','Cubierta de techo e instalación','sq',260,300,'roof'],
  ['framing','Wall framing lumber / fasteners','Madera y fijaciones de entramado','lf',38,0,'manual'],
  ['framing','Wall framing installation labor','Mano de obra de entramado','lf',0,48,'manual'],
+ ['appliances','Appliance relocation / reconnection','Mover y reconectar electrodoméstico','ea',45,225,'manual'],
+ ['appliances','Appliance material allowance (if supplied)','Material de electrodomésticos (si aplica)','ea',600,0,'manual'],
  ['doors','Door replacement — unit','Cambio de puerta — unidad','ea',325,325,'manual'],
  ['doors','Window replacement — unit','Cambio de ventana — unidad','ea',450,375,'manual'],
  ['hvac','Mini-split equipment allowance','Equipo mini-split — costo a verificar','ea',1600,0,'manual'],
@@ -192,19 +194,42 @@ function inferTradeQty(row){
  // Walls, ceiling and roofing areas cannot be derived safely from floor area.
  return 0;
 }
+function defaultTradeTask(task){
+ const [scope,en]=task,d=$('description').value.toLowerCase();
+ if(scope==='tile'){
+  if(/shower|ducha|regadera/i.test(en))return /shower|ducha|regadera|bañera|tina/i.test(d);
+  return /floor|piso|loseta|porcelanato|tile|azulejo/i.test(d)||job==='kitchen'&&/flooring/i.test(en);
+ }
+ if(scope==='paint'&&/Ceiling/i.test(en))return /techo|cielo|ceiling/i.test(d);
+ if(scope==='plumbing'&&/modification/i.test(en))return /cambiar tuber|modific|reroute|repipe|drain relocation|mover tuber/i.test(d);
+ if(scope==='plumbing'&&/Toilet/i.test(en))return /inodoro|toilet|sanitario/i.test(d);
+ if(scope==='plumbing'&&/Sink/i.test(en))return /fregader|lavamanos|lavabo|sink|faucet|grifo/i.test(d);
+ if(scope==='electrical'&&/New circuit/i.test(en))return /circuit|cablead|wiring/i.test(d);
+ if(scope==='electrical'&&/Outlet/i.test(en))return /outlet|enchufe|tomacorriente|interruptor|switch/i.test(d);
+ if(scope==='electrical'&&/Recessed/i.test(en))return /recess|empotr|luces|lámparas|lights|iluminaci[oó]n/i.test(d);
+ if(scope==='cabinets'&&/removal/i.test(en))return /remover|quitar|retirar|demol|remove|demo|replace|reemplaz/i.test(d);
+ if(scope==='roofing'&&/tear.off/i.test(en))return /remove|tear|retirar|remover|quitar|demol|reemplazar|replace/i.test(d);
+ if(scope==='hvac'&&/Duct/i.test(en))return /duct|ductos|conducto/i.test(d);
+ if(scope==='fencing'&&/Gate/i.test(en))return /gate|port[oó]n|reja/i.test(d);
+ if(scope==='landscape'&&/Irrigation/i.test(en))return /riego|irrigation|sprinkler/i.test(d);
+ if(scope==='landscape'&&/Sod/i.test(en))return /cesped|césped|grass|lawn|sod|pasto|planta/i.test(d);
+ if(scope==='doors')return /Window/i.test(en)?/ventana|window/i.test(d):/puerta|door/i.test(d);
+ if(scope==='appliances'&&/material/i.test(en))return /appliances? supplied|electrodom[eé]sticos nuevos/i.test(d);
+ return scope!=='other';
+}
 function prepareTradeRows(keepValues=false){
  const rows=tradeTasksForProject();
  $('tradePanel').classList.toggle('hidden',!rows.length||job==='adu');
  if(job==='adu'||!rows.length){tradeRows=[];tradeSetupKey='';return;}
  const key=job+'|'+[...selected].sort().join(',');
  const previous=keepValues?new Map(tradeRows.map(x=>[x.id,x])):new Map();
- tradeRows=rows.map((task,i)=>{const id=task[0]+':'+task[1];const old=previous.get(id);return old||{id,scope:task[0],en:task[1],es:task[2],unit:task[3],material:task[4],labor:task[5],quantity:inferTradeQty(task),checked:task[0]!=='other'}});
+ tradeRows=rows.map((task,i)=>{const id=task[0]+':'+task[1];const old=previous.get(id);return old||{id,scope:task[0],en:task[1],es:task[2],unit:task[3],material:task[4],labor:task[5],quantity:inferTradeQty(task),checked:defaultTradeTask(task)}});
  tradeSetupKey=key;drawTradeRows();
 }
 function drawTradeRows(){
  const es=lang==='es';const wrap=$('tradeTaskRows');wrap.replaceChildren();
  $('tradePanelTitle').textContent=es?'Revisión de partidas por oficio':'Trade-specific task review';
- $('tradePanelHelp').textContent=es?'Marca solo trabajos incluidos. Confirma cantidades y costos separados de materiales y mano de obra. Tarifas de ejemplo; NO cotizaciones locales.':'Check only included tasks; confirm quantities and separate material/labor inputs. Illustrative rates, NOT local quotes.';
+ $('tradePanelHelp').textContent=es?'Marca los trabajos incluidos y confirma medidas y costos de materiales/mano de obra. Los trabajos sin cantidad no se suman; tarifas NO verificadas.':'Check included tasks, confirm quantities and material/labor rates. Unmeasured work stays outside the quoted total; these are NOT local vendor quotes.';
  const headers=es?['Trabajo','Cantidad','Unidad','Material / unidad ($)','Mano de obra / unidad ($)']:['Task','Quantity','Unit','Material / unit ($)','Labor / unit ($)'];
  ['tradeTaskHeading','tradeQtyHeading','tradeUnitHeading','tradeMaterialHeading','tradeLaborHeading'].forEach((id,i)=>$(id).textContent=headers[i]);
  for(const task of tradeRows){
