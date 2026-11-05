@@ -115,7 +115,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v30 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v31 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -337,7 +337,7 @@ function paintingEstimateItems(){
  return items;
 }
 function evIsProject(d){
- const charger=/ev\s*charg|electric\s+(?:vehicle\s+)?charg|cargador\s+(?:de\s+)?(?:carro|auto|veh[ií]culo)\s+el[eé]ctrico|cargador\s+(?:ev|el[eé]ctrico)|wall\s*connector|tesla\s*charger|cargador\s+de\s+auto|cargador\s+de\s+carro/i.test(d);
+ const charger=/ev\s*charg|electric\s+(?:vehicle\s+)?charg|cargador\s+(?:de\s+)?(?:carro|auto|veh[ií]culo)\s+el[eé]ctrico|cargador\s+(?:ev|el[eé]ctrico)|wall\s*connector|tesla\s*charger|(?:ivy|ivi|evi)\s*charger|cargador\s+de\s+auto|cargador\s+de\s+carro/i.test(d);
  const circuit=/240\s*(?:voltios?|volts?|v\b)|(?:breaker|interruptor)\s+(?:de\s+)?(?:\d+\s*)?(?:amperios?|amps?)|(?:40|50|60)\s*(?:amperios?|amps?)/i.test(d);
  const install=/instalar|instalaci[oó]n|correr|cable|alambre|tuber[ií]a|conduit|wire|install/i.test(d);
  return charger||circuit&&install&&/carg|charg|veh[ií]culo|carro|auto|breaker/i.test(d);
@@ -533,7 +533,7 @@ $('next1').onclick=()=>{stop();if(!$('description').value.trim()){alert(lang==='
 $('back2').onclick=()=>showStep(1);
 $('back3').onclick=()=>showStep(2);
 function makeReport(){const scopes=scopeDefs.filter(x=>selected.has(x[0])).map(x=>lang==='es'?x[2]:x[1]);const projectName=tr(job);const lines=[tr('report'),'—',tr('job')+': '+projectName,tr('description')+': '+($('description').value.trim()||tr('unspecified')),tr('city')+': '+($('city').value.trim()||tr('unspecified')),tr('area')+': '+($('size').value?$('size').value+' ft²':tr('unspecified')),tr('scopes')+': '+(scopes.join(', ')||tr('unspecified')),tr('finishField')+': '+$('finish').selectedOptions[0].textContent,tr('layoutField')+': '+$('layout').selectedOptions[0].textContent,tr('files')+': '+visitFiles.map(x=>x.name).join(', '),'',tr('note')];report=lines.join('\n');$('summary').textContent=report;}
-$('next2').onclick=()=>{if(evActive&&(!safeNum($('evRun').value)||!safeNum($('evVolts').value))){alert(lang==='es'?'Confirma recorrido, voltaje y breaker.':'Confirm route, voltage and breaker.');return;}if(paintingActive&&(!safeNum($('pRooms').value)||!safeNum($('pLength').value)||!safeNum($('pWidth').value)||!safeNum($('pHeight').value)||(!$('pWalls').checked&&!$('pCeilings').checked))){alert(lang==='es'?'Confirma habitaciones, medidas, altura y superficies a pintar.':'Confirm number of rooms, dimensions, height and surfaces to paint.');return;}if(job==='concrete'&&(!safeNum($('cLength').value)||!safeNum($('cWidth').value)||!safeNum($('cThick').value))){alert(lang==='es'?'Confirma largo, ancho y grosor del concreto. La voz puede confundir tres y cuatro pulgadas.':'Confirm concrete length, width and thickness; voice recognition may confuse three and four inches.');return;}if(job!=='concrete'&&job!=='adu'&&tradeRows.some(x=>x.checked&&!(safeNum(x.quantity)>0))){const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0));if(!confirm((lang==='es'?'Hay '+missing.length+' trabajos sin cantidad. No se cobrarán en el total. ¿Continuar con estimado incompleto?':'There are '+missing.length+' tasks without quantities. These will not be priced. Continue with incomplete estimate?')))return;}if(job==='handyman'&&faucetRequest($('description').value)&&['sinkCount','kitchenCount','tubCount'].every(id=>safeNum($(id).value)===0)){alert(lang==='es'?'Confirma cuántos grifos se van a reemplazar antes de cotizar.':'Confirm the faucet quantities before estimating.');return;}makeReport();$('estimateProjectNotes').textContent=report;suggestedItems();showStep(4)};
+$('next2').onclick=()=>{if(evIsProject($('description').value)&&!evActive){evInit();selected=new Set(['electrical']);prepareTradeRows();}if(evActive&&(!safeNum($('evRun').value)||!safeNum($('evVolts').value))){alert(lang==='es'?'Confirma recorrido, voltaje y breaker.':'Confirm route, voltage and breaker.');return;}if(paintingActive&&(!safeNum($('pRooms').value)||!safeNum($('pLength').value)||!safeNum($('pWidth').value)||!safeNum($('pHeight').value)||(!$('pWalls').checked&&!$('pCeilings').checked))){alert(lang==='es'?'Confirma habitaciones, medidas, altura y superficies a pintar.':'Confirm number of rooms, dimensions, height and surfaces to paint.');return;}if(job==='concrete'&&(!safeNum($('cLength').value)||!safeNum($('cWidth').value)||!safeNum($('cThick').value))){alert(lang==='es'?'Confirma largo, ancho y grosor del concreto. La voz puede confundir tres y cuatro pulgadas.':'Confirm concrete length, width and thickness; voice recognition may confuse three and four inches.');return;}if(job!=='concrete'&&job!=='adu'&&tradeRows.some(x=>x.checked&&!(safeNum(x.quantity)>0))){const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0));if(!confirm((lang==='es'?'Hay '+missing.length+' trabajos sin cantidad. No se cobrarán en el total. ¿Continuar con estimado incompleto?':'There are '+missing.length+' tasks without quantities. These will not be priced. Continue with incomplete estimate?')))return;}if(job==='handyman'&&faucetRequest($('description').value)&&['sinkCount','kitchenCount','tubCount'].every(id=>safeNum($(id).value)===0)){alert(lang==='es'?'Confirma cuántos grifos se van a reemplazar antes de cotizar.':'Confirm the faucet quantities before estimating.');return;}makeReport();$('estimateProjectNotes').textContent=report;suggestedItems();showStep(4)};
 $('download').onclick=()=>{const b=new Blob([report],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='contractor-office-pro-project-request.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(report);$('copy').textContent=tr('copied')}catch(e){$('copy').textContent=lang==='es'?'Selecciona el texto del resumen para copiarlo':'Select the report text to copy it'}};
 $('print').onclick=()=>window.print();
@@ -566,7 +566,10 @@ const samples={
  adu:[['other','Preliminary scope review (not a full ADU bid)','Revisión preliminar del alcance (no cotización de ADU)',1,'job',0]],
  other:[['other','General construction allowance','Partida de construcción general',1,'job',0]]};
 function suggestedItems(){
-const area=Number($('size').value)>0?Number($('size').value):(job==='bathroom'?40:job==='kitchen'?120:job==='concrete'?360:0);
+ // Re-evaluate the original transcript on the estimating step. This protects
+ // against stale trade selection state and speech-recognition spelling variants.
+ if(evIsProject($('description').value)&&!evActive){evInit();selected=new Set(['electrical']);}
+ const area=Number($('size').value)>0?Number($('size').value):(job==='bathroom'?40:job==='kitchen'?120:job==='concrete'?360:0);
 const list=samples[job]||samples.other;
 const full=/remodel|renovat|reforma|complet|entero|whole|total|rehacer|hacer de nuevo/i.test($('description').value);
 if(job==='handyman'&&faucetRequest($('description').value)){
@@ -608,6 +611,12 @@ if(job==='other'&&!selected.size){
  estimateItems=[{description:lang==='es'?'Alcance no identificado — falta información':'Scope not identified — more information required',quantity:1,unit:'job',rate:0}];
  initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
  $('estimateHint').textContent=lang==='es'?'NO COTIZABLE: el trabajo no fue reconocido. Vuelve y describe el oficio o confirma las partidas.':'NOT READY TO QUOTE: the trade was not recognized. Go back and confirm work items.';
+ return;
+}
+if(job==='other'&&!(tradeRows.length)&&!evActive){
+ estimateItems=[{description:lang==='es'?'SERVICIO NO RECONOCIDO — revisar descripción y oficio':'SERVICE NOT RECOGNIZED — confirm description and trade',quantity:1,unit:'job',rate:0}];
+ initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
+ $('estimateHint').textContent=lang==='es'?'NO HAY ESTIMADO: No se reconoció el trabajo. Verifica dictado, vuelve y selecciona las partidas; $0 NO ES UN PRECIO.':'NO ESTIMATE: Trade not recognized. Review speech transcript and select task items; $0 IS NOT A PRICE.';
  return;
 }
 const keys=selected;
