@@ -110,7 +110,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v26 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v27 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -318,7 +318,9 @@ function initializePainting(){
  d.match(/(?:paredes|muros|walls?)[\s\S]{0,55}?(\d+(?:[.,]\d+)?)\s*(?:pies|feet|ft)/i);
  $('pHeight').value=height?height[1].replace(',','.'):'';
  $('pWalls').checked=!/solo\s+(?:el\s+)?(?:cielo|techo)|ceiling only/i.test(d);
- $('pCeilings').checked=/pintar\s+(?:el\s+)?(?:cielo|techo)|paint\s+(?:the\s+)?ceiling/i.test(d);
+ const explicitCeiling=/pintar\s+(?:el\s+)?(?:cielo|techo)|paint\s+(?:the\s+)?ceiling/i.test(d);
+ const excludeCeiling=/no\s+(?:vamos\s+a\s+)?pintar\s+(?:el\s+)?(?:cielo|techo)|sin\s+pintar\s+(?:el\s+)?(?:cielo|techo)|(?:do not|don't|not)\s+paint\s+(?:the\s+)?ceiling|solo\s+(?:las\s+)?paredes|only\s+(?:the\s+)?walls/i.test(d);
+ $('pCeilings').checked=explicitCeiling&&!excludeCeiling;
  refreshPaintingPanel();
 }
 for(const id of ['pRooms','pLength','pWidth','pHeight','pDeduct','pCoats','pCoverage','pPaintRate','pLaborRate','pPrepRate','pWalls','pCeilings'])$(id).addEventListener('input',refreshPaintingPanel);
