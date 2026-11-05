@@ -110,7 +110,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v25 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v26 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -275,7 +275,8 @@ function tradeEstimateItems(){
 function isRoomPainting(text){
  const paint=/pintar|pintura|paint(?:ing)?\b/i.test(text);
  const rooms=/habitaci[oó]n|habitaciones|cuartos?|rec[aá]maras?|rooms?|bedrooms?|paredes|muros|walls?/i.test(text);
- return job!=='concrete'&&paint&&rooms;
+ const otherWork=/(?:instalar|reemplazar|construir|remodelar|demoler|replace|install|build|remodel|demolition)\s+[\s\S]{0,40}?(?:gabinetes|cabinet|plomer[ií]a|plumbing|electricidad|electrical|piso|flooring|roof|techo nuevo|puerta nueva|new door|window replacement)/i.test(text);
+ return job!=='concrete'&&paint&&rooms&&!otherWork;
 }
 function numberOfRooms(text){
  const m=text.match(/\b(tres|three|dos|two|cuatro|four|cinco|five|un|una|uno|one|\d+)\s+(?:habitaciones|habitaci[oó]n|cuartos?|rec[aá]maras?|rooms?|bedrooms?)\b/i);
@@ -455,7 +456,7 @@ if(!$('size').value && dimensions)$('size').value=(Number(dimensions[1].replace(
 else if(!$('size').value&&area)$('size').value=area[1].replace(',','.');
 document.querySelectorAll('[data-job]').forEach(x=>x.classList.toggle('selected',x.dataset.job===job));
 $('sizeField').classList.toggle('hidden',job==='handyman');$('finishLayoutFields').classList.toggle('hidden',job==='handyman');if(job==='handyman')$('size').value='';
-initializeHandymanReview();initializeConcrete();initializePainting();drawChecks();
+initializeHandymanReview();initializeConcrete();initializePainting();$('sizeField').classList.toggle('hidden',job==='handyman'||paintingActive);drawChecks();
 }
 function stop(){if(recognition&&recording)try{recognition.stop()}catch(e){}recording=false;$('mic').classList.remove('recording');$('mic').textContent=tr('start');}
 function render(){document.documentElement.lang=lang;$('en').classList.toggle('active',lang==='en');$('es').classList.toggle('active',lang==='es');for(const k of ['slogan','headline','intro','projectTitle','descLabel','voiceLabel','voiceActionLabel','attachmentsLabel','attachmentsHelp','next1','confirmTitle','confirmIntro','optionalTitle','optionalHelp','cityLabel','sizeLabel','finishLabel','layoutLabel','back2','next2','summaryTitle','summaryIntro','back3','download','copy','print','honesty','foot','estimateTitle','estimateHelp','contractorLabel','clientLabel','estimateHint','itemHeading','qtyHeading','unitHeading','rateHeading','amountHeading','addItem','overheadLabel','profitLabel','subtotalLabel','overheadAmountLabel','profitAmountLabel','totalLabel','back4','next4','proposalTitle','proposalHelp','back5','printEstimate','downloadCSV','saveDraft','proposalNotice','startEstimate','detailsToggle','visitIntro','visitModeLabel','permissionLabel','permissionHelp','photosLabel','takePhoto','customerScopeLabel','customerScopeHelp','refreshScope','takeoffHeading','takeoffHelp','takeoffRecalc','takeoffSave','handymanConfirmTitle','handymanConfirmHelp','sinkCountLabel','kitchenCountLabel','tubCountLabel','laborRateLabel','tubRateLabel','supplyLabel','conditionLabel','countryLabel','cabinetTitle','cabinetHelp','islandLabel','cabinetFinishLabel','cabinetItemHeading','cabinetCountHeading','cabinetPriceHeading','cabinetCostHeading','cabinetTotalLabel','cabinetDisclaimer','applyCabinets','wallHeightLabel','wallCountLabel','takeoffApply','shareTitle','shareHelp','emailLabel','emailEstimate','gmailEstimate','shareEstimate','copyEstimate','shareNote','downloadProposal','exportReview','copyPrivateReview','homeButton','newProjectButton'])$(k).textContent=tr(k);for(const k of ['kitchen','bathroom','handyman','adu','concrete','other'])document.querySelector('[data-k="'+k+'"]').textContent=tr(k);$('description').placeholder=tr('descPlaceholder');$('mic').textContent=recording?tr('stop'):tr('start');const oldFinish=$('finish').value,oldLayout=$('layout').value;$('finish').replaceChildren();['unknown','basic','mid','high'].forEach((v,i)=>{const o=new Option(tr('finish')[i],v);$('finish').add(o)});$('finish').value=oldFinish;$('layout').replaceChildren();['unknown','no','yes'].forEach((v,i)=>$('layout').add(new Option(tr('layout')[i],v)));$('layout').value=oldLayout;document.querySelectorAll('[data-job]').forEach(b=>b.classList.toggle('selected',b.dataset.job===job));$('visitMode').options[0].textContent=lang==='es'?'Solo observaciones del contratista':'Contractor’s own observations only';$('visitMode').options[1].textContent=lang==='es'?'Conversación con el cliente (requiere permiso)':'Conversation with customer (permission required)';drawChecks();if(tradeRows.length)drawTradeRows();refreshPaintingPanel();updateHandymanReview();showStep(step);}
@@ -553,7 +554,7 @@ function buildCustomerScope(){
 const lines=[];
 const location=$('city').value.trim();
 const area=$('size').value.trim();
-if(area)lines.push(tr('scopeArea')+' '+area+' sq ft.');
+if(area&&!paintingActive)lines.push(tr('scopeArea')+' '+area+' sq ft.');
 const unique=[...new Set(estimateItems.map(x=>x.description.trim()).filter(Boolean))];
 if(unique.length){lines.push(tr('scopeIntro'));unique.forEach(x=>lines.push('• '+x+'.'))}
 else lines.push(tr('scopeNoItems'));
