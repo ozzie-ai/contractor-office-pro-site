@@ -98,7 +98,7 @@
 <div class="actions"><button class="btn secondary" id="back5" type="button">← Edit estimate</button><button class="btn" id="printEstimate" type="button">Print / Save PDF</button></div><button class="btn secondary wide" id="downloadCSV" type="button">Download itemized CSV</button><button class="btn secondary wide" id="saveDraft" type="button">Save project draft (.json)</button>
 <div class="actions"><button class="btn secondary" type="button" id="homeButton">⌂ Home</button><button class="btn secondary" type="button" id="newProjectButton">+ New project</button></div><p class="notice" id="proposalNotice">No information is sent to Contractor Office Pro. The browser only prepares downloadable files. Secure intake, pricing feeds and payments are future features.</p>
 </section>
-<p class="footer" id="foot">Pilot v22 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
+<p class="footer" id="foot">Pilot v23 · No accounts, payments, or uploads are connected. Voice quality depends on your browser and microphone; transcription may be processed by your browser provider. Please review dictated text.</p>
 </main><script>
 const $=id=>document.getElementById(id);
 const copy={
@@ -116,7 +116,13 @@ const scopeDefs=[
 ['concrete','Concrete','Concreto',/concrete|concreto|cemento|driveway|entrada.*auto/i],
 ['roofing','Roofing','Techo / Roofing',/roof|techo|tejado|shingle|teja/i],
 ['framing','Framing','Estructura / Framing',/framing|estructura|entramado|studs/i],
-['appliances','Appliances','Electrodomésticos',/appliance|electrodom|estufa|horno|dishwasher|lavavajillas/i]
+['appliances','Appliances','Electrodomésticos',/appliance|electrodom|estufa|horno|dishwasher|lavavajillas/i],
+['doors','Doors / Windows','Puertas / Ventanas',/doors?|puertas?|windows?|ventanas?|sliding door|puerta corrediza/i],
+['hvac','HVAC','Climatización / HVAC',/hvac|aire acondicionado|air conditioning|mini.split|ductwork|ductos|furnace|calefacci[oó]n/i],
+['insulation','Insulation','Aislamiento',/insulation|aislamiento|aislante|fiberglass|fibra de vidrio/i],
+['stucco','Stucco / Siding','Estuco / Revestimiento',/stucco|estuco|siding|revestimiento|fachada/i],
+['fencing','Fencing / Gates','Cercas / Portones',/fenc|cercas?|port[oó]n|gate|wrought iron|reja/i],
+['landscape','Landscaping / Irrigation','Jardinería / Riego',/landscap|jardiner|irrigat|riego|sod|cesped|c[eé]sped|grass/i]
 ];
 let lang='en',job='kitchen',step=1,recognition=null,recording=false,selected=new Set(),report='';
 let tradeRows=[],tradeSetupKey='';
@@ -154,6 +160,23 @@ const tradeCatalog=[
  ['roofing','Roof covering and installation','Cubierta de techo e instalación','sq',260,300,'roof'],
  ['framing','Wall framing lumber / fasteners','Madera y fijaciones de entramado','lf',38,0,'manual'],
  ['framing','Wall framing installation labor','Mano de obra de entramado','lf',0,48,'manual'],
+ ['doors','Door replacement — unit','Cambio de puerta — unidad','ea',325,325,'manual'],
+ ['doors','Window replacement — unit','Cambio de ventana — unidad','ea',450,375,'manual'],
+ ['hvac','Mini-split equipment allowance','Equipo mini-split — costo a verificar','ea',1600,0,'manual'],
+ ['hvac','Mini-split installation labor','Instalación mini-split — mano de obra','ea',0,900,'manual'],
+ ['hvac','Duct modifications / testing','Ductos / pruebas','job',150,600,'one'],
+ ['insulation','Batt insulation material','Aislante tipo manta','sf',1.25,0,'wall'],
+ ['insulation','Insulation installation','Colocación de aislante','sf',0,1.5,'wall'],
+ ['stucco','Stucco system materials','Material de estuco','sf',2.5,0,'wall'],
+ ['stucco','Stucco system installation labor','Colocación de estuco','sf',0,5,'wall'],
+ ['fencing','Fence materials','Material de cerca','lf',45,0,'manual'],
+ ['fencing','Fence installation labor','Mano de obra de cerca','lf',0,40,'manual'],
+ ['fencing','Gate — fabricated / installed','Portón — fabricado e instalado','ea',600,500,'manual'],
+ ['landscape','Site clearing / rough grading','Limpieza del terreno / nivelación','sf',0,1.75,'area'],
+ ['landscape','Irrigation piping and emitters','Tubería y aspersores de riego','sf',1.2,0,'area'],
+ ['landscape','Irrigation installation labor','Instalación de riego','sf',0,1.5,'area'],
+ ['landscape','Sod / landscape material','Material de césped o jardín','sf',2.2,0,'area'],
+ ['landscape','Sod / planting labor','Colocación césped / plantas','sf',0,1.75,'area'],
  ['other','General repairs — describe scope','Reparaciones generales — describir','job',0,0,'one']
 ];
 const tradeTasksForProject=()=>job==='concrete'||job==='handyman'&&faucetRequest($('description').value)?[]:tradeCatalog.filter(x=>selected.has(x[0]));
@@ -446,6 +469,13 @@ if(job==='concrete'){
  lines.push(lang==='es'?'Confirmar pendiente, drenaje, acceso, grosor y especificaciones antes de construir.':'Confirm slope, drainage, access, thickness and specifications before construction.');
  $('customerScope').value=lines.join('\n');return;
 }
+if(tradeRows.length&&job!=='concrete'){
+ const missing=tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0));
+ const unpriced=tradeRows.filter(x=>x.checked&&safeNum(x.quantity)>0&&!(safeNum(x.material)>0||safeNum(x.labor)>0));
+ if(missing.length)lines.push((lang==='es'?'TRABAJOS SIN CANTIDAD Y FUERA DEL TOTAL: ':'UNMEASURED WORK EXCLUDED FROM TOTAL: ')+missing.map(x=>lang==='es'?x.es:x.en).join('; ')+'.');
+ if(unpriced.length)lines.push((lang==='es'?'TRABAJOS SIN PRECIO CONFIRMADO: ':'WORK WITH NO CONFIRMED PRICE: ')+unpriced.map(x=>lang==='es'?x.es:x.en).join('; ')+'.');
+ lines.push(lang==='es'?'Los costos unitarios son referencias editables; verificar precios, impuestos, permisos, acceso y medidas.':'Editable unit costs are illustrations; verify vendor rates, taxes, permits, access and measurements.');
+}
 if(job==='handyman'&&faucetRequest(notes)){
   const totalFaucets=safeNum($('sinkCount').value)+safeNum($('kitchenCount').value)+safeNum($('tubCount').value);const owner=$('supplyMode').value==='owner';
   lines.push(lang==='es'?'Total de grifos confirmados: '+totalFaucets+'.':'Confirmed faucet count: '+totalFaucets+'.');
@@ -558,7 +588,8 @@ function calculateTakeoff(){
  }
  if(job==='handyman'&&faucetRequest(notes)){const c={sink:safeNum($('sinkCount').value),kitchen:safeNum($('kitchenCount').value),tub:safeNum($('tubCount').value)};if(c.sink)push('sink-faucet',es?'Cambio de grifo de lavamanos':'Bathroom sink faucet replacement',c.sink,'ea',es?'Solo mano de obra; grifos del dueño':'Labor only; customer supplies fixtures');if(c.kitchen)push('kitchen-faucet',es?'Cambio grifo fregadero cocina':'Kitchen sink faucet replacement',c.kitchen,'ea',es?'Mano de obra; confirmar suministro':'Labor; verify supplier');if(c.tub)push('tub-faucet',es?'Cambio de grifo de tina':'Bathtub faucet replacement',c.tub,'ea',es?'Solo mano de obra; verificar acceso':'Labor only; check access');}
  if(job==='concrete'){const m=concreteMetrics();if(m.area){push('concrete',es?'Concreto premezclado':'Ready-mix concrete',m.order,'yd³',m.area+' ft² × '+m.thick+' in + '+$('cExtra').value+'%');push('forms',es?'Formaleta':'Forms',m.perimeter,'lf',m.l+' × '+m.w);if($('cReinf').value!=='none')push('reinforcement',es?'Refuerzo':'Reinforcement',m.area,'sf',$('cReinf').value)}}
- if(job==='kitchen'){if(selected.has('cabinets'))warnings.push(es?'Faltan pies lineales de gabinetes.':'Cabinet linear footage missing.');if(selected.has('countertops'))warnings.push(es?'Falta área de cubierta.':'Countertop area missing.')}
+ if(tradeRows.length&&job!=='concrete'&&job!=='adu')for(const task of tradeRows.filter(x=>x.checked&&!(safeNum(x.quantity)>0)))warnings.push((es?'Sin medir: ':'Not measured: ')+(es?task.es:task.en));
+ if(job==='kitchen'&&!tradeRows.length){if(selected.has('cabinets'))warnings.push(es?'Faltan pies lineales de gabinetes.':'Cabinet linear footage missing.');if(selected.has('countertops'))warnings.push(es?'Falta área de cubierta.':'Countertop area missing.')}
  takeoffItems=result;const wrap=$('takeoffContent');wrap.replaceChildren();const table=document.createElement('table');table.className='estimate-table';for(const item of result){const row=document.createElement('tr');for(const value of [item.name,item.qty+' '+item.unit,item.basis]){const td=document.createElement('td');td.textContent=value;row.append(td)}table.append(row)}wrap.append(table);
  $('takeoffWarnings').textContent=warnings.join(' • ')||(es?'Cantidades para revisión antes de comprar.':'Quantities require verification before ordering.');
 }
