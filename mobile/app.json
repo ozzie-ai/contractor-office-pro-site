@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Contractor Office Pro",
+    "slug": "contractor-office-pro",
+    "scheme": "contractorofficepro",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Attach job photos to your estimate.",
+        "NSCameraUsageDescription": "Take photos of the worksite for your estimate."
+      }
+    },
+    "android": {
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose jobsite photos to include with your project.",
+          "cameraPermission": "Take photos of your jobsite for the estimate.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": ""
+    },
+    "newArchEnabled": true
+  }
+}
