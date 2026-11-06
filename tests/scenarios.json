@@ -72,6 +72,24 @@
         "evBreaker": 40
       },
       "notes": "One quote combining panel replacement and EV charging installation. EV breaker priced exactly once; no ADU scope. The 21 count is planned installed circuits, not the panel's slot rating."
+    },
+    {
+      "id": "MIXED-002",
+      "trade": "electrical",
+      "voice": "Okay vamos a reemplazar el Breakers panel existente que es de 100 amperios por uno nuevo de 200 amperios actualmente tiene 20 circuitos los cuales los vamos a reemplazar por otros 20 circuitos nuevos más le vamos a agregar un circuito doble de 40 amperios Breaker para alimentar el un cargador de carro eléctrico que va a estar Aproximadamente a 100 pies del panel también vamos a dejar otro Breaker listo de 100 amperios doble para posteriormente en un nuevo trabajo no en este alimentar un su panel en este no lo vamos a hacer Solamente vamos a dejar el Breaker de 100 amperios listo para usarse en posteriores trabajos",
+      "expected": {
+        "old": 100,
+        "now": 200,
+        "existing": 20,
+        "circuits": 21,
+        "adu": 100,
+        "ev": true,
+        "reservedFuture": true,
+        "evRun": 100,
+        "evBreaker": 40,
+        "evCurrent": null
+      },
+      "notes": "Panel upgrade 100A to 200A. Twenty existing circuits transferred; one EV 40A breaker and 100-foot run. Separate 100A double-pole breaker reserved for future subpanel only; NO subpanel or feeder work now; price both breakers once."
     }
   ]
 }
