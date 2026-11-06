@@ -11,7 +11,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Attach job photos to your estimate.",
         "NSCameraUsageDescription": "Take photos of the worksite for your estimate.",
-        "NSMicrophoneUsageDescription": "Record spoken job descriptions for your estimates."
+        "NSMicrophoneUsageDescription": "Record spoken job descriptions for your estimates.",
+        "NSSpeechRecognitionUsageDescription": "Turn spoken job descriptions into editable text without OpenAI."
       }
     },
     "android": {
@@ -30,9 +31,10 @@
         }
       ],
       [
-        "expo-audio",
+        "expo-speech-recognition",
         {
-          "microphonePermission": "Allow Contractor Office Pro to record job descriptions."
+          "microphonePermission": "Allow Contractor Office Pro to hear dictated job descriptions.",
+          "speechRecognitionPermission": "Allow Contractor Office Pro to turn your speech into editable job descriptions."
         }
       ]
     ],
