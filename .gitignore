@@ -1,0 +1,15 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj
+# Swift Package Manager
+.build/
+# Python
+__pycache__/
+.venv/
+.env
+# macOS
+.DS_Store
+# Supabase local
+supabase/.temp/
