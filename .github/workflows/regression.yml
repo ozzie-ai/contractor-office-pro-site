@@ -1,0 +1,21 @@
+name: Contractor Office Pro regression checks
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/regression.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'tests/**'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run electrical regression cases
+        run: node tests/run-tests.mjs
