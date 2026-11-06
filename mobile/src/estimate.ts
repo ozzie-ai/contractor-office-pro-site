@@ -31,11 +31,11 @@ export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
 }
 export function mapInterpretation(result:Interpretation):Pick<Project,'lines'|'exclusions'|'futureWork'|'unknowns'>{
  return {
-  lines:(result.tasks||[]).filter(t=>t.status!=='allowance_to_confirm').map((task,i)=>({
+  lines:(result.tasks||[]).map((task,i)=>({
    id:'ai-'+i,description_en:task.description_en||'Work item to review',
    description_es:task.description_es||'Trabajo por revisar',
    quantity:typeof task.quantity==='number'&&task.quantity>0?task.quantity:0,
-   unit:task.unit||'job',rate:0,status:'included_now' as const
+   unit:task.unit||'job',rate:0,status:task.status==='allowance_to_confirm'?'allowance_to_confirm' as const:'included_now' as const
   })),
   exclusions:[...(result.excluded_work||[])],
   futureWork:[...(result.future_work||[])],
