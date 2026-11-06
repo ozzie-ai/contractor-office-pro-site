@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - 'index.html'
+      - 'api/**'
+      - 'level2.html'
       - 'tests/**'
       - '.github/workflows/regression.yml'
   pull_request:
@@ -19,3 +21,5 @@ jobs:
           node-version: '22'
       - name: Run electrical regression cases
         run: node tests/run-tests.mjs
+      - name: Run Level 2 backend smoke tests
+        run: node tests/level2-api.test.mjs
