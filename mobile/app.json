@@ -10,12 +10,14 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Attach job photos to your estimate.",
-        "NSCameraUsageDescription": "Take photos of the worksite for your estimate."
+        "NSCameraUsageDescription": "Take photos of the worksite for your estimate.",
+        "NSMicrophoneUsageDescription": "Record spoken job descriptions for your estimates."
       }
     },
     "android": {
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -25,6 +27,12 @@
           "photosPermission": "Choose jobsite photos to include with your project.",
           "cameraPermission": "Take photos of your jobsite for the estimate.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Contractor Office Pro to record job descriptions."
         }
       ]
     ],
