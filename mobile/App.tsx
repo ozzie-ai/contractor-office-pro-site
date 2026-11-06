@@ -4,8 +4,7 @@ import {StatusBar} from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import {AudioModule,RecordingPresets,setAudioModeAsync,useAudioRecorder,useAudioRecorderState} from 'expo-audio';
-import {File} from 'expo-file-system';
+import SpeechInput from './src/SpeechInput';
 import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
@@ -27,12 +26,7 @@ export default function App(){
  const [busy,setBusy]=useState(false);
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
- const audioRecorder=useAudioRecorder(RecordingPresets.HIGH_QUALITY);
- const recorderState=useAudioRecorderState(audioRecorder);
- const [recordingUri,setRecordingUri]=useState<string|null>(null);
- const [voiceStatus,setVoiceStatus]=useState('');
- const [transcribing,setTranscribing]=useState(false);
-  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
+ const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
  const setLine=(index:number,part:Partial<EstimateLine>)=>setProject(prev=>({...prev,lines:prev.lines.map((x,i)=>i===index?{...x,...part}:x)}));
  const addLine=()=>patch({lines:[...project.lines,{id:'manual-'+Date.now(),description_en:'',description_es:'',quantity:1,unit:'job',rate:0,status:'included_now'}]});
  const addPhoto=async(camera=false)=>{
@@ -40,56 +34,6 @@ export default function App(){
    const result=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.7}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.7,allowsMultipleSelection:true});
    if(!result.canceled) setPhotos(current=>[...current,...result.assets.map(asset=>asset.uri)].slice(0,20));
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
- };
- const startRecording=async()=>{
-  try{
-   const permission=await AudioModule.requestRecordingPermissionsAsync();
-   if(!permission.granted){setVoiceStatus('Microphone permission is needed. Allow microphone access in Settings.');return}
-   await setAudioModeAsync({playsInSilentMode:true,allowsRecording:true});
-   setRecordingUri(null);
-   await audioRecorder.prepareToRecordAsync();
-   audioRecorder.record();
-   setVoiceStatus('Recording. Describe the whole job naturally, then tap Stop.');
-  }catch(e){setVoiceStatus('Unable to start recording: '+(e instanceof Error?e.message:'Unknown error'))}
- };
- const stopRecording=async()=>{
-  try{
-   await audioRecorder.stop();
-   const uri=audioRecorder.uri;
-   if(!uri)throw new Error('No audio file was created');
-   setRecordingUri(uri);
-   setVoiceStatus('Recording saved on this phone. Tap Transcribe recording to turn it into editable notes.');
-  }catch(e){setVoiceStatus('Unable to save recording: '+(e instanceof Error?e.message:'Unknown error'))}
- };
- const transcribeRecording=async()=>{
-  if(!recordingUri){setVoiceStatus('Record a description first.');return}
-  if(!apiUrl.trim()||!betaToken.trim()){
-   setVoiceStatus('Audio is recorded, but AI transcription needs Derek to connect the secure service. Open step 2 (AI) to enter its URL and beta access code.');return;
-  }
-  if(!/^https:\/\//i.test(apiUrl)||!apiUrl.endsWith('/api/interpret')){setVoiceStatus('Use a valid HTTPS AI endpoint ending in /api/interpret.');return}
-  setTranscribing(true);
-  setVoiceStatus('Transcribing the recorded job...');
-  try{
-   const file=new File(recordingUri);
-   if(file.size>2300000)throw new Error('Recording is too long. Record a shorter section (about two minutes or less).');
-   const audioBase64=await file.base64();
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
-   let response:Response;
-   try{
-    response=await fetch(apiUrl.replace(/\/interpret$/,'/transcribe'),{
-     method:'POST',signal:controller.signal,
-     headers:{'Content-Type':'application/json','X-Beta-Access':betaToken},
-     body:JSON.stringify({audioBase64})
-    });
-   }finally{clearTimeout(timer)}
-   const data=await response.json();
-   if(!response.ok)throw new Error(data.error||'Transcription service error');
-   if(typeof data.transcript!=='string'||!data.transcript.trim())throw new Error('No words were returned');
-   patch({description:[project.description.trim(),data.transcript.trim()].filter(Boolean).join('\n')});
-   setRecordingUri(null);
-   setVoiceStatus('Transcript added below. Review what the AI heard before preparing your estimate.');
-  }catch(e){setVoiceStatus('Transcription failed: '+(e instanceof Error?e.message:'Unknown error')+'. Your recording is still on this phone.');}
-  finally{setTranscribing(false)}
  };
  const interpret=async()=>{
   if(project.description.trim().length<10){Alert.alert('Describe the job','Add a short description before using the AI interpreter.');return;}
@@ -137,15 +81,7 @@ export default function App(){
     <Input label="Contractor / Contratista" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name"/>
     <Input label="Customer / Cliente" value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
     <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City only"/>
-    <View style={styles.voiceCard}>
-      <Text style={styles.h2}>🎙 Describe tu trabajo / Speak the job</Text>
-      <Text style={styles.hint}>Habla en español o inglés. Describe qué vas a hacer, materiales, medidas y qué trabajo queda para después.</Text>
-      <Action title={recorderState.isRecording?'■ Stop recording / Detener':'🎙 Record job / Grabar trabajo'} disabled={transcribing} onPress={recorderState.isRecording?stopRecording:startRecording}/>
-      {recorderState.isRecording&&<Text style={styles.notice}>● Recording now · Grabando...</Text>}
-      {recordingUri&&!recorderState.isRecording&&<Action title={transcribing?'Transcribing...':'Transcribe recording / Transcribir grabación'} disabled={transcribing} onPress={transcribeRecording}/>}
-      {!!voiceStatus&&<Text style={styles.hint}>{voiceStatus}</Text>}
-      <Text style={styles.hint}>No audio is sent until you tap Transcribe. The transcript is private and can be corrected below.</Text>
-    </View>
+    <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
     <Input label="Transcript / Descripción editable del trabajo" value={project.description} multiline onChangeText={x=>patch({description:x})} placeholder="Aquí aparecerá tu dictado. También puedes escribir o corregirlo."/>
     <View style={styles.row}><View style={{flex:1}}><Action title="Take photo" secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title="Choose photos" secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
@@ -191,7 +127,7 @@ export default function App(){
     <Action title={busy?'Creating PDF...':'Create & share customer PDF'} disabled={busy} onPress={sharePdf}/>
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
    </View>}
-   <Text style={styles.footer}>Pilot · Voice recording is available; transcription requires the private AI backend. No automatic cloud save or live supplier prices yet. Keep private API keys off the mobile app.</Text>
+   <Text style={styles.footer}>Pilot · Native voice transcription requires a development build. Keyboard dictation works in Expo Go. AI estimation still requires the backend. No cloud save or live supplier pricing yet.</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
 }
