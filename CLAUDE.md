@@ -51,7 +51,7 @@ progress payment schedule in dollars tied to work; mechanics lien warning; chang
 Templates must be reviewed by a California construction attorney before real use.
 
 ## How to work
-- Build/test from the CLI so you can see errors: `xcodebuild -scheme ContractorOfficePro -destination 'platform=iOS Simulator,name=iPhone 16' build test`
+- Build/test from the CLI so you can see errors (run `xcodegen` in `ios/` first): `cd ios && xcodebuild -scheme ContractorOfficePro -destination 'platform=iOS Simulator,name=iPhone 17' build test`
 - Backend: `pytest` in `backend/`.
 - Small, reviewable commits. Explain schema changes before applying them.
 - Ask before adding a third-party dependency.

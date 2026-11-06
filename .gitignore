@@ -13,3 +13,5 @@ __pycache__/
 .DS_Store
 # Supabase local
 supabase/.temp/
+# Local secrets for the iOS app
+ios/Config/Config.xcconfig
