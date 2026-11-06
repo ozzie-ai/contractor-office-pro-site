@@ -14,8 +14,8 @@ type Stage=0|1|2|3;
 function Action({title,onPress,secondary=false,disabled=false}:{title:string;onPress:()=>void;secondary?:boolean;disabled?:boolean}){
  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,secondary&&styles.buttonSecondary,disabled&&{opacity:.5}]}><Text style={[styles.buttonText,secondary&&{color:PALETTE.ink}]}>{title}</Text></Pressable>;
 }
-function Input({label,value,onChangeText,placeholder,multiline=false,number=false}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean}){
- return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
+function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean}){
+ return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
@@ -26,8 +26,7 @@ export default function App(){
  const [busy,setBusy]=useState(false);
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
- const [editItems,setEditItems]=useState(true);
- const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
+  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
  const setLine=(index:number,part:Partial<EstimateLine>)=>setProject(prev=>({...prev,lines:prev.lines.map((x,i)=>i===index?{...x,...part}:x)}));
  const addLine=()=>patch({lines:[...project.lines,{id:'manual-'+Date.now(),description_en:'',description_es:'',quantity:1,unit:'job',rate:0,status:'included_now'}]});
  const addPhoto=async(camera=false)=>{
@@ -93,7 +92,7 @@ export default function App(){
     <Text style={styles.h2}>2 · AI interprets the job</Text>
     <Text style={styles.hint}>The AI separates each task, included work, exclusions and future work. No AI key is stored in the app.</Text>
     <Input label="Backend URL (configured by Derek)" value={apiUrl} onChangeText={setApiUrl} placeholder="https://your-service.vercel.app/api/interpret"/>
-    <Input label="Private beta access code (not OpenAI key)" value={betaToken} onChangeText={setBetaToken} placeholder="Code provided by the project developer"/>
+    <Input label="Private beta access code (not OpenAI key)" secure value={betaToken} onChangeText={setBetaToken} placeholder="Code provided by the project developer"/>
     <Text style={styles.hint}>This pilot uses a temporary tester code. A public paid version will require real user accounts and usage limits.</Text>
     <Action title={busy?'Analyzing...':'Interpret with AI'} onPress={interpret} disabled={busy}/>
     <Action title="Skip AI · Add work items manually" secondary onPress={()=>setStage(2)}/>
