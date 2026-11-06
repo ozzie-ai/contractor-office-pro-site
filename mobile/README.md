@@ -53,3 +53,27 @@ Derek can work on `mobile/` and `api/` in the same repository once the owner inv
 - https://docs.expo.dev/versions/latest/sdk/imagepicker/
 - https://docs.expo.dev/versions/latest/sdk/print/
 - https://docs.expo.dev/versions/latest/sdk/sharing/
+
+## Native dictation — no OpenAI key needed
+
+Mobile speech-to-text is now separated from the AI estimator. It uses `expo-speech-recognition` (Apple SFSpeechRecognizer on iPhone, Android SpeechRecognizer on Android) and writes directly into the editable customer job notes.
+
+**Expo Go does not bundle this third-party native module.** The Expo Go screen retains a clear, usable fallback: tap the transcript text box and use the microphone on the native iPhone keyboard. For the app's large one-tap direct speech-to-text control, install a custom development build.
+
+On the developer's Mac:
+
+```sh
+cd ~/contractor-office-pro-site/mobile
+git pull --ff-only origin main
+npm install
+npx expo install --fix
+npm run check
+npx expo install expo-dev-client
+npx expo run:ios --device
+```
+
+The last command requires Xcode, iOS signing, and a connected device. It compiles/installs a Contractor Office Pro development build, not Expo Go. Alternatively, use `eas build --platform ios --profile development` with Apple signing and the appropriate Expo/EAS account. After installation, run `npx expo start --dev-client` to send JS updates. A **new native build** is required whenever adding/removing native modules or permissions.
+
+On iPhone, grant Microphone + Speech Recognition permissions and choose **Español** or **English** before starting. Recognized interim/final text appears immediately in the editable box and may be corrected by the contractor. Device support and network usage depend on locale and OS settings: this is independent of OpenAI, but it does **not** guarantee offline-only processing.
+
+The AI interpretation step remains separate and optional. Its endpoint/token are unrelated to iOS/Android voice transcription.
