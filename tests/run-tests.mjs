@@ -17,6 +17,20 @@ for(const item of scenarios){
  checked++;
 }
 assert.ok(checked>=3,'Expected at least three electrical speech fixtures');
+const panelStart=html.indexOf('function parsePanelUpgradeSpeech(');
+const panelEnd=html.indexOf('function initUpgrade(){',panelStart);
+assert.ok(panelStart>=0&&panelEnd>panelStart,'Contextual panel parser must exist');
+const evSource=html.slice(html.indexOf('function evIsProject(d){'),html.indexOf('function evData(){'));
+const parsePanel=new Function(evSource+html.slice(panelStart,panelEnd)+';return parsePanelUpgradeSpeech')();
+const mixed=scenarios.find(x=>x.id==='MIXED-001');
+assert.ok(mixed,'Expected mixed EV and panel fixture');
+const mixedPanel=parsePanel(mixed.voice),mixedEV=parseEvSpeech(mixed.voice);
+for(const field of ['old','now','existing','circuits','adu','ev'])assert.deepEqual(mixedPanel[field],mixed.expected[field],'MIXED-001 panel: '+field);
+assert.equal(mixedEV.run,mixed.expected.evRun,'MIXED-001 EV length');
+assert.equal(mixedEV.breaker,mixed.expected.evBreaker,'MIXED-001 EV breaker');
+assert.ok(html.includes('estimateItems=[...upgradeItems(),...(evActive?evItems():[])]'),'Mixed work must combine both cost catalogs');
+assert.ok(html.includes('if(d.adu)add(\'ADU feeder breaker — material\''),'ADU breaker not inserted without ADU request');
+
 assert.ok(html.includes("d.scope==='breaker'"),'Breaker-only panel upgrade distinction must exist');
 assert.ok(html.includes("englishProposalMeta"),'Customer English proposal must exist');
 assert.ok(html.includes("englishProposalReady"),'English description review gate must exist');
