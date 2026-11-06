@@ -15,7 +15,7 @@ This lives under `/mobile` in the existing `ozzie-ai/contractor-office-pro-site`
 - Customer document does **not** include the private dictated notes, access token, or private worksite photos.
 
 ## Important limits (not implemented yet)
-- **Speech dictation is not yet connected.** Users type or paste notes in this pilot. Derek and the team can add audio capture + secure transcription after API connectivity works.
+- **Voice recording is implemented in the mobile interface.** Users can record on-device and then request transcription through the secure `/api/transcribe` endpoint. Live transcription requires Derek to deploy/configure the backend. Audio stays local until the user explicitly taps Transcribe.
 - No live Home Depot/supplier pricing feed, payment processing, account management, cloud projects, automatic draft persistence, app-store submission, or full test-device validation.
 - AI can structure scope but the user must verify work, quantities and prices. Zero rates are intentionally not silently replaced with invented prices.
 - `COP_BETA_TOKEN` is a temporary shared pilot access mechanism; replace with authenticated per-user access and usage quotas before public launch.
@@ -41,7 +41,7 @@ The API backend must be deployed separately to Vercel with `OPENAI_API_KEY` and 
 ## Suggested integration milestones
 1. Run the mobile app on two real devices; verify photos and PDF sharing.
 2. Derek connects the existing secure AI interpreter backend and validates `MIXED-001` / `MIXED-002` on devices.
-3. Add native microphone recording and server-side speech transcription, with clear consent and privacy wording.
+3. Test the newly implemented microphone recording and server-side speech transcription on iPhone and Android; verify permissions and transcript accuracy.
 4. Add validated, editable trade rate books by location; no invented price confidence.
 5. Add local drafts, then optional cloud sync, accounts, rate limits, subscriptions and store distribution.
 
