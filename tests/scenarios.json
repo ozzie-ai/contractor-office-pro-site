@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "created": "2026-11-06",
+  "purpose": "Non-identifying contractor speech regression cases. No real customer names or addresses.",
+  "cases": [
+    {
+      "id": "ELEC-001",
+      "trade": "electrical",
+      "voice": "Instalar un cargador de carro eléctrico; correr 100 pies de cable, breaker de 40 amperios, reemplazar dos breakers dañados de 20 amperios y cambiar un tomacorriente por GFCI.",
+      "expected": {
+        "run": 100,
+        "breaker": 40,
+        "current": null,
+        "damagedCount": 2,
+        "oldAmps": 20,
+        "gfciCount": 1
+      },
+      "notes": "Circuit breaker 40 A is distinct from EVSE continuous charging current."
+    },
+    {
+      "id": "ELEC-002",
+      "trade": "electrical",
+      "voice": "Cargador de 32 amperios con breaker de 40 amperios, 80 pies de cable, reemplazar tres breakers dañados de 15 amperios.",
+      "expected": {
+        "run": 80,
+        "breaker": 40,
+        "current": 32,
+        "damagedCount": 3,
+        "oldAmps": 15
+      },
+      "notes": "Independent charger rating and breaker rating."
+    },
+    {
+      "id": "ELEC-003",
+      "trade": "electrical",
+      "voice": "Instalar un cargador eléctrico con breaker de 40 amperios, correr 100 pies y cambiar un outlet por GFCI.",
+      "expected": {
+        "run": 100,
+        "breaker": 40,
+        "current": null,
+        "damagedCount": 0,
+        "gfciCount": 1
+      },
+      "notes": "No damaged breaker replacements should be inferred."
+    },
+    {
+      "id": "PANEL-001",
+      "trade": "electrical",
+      "voice": "Upgrade del panel principal de 100 amperios a 200 amperios; transferir 20 circuitos a un panel de 22 circuitos, instalar breaker de 100 amperios reservado para el ADU. El alimentador y subpanel se harán después.",
+      "expected": {
+        "oldService": 100,
+        "newService": 200,
+        "existingCircuits": 20,
+        "newCircuits": 22,
+        "aduBreaker": 100,
+        "scope": "breaker-only"
+      },
+      "notes": "Feeder and subpanel are excluded future work, not missing quantities."
+    }
+  ]
+}
