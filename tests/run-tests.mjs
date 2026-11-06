@@ -28,6 +28,13 @@ const mixedPanel=parsePanel(mixed.voice),mixedEV=parseEvSpeech(mixed.voice);
 for(const field of ['old','now','existing','circuits','adu','ev'])assert.deepEqual(mixedPanel[field],mixed.expected[field],'MIXED-001 panel: '+field);
 assert.equal(mixedEV.run,mixed.expected.evRun,'MIXED-001 EV length');
 assert.equal(mixedEV.breaker,mixed.expected.evBreaker,'MIXED-001 EV breaker');
+const reserved=scenarios.find(x=>x.id==='MIXED-002');
+assert.ok(reserved,'Expected mixed panel/EV/future subpanel regression fixture');
+const reservedPanel=parsePanel(reserved.voice),reservedEV=parseEvSpeech(reserved.voice);
+for(const field of ['old','now','existing','circuits','adu','ev','reservedFuture'])assert.deepEqual(reservedPanel[field],reserved.expected[field],'MIXED-002 panel: '+field);
+assert.equal(reservedEV.run,reserved.expected.evRun,'MIXED-002 EV length');
+assert.equal(reservedEV.breaker,reserved.expected.evBreaker,'MIXED-002 EV breaker');
+assert.equal(reservedEV.current,reserved.expected.evCurrent,'MIXED-002 EV current unknown');
 assert.ok(html.includes('estimateItems=[...upgradeItems(),...(evActive?evItems():[])]'),'Mixed work must combine both cost catalogs');
 assert.ok(html.includes('if(d.adu)add(\'ADU feeder breaker — material\''),'ADU breaker not inserted without ADU request');
 
