@@ -36,7 +36,7 @@ assert.equal(reservedEV.run,reserved.expected.evRun,'MIXED-002 EV length');
 assert.equal(reservedEV.breaker,reserved.expected.evBreaker,'MIXED-002 EV breaker');
 assert.equal(reservedEV.current,reserved.expected.evCurrent,'MIXED-002 EV current unknown');
 assert.ok(html.includes('estimateItems=[...upgradeItems(),...(evActive?evItems():[])]'),'Mixed work must combine both cost catalogs');
-assert.ok(html.includes('if(d.adu)add(\'ADU feeder breaker — material\''),'ADU breaker not inserted without ADU request');
+assert.ok(html.includes("if(d.adu)add('Future subpanel breaker — material'"),'Future subpanel breaker must only be added when expressly requested');
 
 assert.ok(html.includes("d.scope==='breaker'"),'Breaker-only panel upgrade distinction must exist');
 assert.ok(html.includes("englishProposalMeta"),'Customer English proposal must exist');
