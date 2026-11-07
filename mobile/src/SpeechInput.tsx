@@ -1,28 +1,43 @@
-import React from 'react';
-import {Pressable,StyleSheet,Text,View} from 'react-native';
+import React,{useRef,useState} from 'react';
+import {Keyboard,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
 
-type Props={
-  description:string;
-  onChange:(text:string)=>void;
-  onDictate:()=>void;
-};
+type Props={description:string;onChange:(text:string)=>void};
 
 /**
- * Reliable iOS speech-input fallback.
- * Focuses the editable transcript so the user can use the iPhone keyboard microphone.
- * Intentionally does not import expo-speech-recognition: native start() has crashed
- * on the physical test device. Restore direct native recognition only after a
- * diagnosed and tested fix.
+ * Stable keyboard dictation UI while investigating the iOS native speech crash.
+ * Both the button and the editable field are inside this component, so focus
+ * does not depend on a cross-component ref.
  */
-export default function SpeechInput({onDictate}:Props){
+export default function SpeechInput({description,onChange}:Props){
+  const field=useRef<TextInput>(null);
+  const [focused,setFocused]=useState(false);
+  const activate=()=>{
+    field.current?.focus();
+  };
   return <View style={styles.container}>
     <Text style={styles.title}>🎙 Dictado / Speech-to-text</Text>
-    <Text style={styles.note}>Para dictar: toca el botón, luego toca el micrófono del teclado del iPhone. Tus palabras aparecerán en la descripción editable.</Text>
-    <Text style={styles.note}>To dictate: tap the button, then the microphone on your iPhone keyboard. You can review and correct every word.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open job description for keyboard dictation" onPress={onDictate} style={styles.button}>
-      <Text style={styles.buttonText}>🎙 Dictar con teclado / Use iPhone mic</Text>
+    <Text style={styles.note}>Toca el botón verde. Cuando aparezca el teclado, toca su micrófono y describe tu trabajo en español o inglés.</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel="Open transcript keyboard" onPress={activate} style={styles.button}>
+      <Text style={styles.buttonText}>🎙 Abrir teclado / Open keyboard</Text>
     </Pressable>
-    <Text style={styles.small}>El dictado directo está temporalmente desactivado mientras solucionamos el cierre inesperado de la app.</Text>
+    <Text style={styles.label}>Descripción del trabajo / Editable job transcript</Text>
+    <TextInput
+      ref={field}
+      style={styles.input}
+      multiline
+      autoCapitalize="sentences"
+      scrollEnabled
+      value={description}
+      onChangeText={onChange}
+      onFocus={()=>setFocused(true)}
+      onBlur={()=>setFocused(false)}
+      placeholder="Describe tu trabajo aquí. Usa el micrófono del teclado para dictar."
+      placeholderTextColor="#84969a"
+      accessibilityLabel="Editable job description"
+      returnKeyType="default"
+    />
+    <Text style={styles.help}>{focused?'Teclado abierto: toca el micrófono del iPhone para hablar.':'También puedes tocar directamente la caja blanca y escribir o dictar.'}</Text>
+    <Text style={styles.small}>El dictado nativo directo está desactivado temporalmente para evitar el cierre de la aplicación.</Text>
   </View>;
 }
 const styles=StyleSheet.create({
@@ -31,5 +46,8 @@ const styles=StyleSheet.create({
   note:{fontSize:13,lineHeight:20,marginTop:8,color:'#526e70'},
   button:{backgroundColor:'#116b60',padding:14,borderRadius:10,marginTop:12,alignItems:'center'},
   buttonText:{color:'#fff',fontSize:15,fontWeight:'800',textAlign:'center'},
+  label:{fontWeight:'700',fontSize:13,color:'#163942',marginTop:14,marginBottom:8},
+  input:{backgroundColor:'#fff',borderWidth:1,borderColor:'#b8c9c6',borderRadius:9,minHeight:140,padding:12,color:'#163942',fontSize:16,textAlignVertical:'top'},
+  help:{fontSize:13,color:'#235d5a',marginTop:8},
   small:{fontSize:12,color:'#526e70',lineHeight:18,marginTop:10}
 });
