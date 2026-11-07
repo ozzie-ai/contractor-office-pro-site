@@ -29,6 +29,21 @@ export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
  const profit=(subtotal+overhead)*Math.max(0,p.profitPct||0)/100;
  return {subtotal,overhead,profit,total:subtotal+overhead+profit};
 }
+/** Block customer PDF export when an included line has no priced quantity.
+ * This prevents a $0 shower-wall-tile line from silently understating the total.
+ * Preliminary rates still require contractor review.
+ */
+export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues:string[]}{
+ const issues:string[]=[];
+ if(!p.lines.length)issues.push('No work items have been added.');
+ for(const x of p.lines){
+  const name=x.description_en.trim()||x.description_es.trim()||'Untitled item';
+  if(!Number.isFinite(x.quantity)||x.quantity<=0)issues.push(name+': enter a measured quantity.');
+  if(!Number.isFinite(x.rate)||x.rate<=0)issues.push(name+': enter a positive rate.');
+  if(!x.description_en.trim()||!x.description_es.trim())issues.push(name+': complete both customer descriptions.');
+ }
+ return {ready:issues.length===0,issues};
+}
 export function mapInterpretation(result:Interpretation):Pick<Project,'lines'|'exclusions'|'futureWork'|'unknowns'>{
  return {
   lines:(result.tasks||[]).map((task,i)=>({
