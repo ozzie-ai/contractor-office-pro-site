@@ -47,9 +47,11 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const short=showerDim?Math.min(showerDim.a,showerDim.b):0,long=showerDim?Math.max(showerDim.a,showerDim.b):0;
  const wallArea=showerDim&&height>0&&height<=20?(2*short+long)*height:0;
  const newToilet=has(s,/\b(nuevo|nueva|new)\s+(?:toilet|inodoro|sanitario|retrete)\b|\b(?:toilet|inodoro|sanitario)\s+(?:nuevo|nueva|new)\b/);
- const oldToilet=has(s,/\b(?:retirar|remover|quitar|sacar|remove)\s+(?:el\s+|un\s+|existing\s+)?(?:toilet|inodoro|sanitario|retrete)\b/);
- const oldVanity=has(s,/\b(?:retirar|remover|quitar|sacar|remove)\b[^.!?]{0,50}\b(vanity|vanitorio)\b/);
- const oldMirror=has(s,/\b(?:retirar|remover|quitar|sacar|remove)\b[^.!?]{0,65}\b(espejo|mirror)\b/);
+ const demoSection=s.split(/\b(?:voy a instalar|vamos a instalar|instalare|instalar un nuevo|install a new|install new)\b/)[0];
+ const hasRemovalVerb=has(demoSection,/\b(retirar|remover|quitar|sacar|remove|demoler|demolition)\b/);
+ const oldToilet=hasRemovalVerb&&has(demoSection,/\b(toilet|inodoro|sanitario|retrete)\b/);
+ const oldVanity=hasRemovalVerb&&has(demoSection,/\b(vanity|vanitorio)\b/);
+ const oldMirror=hasRemovalVerb&&has(demoSection,/\b(espejo|mirror)\b/);
  const lightRecessed=has(s,/\b(recessed|empotrada|empotrado|empotrad[oa]|can light)\b/);
  const tileToCeiling=has(s,/\b(hasta el techo|to the ceiling|hasta techo)\b/);
  if(demo&&tub)lines.push(line('tub-remove','Remove and dispose of existing bathtub','Retirar y desechar tina existente',1,'job',650));
@@ -88,7 +90,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   unknowns.push('Confirm vanity width, faucet, countertop and plumbing connections.');
  }
  if(mirror){
-  const mirrorMatch=s.match(/\b(?:espejo|mirror)\b[^.!?]{0,95}?\b(\d{2,3})\s*(?:pulgadas|inches|inch|in)?\s*(?:por|x|×|by)\s*(\d{2,3})\s*(?:pulgadas|inches|inch|in)?\b/);
+  const mirrorMatch=s.match(/\b(?:espejo|mirror)\b[^.!?]{0,95}?\b(\d{2,3})\s*(?:pulgadas|inches|inch|in)?\s*(?:de ancho|wide)?\s*(?:por|x|×|by)\s*(\d{2,3})\s*(?:pulgadas|inches|inch|in)?\b/);
   const mirrorSize=mirrorMatch?' ('+mirrorMatch[1]+' × '+mirrorMatch[2]+' in)':'';
   lines.push(line('mirror',(light?'Supply and install illuminated mirror':'Supply and install mirror')+mirrorSize,
    (light?'Suministrar e instalar espejo iluminado':'Suministrar e instalar espejo')+mirrorSize,1,'job',375));
@@ -100,7 +102,13 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   lines.push(line('floor','Replace bathroom floor tile'+detail,'Reemplazar loseta de piso de baño'+detail,roomArea,'sq ft',22));
   if(!roomArea)unknowns.push('Confirm room floor area; shower footprint must not be reused as bathroom size.');
  }
- if(paint)lines.push(line('paint','Prepare and paint bathroom walls/ceiling','Preparar y pintar paredes y techo del baño',1,'job',475));
+ if(paint){
+  const paintWalls=has(s,/\b(paredes|walls|pared|wall)\b/),paintCeiling=has(s,/\b(ceiling|techo|cielo raso|cielorraso)\b/);
+  if(paintWalls)lines.push(line('paint-walls','Prepare and paint remaining untiled bathroom walls (confirm square footage)',
+    'Preparar y pintar paredes sin loseta (confirmar área)',1,'job',350));
+  if(paintCeiling)lines.push(line('paint-ceiling','Prepare and paint bathroom ceiling','Preparar y pintar techo del baño',1,'job',175));
+  if(!paintWalls&&!paintCeiling)lines.push(line('paint','Prepare and paint bathroom (scope to confirm)','Preparar y pintar baño (confirmar alcance)',1,'job',475));
+ }
  if(plumbing&&!shower)lines.push(line('plumbing','Bathroom plumbing work (confirm scope)','Trabajo de plomería de baño (confirmar alcance)',1,'job',700));
  if(electrical&&!lightRecessed&&!mirror)lines.push(line('electrical','Electrical/lighting work (confirm scope)','Electricidad o iluminación (confirmar alcance)',1,'job',550));
  if(roomArea)unknowns.push('Bathroom floor '+roomArea+' sq ft based on '+size(roomDim!)+'; verify dimensions and units.');
