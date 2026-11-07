@@ -9,7 +9,7 @@ type Props={description:string;onChange:(text:string)=>void};
  * does not depend on a cross-component ref.
  */
 export default function SpeechInput({description,onChange}:Props){
-  const field=useRef<TextInput>(null);
+  const field=useRef<React.ElementRef<typeof TextInput>>(null);
   const [focused,setFocused]=useState(false);
   const activate=()=>{
     field.current?.focus();
