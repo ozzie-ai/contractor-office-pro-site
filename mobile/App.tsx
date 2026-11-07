@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
-import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20};
@@ -153,9 +153,12 @@ export default function App(){
   finally{setBusy(false)}
  };
  const sharePdf=async()=>{
-  const t=totals(project);
-  if(!project.lines.length){Alert.alert('No work items','Add work items before exporting.');return}
-  if(project.lines.some(x=>x.quantity<=0||x.rate<=0)){Alert.alert('Review prices','At least one quantity or rate needs review. The exported PDF will be marked as a draft.');}
+  const readiness=estimateReadiness(project);
+  if(!readiness.ready){
+   Alert.alert('Estimate is incomplete','Finish the missing quantities and prices before exporting. '+readiness.issues.slice(0,2).join(' '),[{text:'Review work items',onPress:()=>setStage(2)}]);
+   return;
+  }
+  saveCurrent();
   setBusy(true);
   try{
    const pdf=await Print.printToFileAsync({html:proposalHtml(project)});
@@ -165,6 +168,7 @@ export default function App(){
   finally{setBusy(false)}
  };
  const total=totals(project);
+ const readiness=estimateReadiness(project);
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
@@ -243,7 +247,14 @@ export default function App(){
     <Text style={styles.total}>{project.language==='en'?'Estimated price':'Precio estimado'}: {money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} work items · {project.exclusions.length} exclusions · {photos.length} private site photos</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
-    <Action title={busy?'Creating PDF...':'Create & share customer PDF'} disabled={busy} onPress={sharePdf}/>
+    {!readiness.ready&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Estimate incomplete / Estimado incompleto</Text>
+      <Text style={styles.hint}>Resolve the following items before sharing a customer PDF. In particular, 0 sq ft of shower tile is not a complete price.</Text>
+      {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
+      {readiness.issues.length>6&&<Text style={styles.hint}>…and {readiness.issues.length-6} more items.</Text>}
+      <Action title="Review missing quantities / Revisar cantidades" secondary onPress={()=>setStage(2)}/>
+     </View>}
+    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={sharePdf}/>
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
    </View>}
    <Text style={styles.footer}>Pilot · Drafts and copied job photos are saved on this phone only. Uninstalling the app deletes local drafts. Keyboard dictation works without the AI backend. Pricing allowances are not verified supplier bids.</Text>
