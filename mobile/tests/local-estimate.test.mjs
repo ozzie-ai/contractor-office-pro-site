@@ -39,3 +39,20 @@ test('unknown shower height gives zero measured wall quantity',()=>{
  assert.equal(find(r,'wall-tile').quantity,0);
  assert.ok(r.unknowns.some(x=>x.includes('wall height')));
 });
+
+test('full dictated bathroom scope: demolition, wall tile, new toilet, lighted mirror, recessed light',()=>{
+ const t='Necesito remodelar este pequeno bano de 7 por 5. Voy a retirar o remover la tina, el toilet, el vanity con el sink y el espejo, y voy a demoler el piso existente. Voy a instalar un nuevo shower de 3 por 5 y va a llevar una puerta de vidrio. Las paredes del shower van a ser de losa y van a llegar hasta el techo. Las paredes son de 8 pies de alto. Voy a instalar un nuevo toilet en la misma posicion que el anterior y un nuevo sink con el vanity de 36 pulgadas en la misma posicion que el anterior. Vamos a poner losa en el piso del bano. Tambien el espejo de 36 pulgadas de ancho por 36 pulgadas de alto, que va a ser un lighted mirror. Y vamos a pintar las paredes que sobren y vamos a pintar tambien el ceiling del area de este bano. Tambien vamos a instalar un nuevo recessed light en el bano.';
+ const r=localEstimate(t,'remodel');
+ assert.equal(find(r,'floor').quantity,35);
+ assert.equal(find(r,'floor-demo').quantity,35);
+ assert.equal(find(r,'wall-tile').quantity,88);
+ for(const id of ['tub-remove','remove-toilet','remove-vanity','remove-mirror','shower','glass','toilet','vanity','mirror','paint-walls','paint-ceiling','recessed-light'])assert.ok(find(r,id),'Missing '+id);
+ assert.match(find(r,'toilet').description_en,/new toilet/);
+ assert.match(find(r,'vanity').description_en,/36 in/);
+ assert.match(find(r,'mirror').description_en,/36 × 36 in/);
+ assert.equal(r.lines.filter(x=>x.id==='local-wall-tile').length,1);
+});
+test('new toilet at same position must not be treated as reinstalling existing toilet',()=>{
+ const r=localEstimate('Remove old toilet. Install new toilet in same position.','remodel');
+ assert.match(find(r,'toilet').description_en,/new toilet/);
+});
