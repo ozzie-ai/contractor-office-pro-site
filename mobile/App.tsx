@@ -27,7 +27,7 @@ export default function App(){
  const [saveStatus,setSaveStatus]=useState('');
  const [wallHeight,setWallHeight]=useState('');
  const [shareDone,setShareDone]=useState(false);
- const scrollRef=useRef<ScrollView>(null);
+ const scrollRef=useRef<React.ElementRef<typeof ScrollView>>(null);
 
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
