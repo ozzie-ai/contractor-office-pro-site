@@ -1,10 +1,11 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,Image,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
+import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml} from './src/estimate';
 
@@ -20,6 +21,12 @@ function Input({label,value,onChangeText,placeholder,multiline=false,number=fals
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
+ const [activeJobId,setActiveJobId]=useState(newJobId);
+ const [savedJobs,setSavedJobs]=useState<SavedJob[]>([]);
+ const [loaded,setLoaded]=useState(false);
+ const [saveStatus,setSaveStatus]=useState('');
+ const [wallHeight,setWallHeight]=useState('');
+
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
  const [apiUrl,setApiUrl]=useState('');
@@ -27,14 +34,95 @@ export default function App(){
  const [busy,setBusy]=useState(false);
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
+ useEffect(()=>{
+  const stored=readStore();
+  setSavedJobs(stored.jobs);
+  const active=stored.jobs.find(x=>x.id===stored.activeId);
+  if(active){
+   setActiveJobId(active.id);
+   setProject(active.project);
+   setPhotos(active.photos);
+   setStage(active.stage);
+   setSaveStatus('Previous job restored from this iPhone.');
+  }
+  setLoaded(true);
+ },[]);
+ useEffect(()=>{
+  if(!loaded||!hasJobContent(project,photos))return;
+  setSaveStatus('Saving changes…');
+  const t=setTimeout(()=>{
+   try{
+    saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project,photos,stage});
+    setSavedJobs(readStore().jobs);
+    setSaveStatus('Saved on this iPhone');
+   }catch(e){
+    setSaveStatus('Could not save job — tap Save now');
+    console.warn('Draft autosave failed',e);
+   }
+  },650);
+  return ()=>clearTimeout(t);
+ },[project,photos,stage,activeJobId,loaded]);
+ const saveCurrent=()=>{
+  if(!hasJobContent(project,photos))return;
+  try{
+   saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project,photos,stage});
+   setSavedJobs(readStore().jobs);
+   setSaveStatus('Saved on this iPhone');
+  }catch(e){setSaveStatus('Save failed — check available phone storage');Alert.alert('Save failed','Unable to store the job on this iPhone.');}
+ };
+ const openSaved=(job:SavedJob)=>{
+  saveCurrent();
+  setActiveJobId(job.id);
+  setProject(job.project);
+  setPhotos(job.photos);
+  setStage(job.stage);
+  setAiConnected(false);
+  makeActive(job.id);
+  setSaveStatus('Opened saved job');
+ };
+ const startNewJob=()=>{
+  saveCurrent();
+  const id=newJobId();
+  setActiveJobId(id);
+  setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[]});
+  setPhotos([]);
+  setStage(0);
+  setAiConnected(false);
+  setInfo('');
+  makeActive(null);
+  setSaveStatus('New job — ready to dictate');
+ };
+
  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
  const setLine=(index:number,part:Partial<EstimateLine>)=>setProject(prev=>({...prev,lines:prev.lines.map((x,i)=>i===index?{...x,...part}:x)}));
  const addLine=()=>patch({lines:[...project.lines,{id:'manual-'+Date.now(),description_en:'',description_es:'',quantity:1,unit:'job',rate:0,status:'included_now'}]});
  const addPhoto=async(camera=false)=>{
   try{
    const result=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.7}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.7,allowsMultipleSelection:true});
-   if(!result.canceled) setPhotos(current=>[...current,...result.assets.map(asset=>asset.uri)].slice(0,20));
+   if(!result.canceled){
+    const uris=await Promise.all(result.assets.map(async asset=>{
+     try{return await retainJobPhoto(asset.uri);}
+     catch(e){console.warn('Could not preserve photo',e);return asset.uri;}
+    }));
+    setPhotos(current=>[...current,...uris].slice(0,20));
+   }
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
+ };
+ const applyWallHeight=()=>{
+  const height=Number(wallHeight);
+  if(!Number.isFinite(height)||height<5||height>15){
+   Alert.alert('Check measurement','Enter the actual shower wall height in feet (between 5 and 15).');
+   return;
+  }
+  const description=project.description+'\nShower walls are '+height+' feet high.';
+  const draft=localEstimate(description,project.trade);
+  const updated=draft.lines.map(item=>({
+   ...item,
+   rate:project.lines.find(previous=>previous.id===item.id)?.rate??item.rate
+  }));
+  patch({description,lines:updated,unknowns:draft.unknowns});
+  setWallHeight('');
+  setInfo('Shower wall area recalculated. Review the updated quantity and all rates.');
  };
  const createLocalDraft=()=>{
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
@@ -82,6 +170,21 @@ export default function App(){
   <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO · MOBILE PILOT</Text>
    <Text style={styles.title}>You Build.{'\n'}We Handle the Office.</Text>
+   <View style={styles.card}>
+    <Text style={styles.h2}>My Jobs / Mis trabajos</Text>
+    <Text style={styles.hint}>Work is saved on this iPhone as you edit. Open any recent job to continue; no internet required.</Text>
+    <Text style={styles.hint}>{saveStatus||'Local drafts · Not synced to the cloud'}</Text>
+    <View style={styles.row}>
+     <View style={{flex:1}}><Action title="Save now / Guardar" secondary onPress={saveCurrent}/></View>
+     <View style={{flex:1}}><Action title="+ New job / Nuevo" onPress={startNewJob}/></View>
+    </View>
+    {savedJobs.length===0?<Text style={styles.hint}>No saved jobs yet. Dictate your first job below.</Text>:
+    savedJobs.slice(0,10).map(j=><Pressable key={j.id} accessibilityRole="button" onPress={()=>openSaved(j)} style={[styles.savedJob,j.id===activeJobId&&{borderColor:PALETTE.accent}]}>
+     <Text style={{fontWeight:'800',color:PALETTE.ink}}>{j.project.customer||j.project.city||j.project.description.slice(0,42)||'Untitled job'}{j.id===activeJobId?' · Current':''}</Text>
+     <Text style={styles.hint}>{TRADES[j.project.trade].en} · {j.project.lines.length} items · {new Date(j.updatedAt).toLocaleString()}</Text>
+     <Text style={{color:PALETTE.accent,fontWeight:'700'}}>Open / Continuar</Text>
+    </Pressable>)}
+   </View>
    <View style={styles.steps}>{['Job','AI','Price','Send'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
     <Text style={styles.h2}>1 · Start a job</Text>
@@ -122,6 +225,12 @@ export default function App(){
     <Input label="Not included (one per line)" multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label="Future work (not part of this estimate)" multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     {project.unknowns.length>0&&<Text style={styles.notice}>Planning estimate — confirm before pricing: {project.unknowns.join('; ')}</Text>}
+    {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Missing measurement / Falta medida</Text>
+      <Text style={styles.hint}>How high are the shower walls? Enter measured feet to calculate tile area. No default height is assumed.</Text>
+      <Input label="Shower wall height (ft) / Altura de paredes (pies)" value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
+      <Action title="Apply height & update estimate" onPress={applyWallHeight}/>
+     </View>}
     <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label="Overhead %" number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Profit %" number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     <Text style={styles.total}>Estimated total: {money(total.total)}</Text>
@@ -137,7 +246,7 @@ export default function App(){
     <Action title={busy?'Creating PDF...':'Create & share customer PDF'} disabled={busy} onPress={sharePdf}/>
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
    </View>}
-   <Text style={styles.footer}>Pilot · Use the iPhone keyboard microphone for dictation. Offline estimates use editable planning allowances. Advanced AI requires the secure backend. No cloud save or verified supplier pricing yet.</Text>
+   <Text style={styles.footer}>Pilot · Drafts and copied job photos are saved on this phone only. Uninstalling the app deletes local drafts. Keyboard dictation works without the AI backend. Pricing allowances are not verified supplier bids.</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
 }
@@ -153,5 +262,6 @@ const styles=StyleSheet.create({
  voiceCard:{borderWidth:1,borderColor:'#9ecdc1',backgroundColor:'#edf8f5',borderRadius:12,padding:12,marginVertical:12},
  row:{flexDirection:'row',gap:9},photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},photo:{width:82,height:82,borderRadius:8},remove:{fontSize:10,color:'#9a4545',textAlign:'center'},
  notice:{fontSize:13,color:'#775d21',backgroundColor:'#fdf6e1',padding:12,borderRadius:9,marginTop:12},
+ savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:9,padding:10,marginTop:9,backgroundColor:'#f6fbf9'},
  lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:12,marginTop:12},lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},total:{fontWeight:'900',fontSize:22,color:PALETTE.accent,marginVertical:17},footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:8}
 });
