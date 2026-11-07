@@ -39,7 +39,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const plumbing=has(s,/\b(plomeria|plumbing|tuberia|pipes|reubicar desague|move drain)\b/);
  const electrical=has(s,/\b(electricidad|electrical|electric|outlet|tomacorriente|recessed|empotrada)\b/);
  const wall=has(s,/\b(pared|paredes|muro|muros|wall|walls)\b/);
- const tile=has(s,/\b(losa|loseta|azulejo|ceramica|tile|tiling|alicatar|enchapar|revestir)\b/);
+ const tile=has(s,/\b(losas?|losetas?|azulejos?|ceramica|tile|tiling|alicatar|enchapar|revestir)\b/);
  const heightMatch=s.match(/\b(?:altura|alto|high|height|de altura|paredes? (?:son|de|tienen)|walls? (?:are|of))\s*(?:de\s*)?(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\b/)
   ||s.match(/\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\s*(?:de altura|de alto|high|tall)\b/)
   ||s.match(/\b(?:paredes?|walls?)[^.!?]{0,85}?\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\b/);
@@ -55,7 +55,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const lightRecessed=has(s,/\b(recessed|empotrada|empotrado|empotrad[oa]|can light)\b/);
  const gfci=has(s,/\b(gfci|gfi|ground fault)\b/);
  const replacingGfci=gfci&&has(s,/\b(reemplazar|reemplazo|sustituir|cambiar|replace|instead|en lugar de)\b/);
- const tileToCeiling=has(s,/\b(hasta el techo|to the ceiling|hasta techo)\b/);
+ const tileToCeiling=has(s,/\b(hasta (?:el )?(?:techo|ceiling)|to the ceiling|up to the ceiling|llegan hasta (?:el )?(?:techo|ceiling))\b/);
  if(demo&&tub)lines.push(line('tub-remove','Remove and dispose of existing bathtub','Retirar y desechar tina existente',1,'job',650));
  else if(demo&&bathroom)lines.push(line('bath-demo','Bathroom demolition and debris removal (confirm scope)','Demolición y retiro de escombros del baño (confirmar alcance)',1,'job',850));
  if(oldToilet)lines.push(line('remove-toilet','Remove and dispose of existing toilet','Retirar y desechar inodoro existente',1,'job',125));
