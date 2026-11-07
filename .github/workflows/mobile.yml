@@ -22,3 +22,5 @@ jobs:
         run: npm install --ignore-scripts --no-audit --no-fund
       - name: Validate TypeScript
         run: npm run check
+      - name: Test local estimate takeoff
+        run: npm test
