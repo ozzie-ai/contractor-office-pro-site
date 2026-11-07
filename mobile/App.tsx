@@ -1,4 +1,4 @@
-import React,{useState} from 'react';
+import React,{useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Image,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
@@ -14,11 +14,12 @@ type Stage=0|1|2|3;
 function Action({title,onPress,secondary=false,disabled=false}:{title:string;onPress:()=>void;secondary?:boolean;disabled?:boolean}){
  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,secondary&&styles.buttonSecondary,disabled&&{opacity:.5}]}><Text style={[styles.buttonText,secondary&&{color:PALETTE.ink}]}>{title}</Text></Pressable>;
 }
-function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean}){
- return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
+function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<TextInput>}){
+ return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
+ const transcriptRef=useRef<TextInput>(null);
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
  const [apiUrl,setApiUrl]=useState('');
@@ -81,8 +82,8 @@ export default function App(){
     <Input label="Contractor / Contratista" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name"/>
     <Input label="Customer / Cliente" value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
     <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City only"/>
-    <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
-    <Input label="Transcript / Descripción editable del trabajo" value={project.description} multiline onChangeText={x=>patch({description:x})} placeholder="Aquí aparecerá tu dictado. También puedes escribir o corregirlo."/>
+    <SpeechInput description={project.description} onChange={x=>patch({description:x})} onDictate={()=>transcriptRef.current?.focus()}/>
+    <Input label="Transcript / Descripción editable del trabajo" inputRef={transcriptRef} value={project.description} multiline onChangeText={x=>patch({description:x})} placeholder="Aquí aparecerá tu dictado. También puedes escribir o corregirlo."/>
     <View style={styles.row}><View style={{flex:1}}><Action title="Take photo" secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title="Choose photos" secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} local photos selected. Photos stay on your device and are not uploaded in this pilot.</Text>
