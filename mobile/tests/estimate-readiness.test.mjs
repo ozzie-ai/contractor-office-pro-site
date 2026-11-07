@@ -20,7 +20,7 @@ test('zero shower wall quantity prevents export readiness',()=>{
 test('measured quantities and positive rates permit draft export',()=>{
  const p={...sample,lines:[item(88)]};
  assert.equal(estimateReadiness(p).ready,true);
- assert.equal(totals(p).total,88*18*1.1*1.2);
+ assert.ok(Math.abs(totals(p).total-88*18*1.1*1.2)<0.001);
 });
 test('customer PDF excludes internal dictated transcript',()=>{
  const p={...sample,lines:[item(88)]};
