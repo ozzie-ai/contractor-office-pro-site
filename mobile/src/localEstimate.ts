@@ -9,17 +9,21 @@ const dims=(s:string):Dim[]=>{
  const re=/\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')?\s*(?:por|x|×|by)\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')?\b/g;
  return Array.from(s.matchAll(re)).map(m=>({a:number(m[1]),b:number(m[2]),index:m.index,end:m.index+m[0].length})).filter(d=>d.a>0&&d.b>0&&d.a<=30&&d.b<=30);
 };
-const closest=(s:string,d:Dim,re:RegExp)=>{
- const before=s.slice(Math.max(0,d.index-75),d.index),after=s.slice(d.end,Math.min(s.length,d.end+40));
- return re.test(before)||re.test(after);
+const near=(s:string,all:Dim[],re:RegExp):Dim|undefined=>{
+ const flags=re.flags.includes('g')?re.flags:re.flags+'g';
+ const targets=Array.from(s.matchAll(new RegExp(re.source,flags))).map(m=>(m.index||0)+m[0].length/2);
+ if(!targets.length)return undefined;
+ const ranked=all.map(d=>({d,distance:Math.min(...targets.map(p=>Math.abs((d.index+d.end)/2-p)))}))
+   .sort((a,b)=>a.distance-b.distance);
+ return ranked[0]?.distance<=85?ranked[0].d:undefined;
 };
 const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuarto)\b/;
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
 export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
  const all=dims(s),shower=has(s,showerRe),bathroom=has(s,roomRe);
- const showerDim=shower?all.find(d=>closest(s,d,showerRe)):undefined;
- const roomDim=all.find(d=>closest(s,d,roomRe))||(all.length===1&&!showerDim?all[0]:undefined);
+ const showerDim=shower?near(s,all,showerRe):undefined;
+ const roomDim=near(s,all,roomRe)||(all.length===1&&!showerDim?all[0]:undefined);
  const roomArea=roomDim?roomDim.a*roomDim.b:0;
  const tub=has(s,/\b(tina|bathtub|tub|banera)\b/);
  const demo=has(s,/\b(demoler|demolicion|demolition|remove|remover|quitar|retirar|demolish|sacar)\b/);
@@ -35,7 +39,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const wall=has(s,/\b(pared|paredes|muro|muros|wall|walls)\b/);
  const tile=has(s,/\b(losa|loseta|azulejo|ceramica|tile|tiling|alicatar|enchapar|revestir)\b/);
  const heightMatch=s.match(/\b(?:altura|alto|high|height|de altura|paredes? (?:son|de|tienen)|walls? (?:are|of))\s*(?:de\s*)?(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\b/)
-  ||s.match(/\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\s*(?:de altura|high|tall)\b/);
+  ||s.match(/\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft|')\s*(?:de altura|de alto|high|tall)\b/);
  const height=heightMatch?number(heightMatch[1]):0;
  const short=showerDim?Math.min(showerDim.a,showerDim.b):0,long=showerDim?Math.max(showerDim.a,showerDim.b):0;
  const wallArea=showerDim&&height>0&&height<=20?(2*short+long)*height:0;
