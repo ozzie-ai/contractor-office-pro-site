@@ -56,3 +56,15 @@ test('new toilet at same position must not be treated as reinstalling existing t
  const r=localEstimate('Remove old toilet. Install new toilet in same position.','remodel');
  assert.match(find(r,'toilet').description_en,/new toilet/);
 });
+
+test('test 4 dictation captures GFCI and recessed light without inventing shower height',()=>{
+ const speech='Remodelación de baño de 7 por 5. Eliminar tina y toilet, vanity y espejo, remover piso. Instalar nuevo shower de 3 por 5 con puerta de vidrio. Las losas llegan hasta el ceiling. Nuevo toilet, nuevo vanity de 36 pulgadas, un solo bowl y espejo de luz. Instalar recessed light y un GFCI en lugar del outlet normal. Pintar paredes libres de losa y ceiling de blanco.';
+ const r=localEstimate(speech,'remodel');
+ assert.equal(find(r,'floor').quantity,35);
+ assert.equal(find(r,'wall-tile').quantity,0);
+ assert.ok(r.unknowns.some(x=>x.includes('ACTION REQUIRED')));
+ assert.ok(find(r,'recessed-light'));
+ assert.match(find(r,'gfci').description_en,/Replace existing standard/);
+ assert.ok(find(r,'paint-ceiling'));
+ assert.match(find(r,'paint-ceiling').description_en,/white/);
+});
