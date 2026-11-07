@@ -15,7 +15,7 @@ type Stage=0|1|2|3;
 function Action({title,onPress,secondary=false,disabled=false}:{title:string;onPress:()=>void;secondary?:boolean;disabled?:boolean}){
  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,secondary&&styles.buttonSecondary,disabled&&{opacity:.5}]}><Text style={[styles.buttonText,secondary&&{color:PALETTE.ink}]}>{title}</Text></Pressable>;
 }
-function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<TextInput>}){
+function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<React.ElementRef<typeof TextInput>>}){
  return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
 }
 export default function App(){
