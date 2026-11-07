@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
+import {localEstimate} from './src/localEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
@@ -34,6 +35,14 @@ export default function App(){
    const result=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.7}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.7,allowsMultipleSelection:true});
    if(!result.canceled) setPhotos(current=>[...current,...result.assets.map(asset=>asset.uri)].slice(0,20));
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
+ };
+ const createLocalDraft=()=>{
+  if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
+  const draft=localEstimate(project.description,project.trade);
+  patch({lines:draft.lines,unknowns:draft.unknowns,exclusions:[],futureWork:[]});
+  setAiConnected(false);
+  setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
+  setStage(2);
  };
  const interpret=async()=>{
   if(project.description.trim().length<10){Alert.alert('Describe the job','Add a short description before using the AI interpreter.');return;}
@@ -89,17 +98,18 @@ export default function App(){
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>2 · AI interprets the job</Text>
-    <Text style={styles.hint}>The AI separates each task, included work, exclusions and future work. No AI key is stored in the app.</Text>
+    <Text style={styles.hint}>No AI connection needed to create a preliminary estimate from your dictated description. Choose the offline option below. For advanced AI interpretation, a separate secure backend is required.</Text>
     <Input label="Backend URL (configured by Derek)" value={apiUrl} onChangeText={setApiUrl} placeholder="https://your-service.vercel.app/api/interpret"/>
     <Input label="Private beta access code (not OpenAI key)" secure value={betaToken} onChangeText={setBetaToken} placeholder="Code provided by the project developer"/>
     <Text style={styles.hint}>This pilot uses a temporary tester code. A public paid version will require real user accounts and usage limits.</Text>
     <Action title={busy?'Analyzing...':'Interpret with AI'} onPress={interpret} disabled={busy}/>
-    <Action title="Skip AI · Add work items manually" secondary onPress={()=>setStage(2)}/>
+    <Action title="Create draft estimate from my description (offline)" onPress={createLocalDraft}/>
+    <Action title="Start manual estimate with blank work items" secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>3 · Review quantities and prices</Text>
-    <Text style={styles.hint}>{aiConnected?'AI interpretation received. ':'Manual estimate. '}Rates start at $0 until verified. The contractor approves every line.</Text>
+    <Text style={styles.hint}>{aiConnected?'AI interpretation received. ':'Draft estimate from dictated work or manual entry. '}Offline planning rates are illustrative, not verified supplier quotes. Review quantities and every rate.</Text>
     {project.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
      <Text style={styles.lineNumber}>WORK ITEM {i+1}</Text>
      <Input label="English customer description" value={line.description_en} onChangeText={x=>setLine(i,{description_en:x})}/>
@@ -111,7 +121,8 @@ export default function App(){
     <Action title="+ Add work item" secondary onPress={addLine}/>
     <Input label="Not included (one per line)" multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label="Future work (not part of this estimate)" multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
-    {project.unknowns.length>0&&<Text style={styles.notice}>Confirm before pricing: {project.unknowns.join('; ')}</Text>}
+    {project.unknowns.length>0&&<Text style={styles.notice}>Planning estimate — confirm before pricing: {project.unknowns.join('; ')}</Text>}
+    <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label="Overhead %" number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Profit %" number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     <Text style={styles.total}>Estimated total: {money(total.total)}</Text>
     <Action title="Next · Customer estimate" onPress={()=>setStage(3)}/>
@@ -126,7 +137,7 @@ export default function App(){
     <Action title={busy?'Creating PDF...':'Create & share customer PDF'} disabled={busy} onPress={sharePdf}/>
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
    </View>}
-   <Text style={styles.footer}>Pilot · Native voice transcription requires a development build. Keyboard dictation works in Expo Go. AI estimation still requires the backend. No cloud save or live supplier pricing yet.</Text>
+   <Text style={styles.footer}>Pilot · Use the iPhone keyboard microphone for dictation. Offline estimates use editable planning allowances. Advanced AI requires the secure backend. No cloud save or verified supplier pricing yet.</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
 }
