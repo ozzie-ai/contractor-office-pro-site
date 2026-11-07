@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
 import ts from 'typescript';
 
 const file=path.resolve('src/localEstimate.ts');
@@ -10,7 +11,7 @@ const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{
  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
 }).outputText;
 const module={exports:{}};
-vm.runInNewContext(js,{module,exports:module.exports,require,console});
+vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url),console});
 const {localEstimate}=module.exports;
 const find=(r,id)=>r.lines.find(x=>x.id==='local-'+id);
 
