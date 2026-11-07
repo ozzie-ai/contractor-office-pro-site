@@ -23,7 +23,8 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
  const all=dims(s),shower=has(s,showerRe),bathroom=has(s,roomRe);
  const showerDim=shower?near(s,all,showerRe):undefined;
- const roomDim=near(s,all,roomRe)||(all.length===1&&!showerDim?all[0]:undefined);
+ const roomCandidate=near(s,all,roomRe)||(all.length===1&&!showerDim?all[0]:undefined);
+ const roomDim=roomCandidate===showerDim?undefined:roomCandidate;
  const roomArea=roomDim?roomDim.a*roomDim.b:0;
  const tub=has(s,/\b(tina|bathtub|tub|banera)\b/);
  const demo=has(s,/\b(demoler|demolicion|demolition|remove|remover|quitar|retirar|demolish|sacar)\b/);
