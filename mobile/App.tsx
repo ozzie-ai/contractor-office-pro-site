@@ -1,4 +1,4 @@
-import React,{useEffect,useState} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Image,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,7 +7,7 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
-import {Language,Project,Trade,TRADES,EstimateLine,Interpretation,mapInterpretation,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20};
@@ -26,11 +26,11 @@ export default function App(){
  const [loaded,setLoaded]=useState(false);
  const [saveStatus,setSaveStatus]=useState('');
  const [wallHeight,setWallHeight]=useState('');
+ const [shareDone,setShareDone]=useState(false);
+ const scrollRef=useRef<ScrollView>(null);
 
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
- const [apiUrl,setApiUrl]=useState('');
- const [betaToken,setBetaToken]=useState('');
  const [busy,setBusy]=useState(false);
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
@@ -62,26 +62,46 @@ export default function App(){
   },650);
   return ()=>clearTimeout(t);
  },[project,photos,stage,activeJobId,loaded]);
- const saveCurrent=()=>{
-  if(!hasJobContent(project,photos))return;
+ const saveCurrent=(showConfirmation=false):boolean=>{
+  if(!hasJobContent(project,photos)){
+   setSaveStatus('Add a job description or customer before saving.');
+   if(showConfirmation)Alert.alert('Nothing to save','Enter a job description or customer to start.');
+   return true;
+  }
   try{
    saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project,photos,stage});
-   setSavedJobs(readStore().jobs);
-   setSaveStatus('Saved on this iPhone');
-  }catch(e){setSaveStatus('Save failed — check available phone storage');Alert.alert('Save failed','Unable to store the job on this iPhone.');}
+   const disk=readStore();
+   const confirmed=disk.jobs.some(j=>j.id===activeJobId&&j.project.description===project.description&&j.project.lines.length===project.lines.length);
+   if(!confirmed)throw new Error('Could not verify saved data.');
+   setSavedJobs(disk.jobs);
+   setSaveStatus('✓ Saved locally · '+new Date().toLocaleTimeString());
+   if(showConfirmation)Alert.alert('Job saved / Trabajo guardado','You can reopen this job under My Jobs / Mis trabajos.');
+   return true;
+  }catch(e){
+   setSaveStatus('Save failed — job NOT confirmed.');
+   Alert.alert('Save failed','Could not verify this job was saved on your iPhone. Keep this job open.');
+   console.warn('Job save failed',e);
+   return false;
+  }
+ };
+ const goToMyJobs=()=>{
+  saveCurrent();
+  scrollRef.current?.scrollTo({y:0,animated:true});
  };
  const openSaved=(job:SavedJob)=>{
-  saveCurrent();
+  if(!saveCurrent())return;
   setActiveJobId(job.id);
   setProject(job.project);
   setPhotos(job.photos);
   setStage(job.stage);
   setAiConnected(false);
   makeActive(job.id);
+  setShareDone(false);
   setSaveStatus('Opened saved job');
+  scrollRef.current?.scrollTo({y:0,animated:true});
  };
  const startNewJob=()=>{
-  saveCurrent();
+  if(!saveCurrent())return;
   const id=newJobId();
   setActiveJobId(id);
   setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[]});
@@ -90,7 +110,9 @@ export default function App(){
   setAiConnected(false);
   setInfo('');
   makeActive(null);
+  setShareDone(false);
   setSaveStatus('New job — ready to dictate');
+  scrollRef.current?.scrollTo({y:0,animated:true});
  };
 
  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
@@ -132,38 +154,21 @@ export default function App(){
   setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
   setStage(2);
  };
- const interpret=async()=>{
-  if(project.description.trim().length<10){Alert.alert('Describe the job','Add a short description before using the AI interpreter.');return;}
-  if(!apiUrl.trim()||!betaToken.trim()){setInfo('AI is not connected yet. You can still enter and price work items manually. Derek can configure the secure endpoint.');return;}
-  if(!/^https:\/\//i.test(apiUrl)||!apiUrl.endsWith('/api/interpret')){setInfo('Enter an HTTPS endpoint ending in /api/interpret.');return;}
-  setBusy(true);setInfo('');
-  try{
-   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),30000);
-   let response:Response;
-   try{response=await fetch(apiUrl,{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json','X-Beta-Access':betaToken},body:JSON.stringify({description:project.description})});}
-   finally{clearTimeout(timer)}
-   const body=await response.json();
-   if(!response.ok)throw new Error(body.error||'AI service error');
-   const parsed:Interpretation=body.interpretation;
-   if(!parsed||!Array.isArray(parsed.tasks))throw new Error('Invalid AI interpretation');
-   const mapped=mapInterpretation(parsed);
-   patch({...mapped});
-   setAiConnected(true);setStage(2);setInfo('AI organized the scope. Review every quantity, enter your prices, and confirm exclusions.');
-  }catch(e){setInfo('AI connection failed: '+(e instanceof Error?e.message:'Unknown error')+'. Your job notes are still on this phone.');}
-  finally{setBusy(false)}
- };
  const sharePdf=async()=>{
   const readiness=estimateReadiness(project);
   if(!readiness.ready){
    Alert.alert('Estimate is incomplete','Finish the missing quantities and prices before exporting. '+readiness.issues.slice(0,2).join(' '),[{text:'Review work items',onPress:()=>setStage(2)}]);
    return;
   }
-  saveCurrent();
+  if(!saveCurrent())return;
   setBusy(true);
   try{
    const pdf=await Print.printToFileAsync({html:proposalHtml(project)});
-   if(await Sharing.isAvailableAsync())await Sharing.shareAsync(pdf.uri,{mimeType:'application/pdf',UTI:'com.adobe.pdf',dialogTitle:'Share Contractor Office Pro Estimate'});
-   else Alert.alert('Sharing unavailable','PDF was generated but sharing is not available on this device.');
+   if(await Sharing.isAvailableAsync()){
+    await Sharing.shareAsync(pdf.uri,{mimeType:'application/pdf',UTI:'com.adobe.pdf',dialogTitle:'Share Contractor Office Pro Estimate'});
+    setShareDone(true);
+    setSaveStatus('✓ Job saved · Share sheet closed');
+   }else Alert.alert('Sharing unavailable','PDF was generated but sharing is not available on this device.');
   }catch(e){Alert.alert('PDF export','Could not create or share the estimate.')}
   finally{setBusy(false)}
  };
@@ -171,15 +176,15 @@ export default function App(){
  const readiness=estimateReadiness(project);
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
-  <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+  <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO · MOBILE PILOT</Text>
    <Text style={styles.title}>You Build.{'\n'}We Handle the Office.</Text>
    <View style={styles.card}>
     <Text style={styles.h2}>My Jobs / Mis trabajos</Text>
-    <Text style={styles.hint}>Work is saved on this iPhone as you edit. Open any recent job to continue; no internet required.</Text>
+    <Text style={styles.hint}>Save a job and return to it later. Drafts are stored on this iPhone, not in the cloud.</Text>
     <Text style={styles.hint}>{saveStatus||'Local drafts · Not synced to the cloud'}</Text>
     <View style={styles.row}>
-     <View style={{flex:1}}><Action title="Save now / Guardar" secondary onPress={saveCurrent}/></View>
+     <View style={{flex:1}}><Action title="Save now / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
      <View style={{flex:1}}><Action title="+ New job / Nuevo" onPress={startNewJob}/></View>
     </View>
     {savedJobs.length===0?<Text style={styles.hint}>No saved jobs yet. Dictate your first job below.</Text>:
@@ -189,7 +194,7 @@ export default function App(){
      <Text style={{color:PALETTE.accent,fontWeight:'700'}}>Open / Continuar</Text>
     </Pressable>)}
    </View>
-   <View style={styles.steps}>{['Job','AI','Price','Send'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
+   <View style={styles.steps}>{['Job','Scope','Price','Send'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
     <Text style={styles.h2}>1 · Start a job</Text>
     <Text style={styles.hint}>Choose the trade, describe the work in Spanish or English, and add site photos.</Text>
@@ -204,14 +209,10 @@ export default function App(){
     <Action title="Next · Understand the job" onPress={()=>setStage(1)}/>
    </View>}
    {stage===1&&<View style={styles.card}>
-    <Text style={styles.h2}>2 · AI interprets the job</Text>
-    <Text style={styles.hint}>No AI connection needed to create a preliminary estimate from your dictated description. Choose the offline option below. For advanced AI interpretation, a separate secure backend is required.</Text>
-    <Input label="Backend URL (configured by Derek)" value={apiUrl} onChangeText={setApiUrl} placeholder="https://your-service.vercel.app/api/interpret"/>
-    <Input label="Private beta access code (not OpenAI key)" secure value={betaToken} onChangeText={setBetaToken} placeholder="Code provided by the project developer"/>
-    <Text style={styles.hint}>This pilot uses a temporary tester code. A public paid version will require real user accounts and usage limits.</Text>
-    <Action title={busy?'Analyzing...':'Interpret with AI'} onPress={interpret} disabled={busy}/>
-    <Action title="Create draft estimate from my description (offline)" onPress={createLocalDraft}/>
-    <Action title="Start manual estimate with blank work items" secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
+    <Text style={styles.h2}>2 · Prepare the scope / Preparar trabajo</Text>
+    <Text style={styles.hint}>Your dictated notes become editable work items. No backend address, developer code, or AI account is needed for this offline estimate.</Text>
+    <Action title="Build work items from dictation / Crear partidas" onPress={createLocalDraft}/>
+    <Action title="Start with blank items / Agregar manualmente" secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
@@ -255,9 +256,20 @@ export default function App(){
       <Action title="Review missing quantities / Revisar cantidades" secondary onPress={()=>setStage(2)}/>
      </View>}
     <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={sharePdf}/>
+    {shareDone&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>PDF prepared / PDF preparado</Text>
+     <Text style={styles.hint}>The sharing window closed. The job is saved on this phone. Please confirm delivery in the destination you selected.</Text>
+     <Action title="Back to My Jobs / Mis trabajos" onPress={goToMyJobs}/>
+     <Action title="+ Start another job / Nuevo trabajo" secondary onPress={startNewJob}/>
+     <Action title="Share PDF again / Compartir otra vez" secondary onPress={sharePdf}/>
+    </View>}
+    {!shareDone&&<View style={styles.row}>
+     <View style={{flex:1}}><Action title="Save job / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
+     <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
+    </View>}
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
    </View>}
-   <Text style={styles.footer}>Pilot · Drafts and copied job photos are saved on this phone only. Uninstalling the app deletes local drafts. Keyboard dictation works without the AI backend. Pricing allowances are not verified supplier bids.</Text>
+   <Text style={styles.footer}>Drafts are stored on this phone only. Uninstalling removes local drafts. Keyboard dictation works offline. Planning rates are editable and not verified supplier bids.</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
 }
