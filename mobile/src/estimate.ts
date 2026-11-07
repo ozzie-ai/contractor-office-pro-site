@@ -63,7 +63,7 @@ export function proposalHtml(p:Project){
  const rows=p.lines.map(x=>'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
- 'body{font-family:Arial,sans-serif;color:#173b42;padding:28px;line-height:1.42}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:45px}'+
+ 'body{font-family:Arial,sans-serif;color:#173b42;padding:28px;line-height:1.42}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:45px}tr{break-inside:avoid;page-break-inside:avoid}'+
  '</style></head><body><h1>'+tr.title+'</h1>'+
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+tr.location+':</b> '+esc(p.city||'—')+'</p>'+
@@ -71,6 +71,6 @@ export function proposalHtml(p:Project){
  '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th><th>'+tr.rate+'</th><th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
- '<section style="margin-top:22px">'+line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
+ '<section class="summary">'+line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
  '<p class="notice">'+tr.notice+'</p><div class="sign">'+tr.signature+': ______________________________ &nbsp; '+tr.date+': ______________</div></body></html>';
 }
