@@ -54,7 +54,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const oldMirror=hasRemovalVerb&&has(demoSection,/\b(espejo|mirror)\b/);
  const lightRecessed=has(s,/\b(recessed|empotrada|empotrado|empotrad[oa]|can light)\b/);
  const gfci=has(s,/\b(gfci|gfi|ground fault)\b/);
- const replacingGfci=gfci&&has(s,/\b(reemplazar|reemplazo|sustituir|cambiar|replace|instead|en lugar de)\b/);
+ const replacingGfci=gfci&&has(s,/\b(reemplazar|reemplazo|sustituir|cambiar|replace|instead|en lugar de(?:l)?)\b/);
  const tileToCeiling=has(s,/\b(hasta (?:el )?(?:techo|ceiling)|to the ceiling|up to the ceiling|llegan hasta (?:el )?(?:techo|ceiling))\b/);
  if(demo&&tub)lines.push(line('tub-remove','Remove and dispose of existing bathtub','Retirar y desechar tina existente',1,'job',650));
  else if(demo&&bathroom)lines.push(line('bath-demo','Bathroom demolition and debris removal (confirm scope)','Demolición y retiro de escombros del baño (confirmar alcance)',1,'job',850));
