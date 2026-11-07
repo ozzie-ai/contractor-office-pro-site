@@ -56,3 +56,15 @@ test('new toilet at same position must not be treated as reinstalling existing t
  const r=localEstimate('Remove old toilet. Install new toilet in same position.','remodel');
  assert.match(find(r,'toilet').description_en,/new toilet/);
 });
+
+test('latest voice dictation includes both GFCI and recessed light, and leaves unknown wall height pending',()=>{
+ const t='OK tengo la remodelacion de un pequeno bano de 7 por 5 donde voy a eliminar o demoler una tina el sink con el vanity de 36 pulgadas voy a remover el espejo y tambien el toilet. Tambien voy a remover el actual piso del bano. Luego voy a instalar un nuevo shower de 3 por 5 pegado a la pared donde las losas van a llegar hasta el ceiling y va a llevar una puerta de vidrio. El piso va a ser nuevo de losa voy a instalar un nuevo toilet un nuevo vanity de 36 pulgadas con un solo bowl y un espejo de luz. Tambien voy a instalar un recessed light y un GFCI en lugar del outlet normal que existe. voy a pintar las paredes que queden libres de losa y el ceiling de color blanco.';
+ const r=localEstimate(t,'remodel');
+ for(const id of ['gfci','recessed-light','floor','floor-demo','paint-walls','paint-ceiling','wall-tile','mirror'])assert.ok(find(r,id),'Missing '+id);
+ assert.equal(find(r,'floor').quantity,35);
+ assert.equal(find(r,'wall-tile').quantity,0);
+ assert.equal(r.lines.filter(x=>x.id==='local-vanity').length,1);
+ assert.match(find(r,'gfci').description_en,/Replace existing/);
+ assert.match(find(r,'paint-ceiling').description_en,/white/);
+ assert.match(find(r,'paint-walls').description_en,/white/);
+});
