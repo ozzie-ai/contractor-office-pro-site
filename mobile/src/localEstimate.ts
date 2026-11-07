@@ -52,7 +52,10 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const oldToilet=hasRemovalVerb&&has(demoSection,/\b(toilet|inodoro|sanitario|retrete)\b/);
  const oldVanity=hasRemovalVerb&&has(demoSection,/\b(vanity|vanitorio)\b/);
  const oldMirror=hasRemovalVerb&&has(demoSection,/\b(espejo|mirror)\b/);
- const lightRecessed=has(s,/\b(recessed|empotrada|empotrado|empotrad[oa]|can light)\b/);
+ const lightRecessed=has(s,/\b(recessed\s*(?:light|lighting|luz)?|luz\s*empotrada|foco\s*empotrado|can light|downlight)\b/);
+ const gfci=has(s,/\b(gfci|gfi|ground.fault)\b/);
+ const gfciReplacement=gfci&&has(s,/\b(reemplaz\w*|cambiar|reponer|sustituir|replace|instead of|en lugar de)\b/);
+ const whitePaint=has(s,/\b(blanco|blanca|white)\b/);
  const tileToCeiling=has(s,/\b(hasta el techo|to the ceiling|hasta techo)\b/);
  if(demo&&tub)lines.push(line('tub-remove','Remove and dispose of existing bathtub','Retirar y desechar tina existente',1,'job',650));
  else if(demo&&bathroom)lines.push(line('bath-demo','Bathroom demolition and debris removal (confirm scope)','Demolición y retiro de escombros del baño (confirmar alcance)',1,'job',850));
@@ -95,8 +98,12 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   lines.push(line('mirror',(light?'Supply and install illuminated mirror':'Supply and install mirror')+mirrorSize,
    (light?'Suministrar e instalar espejo iluminado':'Suministrar e instalar espejo')+mirrorSize,1,'job',375));
  }
- if(lightRecessed)lines.push(line('recessed-light','Supply and install new bathroom recessed ceiling light (confirm circuit and wiring)',
-  'Suministrar e instalar luz empotrada nueva en techo de baño (confirmar cableado)',1,'job',325));
+ if(lightRecessed)lines.push(line('recessed-light','Supply and install new recessed ceiling light (verify existing circuit and wiring)',
+  'Suministrar e instalar lámpara empotrada nueva en techo (verificar circuito y cableado)',1,'job',325));
+ if(gfci)lines.push(line('gfci',
+  gfciReplacement?'Replace existing bathroom receptacle with GFCI outlet':'Install GFCI bathroom receptacle (verify existing wiring)',
+  gfciReplacement?'Reemplazar tomacorriente existente por uno GFCI':'Instalar tomacorriente GFCI (verificar cableado existente)',
+  1,'job',175));
  if(floor){
   const detail=roomDim?' ('+size(roomDim)+' = '+roomArea+' sq ft)':' (room dimensions to confirm)';
   lines.push(line('floor','Replace bathroom floor tile'+detail,'Reemplazar loseta de piso de baño'+detail,roomArea,'sq ft',22));
@@ -104,15 +111,16 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  }
  if(paint){
   const paintWalls=has(s,/\b(paredes|walls|pared|wall)\b/),paintCeiling=has(s,/\b(ceiling|techo|cielo raso|cielorraso)\b/);
-  if(paintWalls)lines.push(line('paint-walls','Prepare and paint remaining untiled bathroom walls (confirm square footage)',
-    'Preparar y pintar paredes sin loseta (confirmar área)',1,'job',350));
-  if(paintCeiling)lines.push(line('paint-ceiling','Prepare and paint bathroom ceiling','Preparar y pintar techo del baño',1,'job',175));
+  if(paintWalls)lines.push(line('paint-walls','Prepare and paint remaining untiled bathroom walls'+(whitePaint?' white':'' )+' (confirm square footage)',
+    'Preparar y pintar paredes sin loseta'+(whitePaint?' de blanco':'')+' (confirmar área)',1,'job',350));
+  if(paintCeiling)lines.push(line('paint-ceiling','Prepare and paint bathroom ceiling'+(whitePaint?' white':''),'Preparar y pintar techo del baño'+(whitePaint?' de blanco':''),1,'job',175));
   if(!paintWalls&&!paintCeiling)lines.push(line('paint','Prepare and paint bathroom (scope to confirm)','Preparar y pintar baño (confirmar alcance)',1,'job',475));
  }
  if(plumbing&&!shower)lines.push(line('plumbing','Bathroom plumbing work (confirm scope)','Trabajo de plomería de baño (confirmar alcance)',1,'job',700));
- if(electrical&&!lightRecessed&&!mirror)lines.push(line('electrical','Electrical/lighting work (confirm scope)','Electricidad o iluminación (confirmar alcance)',1,'job',550));
+ if(electrical&&!lightRecessed&&!gfci&&!mirror)lines.push(line('electrical','Electrical/lighting work (confirm scope)','Electricidad o iluminación (confirmar alcance)',1,'job',550));
  if(roomArea)unknowns.push('Bathroom floor '+roomArea+' sq ft based on '+size(roomDim!)+'; verify dimensions and units.');
  if(tileToCeiling&&!height)unknowns.push('Shower tile reaches ceiling; confirm measured wall height before pricing.');
+ if(gfci)unknowns.push('Verify GFCI location, circuit protection and wiring before final pricing.');
  if(!lines.length){
   lines.push(line('unclassified','Review dictated scope and define work items','Revisar descripción dictada y definir partidas',1,'job',0));
   unknowns.push('No supported remodeling tasks recognized. Add line items manually.');
