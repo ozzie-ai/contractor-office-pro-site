@@ -25,6 +25,7 @@ export default function App(){
  const [savedJobs,setSavedJobs]=useState<SavedJob[]>([]);
  const [loaded,setLoaded]=useState(false);
  const [saveStatus,setSaveStatus]=useState('');
+ const [wallHeight,setWallHeight]=useState('');
 
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
@@ -106,6 +107,22 @@ export default function App(){
     setPhotos(current=>[...current,...uris].slice(0,20));
    }
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
+ };
+ const applyWallHeight=()=>{
+  const height=Number(wallHeight);
+  if(!Number.isFinite(height)||height<5||height>15){
+   Alert.alert('Check measurement','Enter the actual shower wall height in feet (between 5 and 15).');
+   return;
+  }
+  const description=project.description+'\nShower walls are '+height+' feet high.';
+  const draft=localEstimate(description,project.trade);
+  const updated=draft.lines.map(item=>({
+   ...item,
+   rate:project.lines.find(previous=>previous.id===item.id)?.rate??item.rate
+  }));
+  patch({description,lines:updated,unknowns:draft.unknowns});
+  setWallHeight('');
+  setInfo('Shower wall area recalculated. Review the updated quantity and all rates.');
  };
  const createLocalDraft=()=>{
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
@@ -208,6 +225,12 @@ export default function App(){
     <Input label="Not included (one per line)" multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label="Future work (not part of this estimate)" multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     {project.unknowns.length>0&&<Text style={styles.notice}>Planning estimate — confirm before pricing: {project.unknowns.join('; ')}</Text>}
+    {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Missing measurement / Falta medida</Text>
+      <Text style={styles.hint}>How high are the shower walls? Enter measured feet to calculate tile area. No default height is assumed.</Text>
+      <Input label="Shower wall height (ft) / Altura de paredes (pies)" value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
+      <Action title="Apply height & update estimate" onPress={applyWallHeight}/>
+     </View>}
     <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label="Overhead %" number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Profit %" number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     <Text style={styles.total}>Estimated total: {money(total.total)}</Text>
