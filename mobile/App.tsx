@@ -16,7 +16,7 @@ import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
-const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'weekly',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:3,bathrooms:2,livingRooms:1,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
+const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'once',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:0,bathrooms:0,livingRooms:0,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
 type Stage=0|1|2|3|4;
 
@@ -60,7 +60,7 @@ export default function App(){
   // Existing saved jobs are kept in My Jobs and opened only by tapping one.
   const id=newJobId();
   setActiveJobId(id);
-  setProject({...initial,contractor:profile.name,language:profile.language,overheadPct:profile.overheadPct,profitPct:profile.profitPct,trade:profile.enabledTrades[0]||'electrical'});
+  setProject({...initial,contractor:profile.name,language:'en',overheadPct:profile.overheadPct,profitPct:profile.profitPct,trade:profile.enabledTrades[0]||'electrical'});
   setPhotos([]);
   setStage(0);
   addressRef.current='';
@@ -115,7 +115,7 @@ export default function App(){
  const openSaved=(job:SavedJob)=>{
   if(!saveCurrent())return;
   setActiveJobId(job.id);
-  setProject(job.project);
+  setProject({...job.project,language:'en'});
   addressRef.current=job.project.address||'';
   setPhotos(job.photos);
   setStage(job.stage);
@@ -131,7 +131,7 @@ export default function App(){
   if(!saveCurrent())return;
   const id=newJobId();
   setActiveJobId(id);
-  setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[],contractor:businessProfile.name,language:businessProfile.language,overheadPct:businessProfile.overheadPct,profitPct:businessProfile.profitPct,trade:businessProfile.enabledTrades[0]});
+  setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[],contractor:businessProfile.name,language:'en',overheadPct:businessProfile.overheadPct,profitPct:businessProfile.profitPct,trade:businessProfile.enabledTrades[0]});
   setPhotos([]);
   addressRef.current='';
   setStage(0);
@@ -149,7 +149,7 @@ export default function App(){
  const tr=(en:string,es:string)=>businessProfile.language==='es'?es:en;
  const chooseLanguage=(language:Language)=>{
   const updated={...businessProfile,language};
-  try{saveProfile(updated);setBusinessProfile(updated);patch({language});}
+  try{saveProfile(updated);setBusinessProfile(updated);}
   catch{Alert.alert('Language','Could not save your language preference.');}
  };
 
@@ -234,8 +234,16 @@ export default function App(){
  const createLocalDraft=()=>{
   if(project.trade==='cleaning'){
    const details=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
-   if(details.type==='post_construction'&&details.areaSqFt<=0){
-    Alert.alert('Need job size / Falta área','Enter an approximate or measured square-foot area for post-construction cleaning before preparing a quote.');
+   if(details.areaSqFt<=0){
+    Alert.alert(tr('Missing cleaning area','Falta el área de limpieza'),tr('Enter approximate or measured square footage. The estimate cannot use a generic 10-hour price.','Ingresa los pies cuadrados estimados o medidos. No se puede calcular con un precio genérico de 10 horas.'));
+    setStage(0);return;
+   }
+   if(details.bedrooms+details.bathrooms+details.livingRooms<=0){
+    Alert.alert(tr('Confirm the rooms','Confirma las habitaciones'),tr('Enter the actual number of rooms. The app no longer assumes 3 bedrooms and 2 bathrooms.','Ingresa las habitaciones reales. Ya no se suponen 3 dormitorios y 2 baños.'));
+    setStage(0);return;
+   }
+   if(/\b(post[- ]?construction|after (?:the )?(?:construction|remodel|renovation)|construction dust|despu[eé]s de (?:la )?(?:obra|construcci[oó]n)|post[- ]?construcci[oó]n|polvo de (?:obra|construcci[oó]n))\b/i.test(project.description)&&details.type!=='post_construction'){
+    Alert.alert(tr('Check cleaning type','Revisa el tipo de limpieza'),tr('Your notes mention construction cleaning, but Residential is selected. Select Post-construction so the area and dust level affect labor hours.','Tus notas mencionan limpieza de obra, pero elegiste Residencial. Selecciona Después de obra para que el área y polvo se incluyan en las horas.'));
     setStage(0);return;
    }
    if(details.type==='post_construction'&&!(details.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length){
@@ -259,8 +267,8 @@ export default function App(){
  };
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote=currentCleaningProject(project);
-  if(quote.trade==='cleaning'&&quote.cleaning?.type==='post_construction'&&(!quote.cleaning.areaSqFt||!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length)){
-   Alert.alert('Missing cleaning details','Enter square footage and select the work included before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
+  if(quote.trade==='cleaning'&&quote.cleaning&&(!quote.cleaning.areaSqFt||quote.cleaning.bedrooms+quote.cleaning.bathrooms+quote.cleaning.livingRooms<=0||(quote.cleaning.type==='post_construction'&&!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length))){
+   Alert.alert('Missing cleaning details','Confirm square footage, room counts and included work before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
    return;
   }
   const readiness=estimateReadiness(quote);
@@ -362,14 +370,14 @@ export default function App(){
      </View>
      <Text style={styles.label}>{tr("Frequency","Frecuencia")}</Text>
      <View style={styles.tradeGrid}>
-      {([{id:'once',en:'One time'},{id:'weekly',en:'Weekly'},{id:'biweekly',en:'Every 2 weeks'},{id:'twice_monthly',en:'Twice a month'},{id:'monthly',en:'Monthly'}] as {id:CleaningFrequency;en:string}[]).map(item=><Pressable key={item.id} onPress={()=>patchCleaning({frequency:item.id})} style={[styles.trade,(project.cleaning?.frequency||'weekly')===item.id&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.frequency||'weekly')===item.id&&{color:PALETTE.white}]}>{businessProfile.language==='es'?({once:'Una vez',weekly:'Semanal',biweekly:'Cada 2 semanas',twice_monthly:'Dos veces al mes',monthly:'Mensual'} as Record<CleaningFrequency,string>)[item.id]:item.en}</Text></Pressable>)}
+      {([{id:'once',en:'One time'},{id:'weekly',en:'Weekly'},{id:'biweekly',en:'Every 2 weeks'},{id:'twice_monthly',en:'Twice a month'},{id:'monthly',en:'Monthly'}] as {id:CleaningFrequency;en:string}[]).map(item=><Pressable key={item.id} onPress={()=>patchCleaning({frequency:item.id})} style={[styles.trade,(project.cleaning?.frequency||'once')===item.id&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.frequency||'once')===item.id&&{color:PALETTE.white}]}>{businessProfile.language==='es'?({once:'Una vez',weekly:'Semanal',biweekly:'Cada 2 semanas',twice_monthly:'Dos veces al mes',monthly:'Mensual'} as Record<CleaningFrequency,string>)[item.id]:item.en}</Text></Pressable>)}
      </View>
      <View style={styles.row}>
-      <View style={{flex:1}}><Input label={tr("Bedrooms","Habitaciones")} number value={String(project.cleaning?.bedrooms??3)} onChangeText={x=>patchCleaning({bedrooms:cleaningInput(x)})}/></View>
-      <View style={{flex:1}}><Input label={tr("Bathrooms","Baños")} number value={String(project.cleaning?.bathrooms??2)} onChangeText={x=>patchCleaning({bathrooms:cleaningInput(x)})}/></View>
-      <View style={{flex:1}}><Input label={tr("Living rooms","Salas")} number value={String(project.cleaning?.livingRooms??1)} onChangeText={x=>patchCleaning({livingRooms:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label={tr("Bedrooms","Habitaciones")} number value={String(project.cleaning?.bedrooms??0)} onChangeText={x=>patchCleaning({bedrooms:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label={tr("Bathrooms","Baños")} number value={String(project.cleaning?.bathrooms??0)} onChangeText={x=>patchCleaning({bathrooms:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label={tr("Living rooms","Salas")} number value={String(project.cleaning?.livingRooms??0)} onChangeText={x=>patchCleaning({livingRooms:cleaningInput(x)})}/></View>
      </View>
-     <Input label={tr("Square feet (optional)","Pies cuadrados (opcional)")} number value={String(project.cleaning?.areaSqFt??0)} onChangeText={x=>patchCleaning({areaSqFt:cleaningInput(x)})}/>
+     <Input label={tr("Area to clean (sq ft) — required","Área por limpiar (pies²) — obligatoria")} number value={String(project.cleaning?.areaSqFt??0)} onChangeText={x=>patchCleaning({areaSqFt:cleaningInput(x)})}/>
      <View style={styles.row}>
       <View style={{flex:1}}><Input label={tr("Workers","Personas")} number value={String(project.cleaning?.workers??2)} onChangeText={x=>patchCleaning({workers:cleaningInput(x)})}/></View>
       <View style={{flex:1}}><Input label={tr("First visit hours per worker","Horas por persona (primera visita)")} number value={String(project.cleaning?.firstHoursPerWorker??5)} onChangeText={x=>patchCleaning({firstHoursPerWorker:cleaningInput(x)})}/></View>
@@ -410,7 +418,7 @@ export default function App(){
        patchCleaning({firstHoursPerWorker:Math.ceil(recommendedPostConstructionWorkerHours(c)/Math.max(1,c.workers))});
       }}/>
      </View>}
-    <Text style={styles.hint}>{tr("Labor and supply amounts are editable planning costs.","Las horas y costos son estimados editables.")}</Text>
+    <Text style={styles.hint}>{tr('Area and rooms must be confirmed before pricing. Dictation is private and is not automatically interpreted for all cleaning details.','Confirma el área y habitaciones antes de calcular. El dictado es privado y aún no interpreta todos los detalles automáticamente.')}</Text>
     </View>}
     <SpeechInput language={businessProfile.language} description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
@@ -476,8 +484,9 @@ export default function App(){
    {stage===3&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("4 · Customer proposal","4 · Propuesta al cliente")}</Text>
     <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
-    <Text style={styles.hint}>{tr('Proposal language','Idioma de la propuesta')}: {project.language==='es'?'Español':'English'}</Text>
-    <Action title={tr('Change proposal language','Cambiar idioma de propuesta')} secondary onPress={()=>patch({language:project.language==='en'?'es':'en'})}/>
+    <Text style={styles.label}>{tr('Customer PDF language','Idioma del PDF del cliente')}</Text>
+    <Text style={styles.hint}>{tr('Independent of your app language. Default: English.','Independiente del idioma de la aplicación. Predeterminado: inglés.')}</Text>
+    <View style={styles.row}><View style={{flex:1}}><Action title="English PDF" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="PDF Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
     <Text style={styles.total}>{tr('Estimated price','Precio estimado')}: {money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
