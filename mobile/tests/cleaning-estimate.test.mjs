@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
 const load=(name)=>{const filename=path.resolve('src/'+name+'.ts');const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const module={exports:{}};vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url)});return module.exports;};
-const {priceCleaning,cleaningToProject}=load('cleaningEstimate');
+const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours}=load('cleaningEstimate');
 const {proposalHtml,totals,TRADES,recurringCleaningPrice}=load('estimate');
 const c={type:'residential',frequency:'twice_monthly',bedrooms:3,bathrooms:2,livingRooms:2,areaSqFt:1800,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour:25,firstSupplies:25,repeatSupplies:15,travelPerVisit:15};
 test('cleaning calculates first deep clean and repeat visit separately',()=>{
@@ -62,4 +62,25 @@ test('recurring cleaning proposal names monthly frequency and price per visit',(
  assert.ok(html.includes('Twice monthly'));
  assert.ok(html.includes('Price per subsequent visit:'));
  assert.ok(html.includes('237.60'));
+});
+
+test('cleaning customer PDF hides direct costs, overhead and profit but shows final service price',()=>{
+ const priced=cleaningToProject(c,{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',contractor:'Cleaning Co',customer:'Client',city:'Santa Clarita',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const html=proposalHtml(p);
+ assert.ok(html.includes('$382.80'));
+ assert.equal(html.includes('$290.00'),false);
+ assert.equal(html.includes('Overhead'),false);
+ assert.equal(html.includes('Profit'),false);
+ assert.equal(html.includes('10%'),false);
+ assert.equal(html.includes('worker(s) × 5 hours'),false);
+});
+test('heavy construction dust produces a detailed scope and a labor time review',()=>{
+ const heavy={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:1800,postConstructionTasks:['dust','cabinets','floors']};
+ const priced=priceCleaning(heavy,10,20);
+ assert.equal(recommendedPostConstructionWorkerHours(heavy),18);
+ assert.ok(priced.unknowns.some(x=>x.includes('REVIEW LABOR HOURS')));
+ assert.match(priced.lines[0].description_en,/Fine construction dust removal/);
+ assert.match(priced.lines[0].description_en,/cabinets/);
+ assert.equal(priced.lines[0].description_en.includes('interior windows'),false);
 });

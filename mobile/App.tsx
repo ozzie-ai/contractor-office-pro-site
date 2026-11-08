@@ -9,11 +9,11 @@ import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,Saved
 import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
-import {cleaningToProject} from './src/cleaningEstimate';
+import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
-const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'weekly',bedrooms:3,bathrooms:2,livingRooms:1,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
+const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'weekly',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:3,bathrooms:2,livingRooms:1,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
 type Stage=0|1|2|3|4;
 
@@ -184,6 +184,14 @@ export default function App(){
  const createLocalDraft=()=>{
   if(project.trade==='cleaning'){
    const details=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+   if(details.type==='post_construction'&&details.areaSqFt<=0){
+    Alert.alert('Need job size / Falta área','Enter an approximate or measured square-foot area for post-construction cleaning before preparing a quote.');
+    setStage(0);return;
+   }
+   if(details.type==='post_construction'&&!(details.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length){
+    Alert.alert('Select scope / Seleccionar alcance','Select at least one cleaning task before preparing a quote.');
+    setStage(0);return;
+   }
    try{
     const drafted=cleaningToProject(details,project);
     patch({...drafted,exclusions:[],futureWork:[]});
@@ -306,7 +314,27 @@ export default function App(){
       <View style={{flex:1}}><Input label="Repeat supplies $" number value={String(project.cleaning?.repeatSupplies??15)} onChangeText={x=>patchCleaning({repeatSupplies:cleaningInput(x)})}/></View>
       <View style={{flex:1}}><Input label="Travel per visit $" number value={String(project.cleaning?.travelPerVisit??15)} onChangeText={x=>patchCleaning({travelPerVisit:cleaningInput(x)})}/></View>
      </View>
-     <Text style={styles.hint}>Enter your real crew hours and costs. Starting values are examples, not market prices. First-time and repeat-visit prices are calculated separately.</Text>
+     {project.cleaning?.type==='post_construction'&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Construction dust / Polvo de construcción</Text>
+      <View style={styles.tradeGrid}>
+       {(['light','moderate','heavy'] as const).map(level=><Pressable key={level} onPress={()=>patchCleaning({dustLevel:level})} style={[styles.trade,(project.cleaning?.dustLevel||'moderate')===level&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.dustLevel||'moderate')===level&&{color:PALETTE.white}]}>{level==='light'?'Light / Poco':level==='heavy'?'Heavy / Mucho':'Moderate / Medio'}</Text></Pressable>)}
+      </View>
+      <Text style={styles.h2}>What work is included? / ¿Qué incluye?</Text>
+      {POST_CONSTRUCTION_TASKS.map(task=><Pressable key={task.id} onPress={()=>{
+       const selected=project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS;
+       patchCleaning({postConstructionTasks:selected.includes(task.id)?selected.filter(x=>x!==task.id):[...selected,task.id]});
+      }} style={styles.savedJob}>
+       <Text style={styles.tradeText}>{(project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).includes(task.id)?'☑':'☐'} {task.en}</Text>
+       <Text style={styles.tradeSub}>{task.es}</Text>
+      </Pressable>)}
+      <Text style={styles.notice}>Suggested planning hours for this area and dust level: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} TOTAL worker-hours. Your entered hours: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. This is a planning heuristic, not a verified market rate or time standard.</Text>
+      <Action title="Use suggested hours / Usar horas sugeridas" secondary onPress={()=>{
+       const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+       if(!c.areaSqFt){Alert.alert('Enter square feet','Measure or estimate the cleanable square footage first.');return;}
+       patchCleaning({firstHoursPerWorker:Math.ceil(recommendedPostConstructionWorkerHours(c)/Math.max(1,c.workers))});
+      }}/>
+     </View>}
+    <Text style={styles.hint}>Enter your real crew hours and costs. Starting values are examples, not market prices. First-time and repeat-visit prices are calculated separately.</Text>
     </View>}
     <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title="Take photo" secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title="Choose photos" secondary onPress={()=>addPhoto()}/></View></View>
