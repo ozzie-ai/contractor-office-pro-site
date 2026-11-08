@@ -335,12 +335,12 @@ export default function App(){
        <Text style={styles.tradeSub}>{task.es}</Text>
       </Pressable>)}
       <Text style={styles.notice}>Area/dust-based planning hours: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} total worker-hours. Entered: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. Price automatically uses the larger number unless you explicitly confirm your own site-assessed hours.</Text>
-      <Text style={styles.hint}>Currently priced worker-hours: {project.cleaning?.laborHoursConfirmed?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
+      <Text style={styles.hint}>Currently priced worker-hours: {(project.cleaning?.laborHoursConfirmed&&project.cleaning?.laborHoursVerificationVersion===2)?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
       <Action title="Use my measured hours / Confirmar mis horas" secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        Alert.alert('Confirm site-assessed labor / Confirmar horas','Use '+(c.workers*c.firstHoursPerWorker)+' actual worker-hours for this job instead of the area-based guideline only if you assessed the condition and scope.',[
         {text:'Cancel'},
-        {text:'Confirm measured hours',onPress:()=>patchCleaning({laborHoursConfirmed:true})}
+        {text:'Confirm measured hours',onPress:()=>patchCleaning({laborHoursConfirmed:true,laborHoursVerificationVersion:2})}
        ]);
       }}/>
       <Action title="Use suggested hours / Usar horas sugeridas" secondary onPress={()=>{

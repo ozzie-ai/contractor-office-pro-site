@@ -123,7 +123,7 @@ test('saved cleaning job, on-screen total, and PDF derive same live quote when a
  assert.equal(html.includes('$290.00'),false);
 });
 test('verified alternative worker-hours can override suggested planning hours explicitly',()=>{
- const c2={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:4034,workers:2,firstHoursPerWorker:5,laborHoursConfirmed:true};
+ const c2={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:4034,workers:2,firstHoursPerWorker:5,laborHoursConfirmed:true,laborHoursVerificationVersion:2};
  assert.equal(priceCleaning(c2,10,20).initialBase,290);
 });
 test('changing dust, workers, hours and cost immediately recomputes cleaning quote',()=>{
@@ -141,4 +141,10 @@ test('multiple cleaning work lines still show only one customer bundled total',(
  const final=totals(p).total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  assert.equal(html.split('$'+final).length-1,2); // service row and total, not one price per work item
  assert.ok(html.includes('Special extra cleaning'));
+});
+
+test('old saved low-hours confirmation does not silently authorize outdated price',()=>{
+ const older={...c,type:'post_construction',areaSqFt:4034,dustLevel:'heavy',workers:2,firstHoursPerWorker:5,laborHoursConfirmed:true};
+ assert.equal(priceCleaning(older,10,20).initialPrice,1405.8);
+ assert.ok(priceCleaning(older,10,20).unknowns.some(x=>x.includes('AREA-BASED LABOR APPLIED')));
 });
