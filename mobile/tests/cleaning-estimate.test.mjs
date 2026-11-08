@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
 const load=(name)=>{const filename=path.resolve('src/'+name+'.ts');const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const module={exports:{}};vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url)});return module.exports;};
-const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours}=load('cleaningEstimate');
+const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours,isCleaningQuoteCurrent}=load('cleaningEstimate');
 const {proposalHtml,totals,TRADES,recurringCleaningPrice}=load('estimate');
 const c={type:'residential',frequency:'twice_monthly',bedrooms:3,bathrooms:2,livingRooms:2,areaSqFt:1800,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour:25,firstSupplies:25,repeatSupplies:15,travelPerVisit:15};
 test('cleaning calculates first deep clean and repeat visit separately',()=>{
@@ -83,4 +83,20 @@ test('heavy construction dust produces a detailed scope and a labor time review'
  assert.match(priced.lines[0].description_en,/Fine construction dust removal/);
  assert.match(priced.lines[0].description_en,/cabinets/);
  assert.equal(priced.lines[0].description_en.includes('interior windows'),false);
+});
+
+test('editing area or crew time invalidates an older cleaning PDF quote',()=>{
+ const priced=cleaningToProject({...c,type:'post_construction',areaSqFt:1800},{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',overheadPct:10,profitPct:20};
+ assert.equal(isCleaningQuoteCurrent(p),true);
+ assert.equal(isCleaningQuoteCurrent({...p,cleaning:{...p.cleaning,areaSqFt:4034}}),false);
+ assert.equal(isCleaningQuoteCurrent({...p,cleaning:{...p.cleaning,firstHoursPerWorker:12}}),false);
+ assert.equal(isCleaningQuoteCurrent({...p,overheadPct:15}),false);
+ assert.equal(isCleaningQuoteCurrent({...p,cleaningQuoteSignature:undefined}),false);
+});
+test('recalculating updated square footage refreshes quote signature',()=>{
+ const c2={...c,type:'post_construction',areaSqFt:4034,dustLevel:'heavy',workers:2,firstHoursPerWorker:21};
+ const quote=cleaningToProject(c2,{overheadPct:10,profitPct:20});
+ assert.equal(isCleaningQuoteCurrent({...quote,trade:'cleaning',overheadPct:10,profitPct:20}),true);
+ assert.ok(recommendedPostConstructionWorkerHours(c2)>c.workers*c.firstHoursPerWorker);
 });
