@@ -23,8 +23,8 @@ type Stage=0|1|2|3|4;
 function Action({title,onPress,secondary=false,disabled=false}:{title:string;onPress:()=>void;secondary?:boolean;disabled?:boolean}){
  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,secondary&&styles.buttonSecondary,disabled&&{opacity:.5}]}><Text style={[styles.buttonText,secondary&&{color:PALETTE.ink}]}>{title}</Text></Pressable>;
 }
-function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<React.ElementRef<typeof TextInput>>}){
- return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
+function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef,onEndEditing}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<React.ElementRef<typeof TextInput>>;onEndEditing?:()=>void}){
+ return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} onEndEditing={onEndEditing} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
@@ -41,6 +41,7 @@ export default function App(){
  const [electricalCeilingHeight,setElectricalCeilingHeight]=useState('8');
  const [shareDone,setShareDone]=useState(false);
  const scrollRef=useRef<React.ElementRef<typeof ScrollView>>(null);
+ const addressRef=useRef('');
 
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
@@ -58,6 +59,7 @@ export default function App(){
   if(active){
    setActiveJobId(active.id);
    setProject(active.project);
+   addressRef.current=active.project.address||'';
    setPhotos(active.photos);
    setStage(active.stage);
    setSaveStatus('Previous job restored from this iPhone.');
@@ -110,6 +112,7 @@ export default function App(){
   if(!saveCurrent())return;
   setActiveJobId(job.id);
   setProject(job.project);
+  addressRef.current=job.project.address||'';
   setPhotos(job.photos);
   setStage(job.stage);
   setAiConnected(false);
@@ -124,6 +127,7 @@ export default function App(){
   setActiveJobId(id);
   setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[],contractor:businessProfile.name,language:businessProfile.language,overheadPct:businessProfile.overheadPct,profitPct:businessProfile.profitPct,trade:businessProfile.enabledTrades[0]});
   setPhotos([]);
+  addressRef.current='';
   setStage(0);
   setAiConnected(false);
   setInfo('');
@@ -154,7 +158,7 @@ export default function App(){
   setPropertyBusy(false);
   if(result.status!=='found'){setPropertyMessage(result.message);return;}
   const record=result.property;
-  if(!areaMatchesAddress(record,project.address||'')){
+  if(!areaMatchesAddress(record,addressRef.current)){
    setPropertyMessage('Property address changed. Search again for the new address.');
    return;
   }
@@ -323,7 +327,7 @@ export default function App(){
     <Input label="Contractor or cleaning business / Negocio" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name (pre-filled from profile)"/>
     <Input label="Customer / Cliente" value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
     <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City"/>
-    <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>{patch({address:x,propertyArea:undefined});setPropertyMessage('');}} placeholder="Street address, city, state, ZIP"/>
+    <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>{addressRef.current=x;patch({address:x,propertyArea:undefined});setPropertyMessage('');}} onEndEditing={()=>{if(PROPERTY_LOOKUP_URL&&(project.address||'').trim().length>=12)void lookupProperty();}} placeholder="Street address, city, state, ZIP"/>
     <Action title={propertyBusy?'Looking up address… / Buscando…':'Find property sq ft / Buscar pies cuadrados'} disabled={propertyBusy} secondary onPress={lookupProperty}/>
     {!!propertyMessage&&<Text style={styles.hint}>{propertyMessage}</Text>}
     {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>}
