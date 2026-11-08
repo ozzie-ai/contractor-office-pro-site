@@ -8,7 +8,7 @@ import ts from 'typescript';
 const filepath=path.resolve('src/propertyLookup.ts');
 const js=ts.transpileModule(fs.readFileSync(filepath,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const module={exports:{}};
-vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url),Date,Number,JSON,RegExp,encodeURIComponent});
+vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url),Date,Number,JSON,RegExp,encodeURIComponent,fetch:async()=>{throw new Error('Unexpected network call');}});
 const {findPropertyArea,areaMatchesAddress}=module.exports;
 test('unconfigured property service gives an honest fallback and never invents square footage',async()=>{
  const x=await findPropertyArea('123 Main Street, Santa Clarita, CA 91390','');
