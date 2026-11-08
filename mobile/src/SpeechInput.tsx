@@ -42,13 +42,13 @@ export default function SpeechInput({description,onChange,language='en'}:Props){
   </View>;
 }
 const styles=StyleSheet.create({
-  container:{borderWidth:1,borderColor:'#9ecdc1',backgroundColor:'#edf8f5',borderRadius:12,padding:14,marginVertical:10},
-  title:{fontWeight:'800',fontSize:18,color:'#163942'},
-  note:{fontSize:13,lineHeight:20,marginTop:8,color:'#526e70'},
-  button:{backgroundColor:'#116b60',padding:14,borderRadius:10,marginTop:12,alignItems:'center'},
+  container:{borderWidth:1,borderColor:'#CFDAEB',backgroundColor:'#F1F6FC',borderRadius:16,padding:15,marginVertical:12},
+  title:{fontWeight:'800',fontSize:18,color:'#12244B'},
+  note:{fontSize:13,lineHeight:20,marginTop:8,color:'#60708C'},
+  button:{backgroundColor:'#13256F',padding:14,borderRadius:13,marginTop:12,alignItems:'center'},
   buttonText:{color:'#fff',fontSize:15,fontWeight:'800',textAlign:'center'},
   label:{fontWeight:'700',fontSize:13,color:'#163942',marginTop:14,marginBottom:8},
-  input:{backgroundColor:'#fff',borderWidth:1,borderColor:'#b8c9c6',borderRadius:9,minHeight:140,padding:12,color:'#163942',fontSize:16,textAlignVertical:'top'},
-  help:{fontSize:13,color:'#235d5a',marginTop:8},
+  input:{backgroundColor:'#fff',borderWidth:1,borderColor:'#CDD8EA',borderRadius:13,minHeight:140,padding:12,color:'#163942',fontSize:16,textAlignVertical:'top'},
+  help:{fontSize:13,color:'#176C80',marginTop:8},
   small:{fontSize:12,color:'#526e70',lineHeight:18,marginTop:10}
 });
