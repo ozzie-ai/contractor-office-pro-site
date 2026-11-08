@@ -325,7 +325,7 @@ export default function App(){
    {showJobs&&<View style={styles.card}>
     <Text style={styles.h2}>{tr('My Jobs','Mis trabajos')}</Text>
     <Text style={styles.hint}>{tr('Tap a saved job to continue. Jobs are stored on this phone.','Toca un trabajo guardado para continuar. Los trabajos están en este teléfono.')}</Text>
-    <Text style={styles.hint}>{saveStatus}</Text>
+    <Text style={styles.hint}>{saveStatus==='New job — ready to start.'?tr('Ready for a new job.','Listo para un trabajo nuevo.'):saveStatus==='New job — ready to dictate'?tr('Ready for a new job.','Listo para un trabajo nuevo.'):saveStatus==='Opened saved job'?tr('Job opened.','Trabajo abierto.'):saveStatus==='Saved on this iPhone'?tr('Saved on this phone.','Guardado en este teléfono.'):saveStatus}</Text>
     <View style={styles.row}>
      <View style={{flex:1}}><Action title={tr("Save","Guardar")} secondary onPress={()=>saveCurrent(true)}/></View>
      <View style={{flex:1}}><Action title={tr("New Job","Nuevo trabajo")} onPress={startNewJob}/></View>
@@ -411,7 +411,7 @@ export default function App(){
     </View>}
     <SpeechInput language={businessProfile.language} description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
-    <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
+    <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
     <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
    </View>}
@@ -475,7 +475,7 @@ export default function App(){
     <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
     <Text style={styles.hint}>{tr('Proposal language','Idioma de la propuesta')}: {project.language==='es'?'Español':'English'}</Text>
     <Action title={tr('Change proposal language','Cambiar idioma de propuesta')} secondary onPress={()=>patch({language:project.language==='en'?'es':'en'})}/>
-    <Text style={styles.total}>{project.language==='en'?'Estimated price':'Precio estimado'}: {money(total.total)}</Text>
+    <Text style={styles.total}>{tr('Estimated price','Precio estimado')}: {money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
     {!readiness.ready&&<View style={styles.lineCard}>
