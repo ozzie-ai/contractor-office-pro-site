@@ -29,7 +29,8 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   const upgrade=panel&&/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*|convert\w*)\b/.test(s);
   const amps=Array.from(s.matchAll(/\b(\d{2,3})\s*(?:a\b|amp(?:s)?\b|amperios?\b|amperes?\b)/g)).map(m=>Number(m[1]));
   const dedicatedBreaker=/(?:\b(breaker|interruptor termomagnetico|disyuntor)\b)/.test(s)&&/\b(posterior\w*|despues|future|later|otro trabajo|only|solo|solamente|nomas|unicamente)\b/.test(s);
-  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+)?(?:(?:existing|existentes?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/);
+  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/)
+   ||s.match(/\b(\d{1,3}|veinte|twenty)\b[^.!?\n]{0,38}?\b(?:circuits?|circuitos?)\b/);
   const circuitQty=circuits?parseCount(circuits[1]):0;
   const permit=/\b(permiso|permit|inspection|inspeccion)\b/.test(s);
   const permitSection=s.match(/(?:permiso|permit)[^.!?\n]{0,90}/)?.[0]||'';
@@ -89,6 +90,22 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   }
   if(lines.some(item=>item.rate<=0))unknowns.push('Enter verified prices for unpriced work items; overhead and profit apply automatically.');
   return {lines,unknowns,recognized:lines[0].id!=='local-unclassified'};
+ }
+ // Other trades must not inherit bathroom-specific work just because their notes mention "replace".
+ // Unsupported scope is explicitly reviewable, never presented as an invented priced task.
+ if(_trade!=='remodel' && !/\b(bano|bathroom|shower|regadera|tina|bathtub|vanity|inodoro)\b/.test(s)){
+  const titles:Record<Trade,[string,string]>={
+   electrical:['Review electrical scope','Revisar trabajo electrico'],
+   plumbing:['Review plumbing scope','Revisar trabajo de plomeria'],
+   painting:['Review painting scope','Revisar trabajo de pintura'],
+   concrete:['Review concrete scope','Revisar trabajo de concreto'],
+   handyman:['Review handyman scope','Revisar trabajos varios'],
+   remodel:['Review remodeling scope','Revisar remodelacion'],
+   cleaning:['Review cleaning scope','Revisar limpieza']
+  };
+  const [en,es]=titles[_trade];
+  return {lines:[line('trade-review',en+' — '+description.trim(),es+' — '+description.trim(),1,'job',0)],
+   unknowns:['This trade requires a reviewed scope and verified prices. No bathroom work was inferred.'],recognized:false};
  }
  const all=dims(s),shower=has(s,showerRe),bathroom=has(s,roomRe);
  const showerDim=shower?near(s,all,showerRe):undefined;
