@@ -536,20 +536,6 @@ export default function App(){
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
-     {project.trade==='electrical'&&line.id!=='local-permit'&&<View style={styles.lineCard}>
-      <Text style={styles.label}>{tr('Unit-cost worksheet (optional)','Hoja de costos por unidad (opcional)')}</Text>
-      <Text style={styles.hint}>{explainLine(line)} {tr('Employee wage reference:','Sueldo de referencia:')} $40.57/hr — {LA_WAGE_SOURCE}. {tr('Burden 1.35 is an editable example, NOT a verified employer burden.','El factor 1.35 es un ejemplo editable, NO una carga laboral verificada.')}</Text>
-      <View style={styles.row}>
-       <View style={{flex:1}}><Input label={tr('Hours / unit','Horas / unidad')} number value={String(line.costHoursPerUnit??'')} onChangeText={x=>setLine(i,{costHoursPerUnit:Number(x)||0})}/></View>
-       <View style={{flex:1}}><Input label={tr('Materials $ / unit','Materiales $ / unidad')} number value={String(line.costMaterialsPerUnit??'')} onChangeText={x=>setLine(i,{costMaterialsPerUnit:Number(x)||0})}/></View>
-      </View>
-      <View style={styles.row}>
-       <View style={{flex:1}}><Input label={tr('Equipment $ / unit','Equipo $ / unidad')} number value={String(line.costEquipmentPerUnit??'')} onChangeText={x=>setLine(i,{costEquipmentPerUnit:Number(x)||0})}/></View>
-        <View style={{flex:1}}><Input label={tr('Hourly wage ($)','Sueldo por hora ($)')} number value={String(line.costHourlyWage??LA_ELECTRICIAN_MEAN_WAGE_Q1_2026)} onChangeText={x=>setLine(i,{costHourlyWage:Number(x)||0})}/></View>
-       </View>
-       <Input label={tr('Labor burden factor','Factor de carga laboral')} number value={String(line.costLaborBurdenMultiplier??1.35)} onChangeText={x=>setLine(i,{costLaborBurdenMultiplier:Number(x)||0})}/>
-       <Action title={tr('Calculate direct unit cost','Calcular costo directo unitario')} secondary onPress={()=>applyReferencePrice(i)}/>
-      </View>}
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
