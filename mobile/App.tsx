@@ -463,11 +463,11 @@ export default function App(){
     <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
-      <Text style={styles.total}>{project.cleaning.type==='post_construction'&&!(project.cleaning.laborHoursConfirmed&&project.cleaning.laborHoursVerificationVersion===2)?Math.max(project.cleaning.workers*project.cleaning.firstHoursPerWorker,recommendedPostConstructionWorkerHours(project.cleaning)):project.cleaning.workers*project.cleaning.firstHoursPerWorker} total worker-hours</Text>
-      <Text style={styles.hint}>{project.cleaning.workers} workers · {project.cleaning.areaSqFt||'Area not entered'} sq ft · {project.cleaning.type==='post_construction'?(project.cleaning.dustLevel||'moderate')+' dust':'Standard deep cleaning'}. Automatically recalculated from your job details. Adjust the plan in Step 1 if needed.</Text>
+      <Text style={styles.total}>{project.cleaning.type==='post_construction'&&!(project.cleaning.laborHoursConfirmed&&project.cleaning.laborHoursVerificationVersion===2)?Math.max(project.cleaning.workers*project.cleaning.firstHoursPerWorker,recommendedPostConstructionWorkerHours(project.cleaning)):project.cleaning.workers*project.cleaning.firstHoursPerWorker} {tr('worker-hours','horas-persona')}</Text>
+      <Text style={styles.hint}>{project.cleaning.workers} {tr('workers','personas')} · {project.cleaning.areaSqFt||tr('Area pending','Área pendiente')} {tr('sq ft','pies²')} · {project.cleaning.type==='post_construction'?tr(({light:'Light',moderate:'Moderate',heavy:'Heavy'} as const)[project.cleaning.dustLevel||'moderate'],({light:'Ligero',moderate:'Moderado',heavy:'Abundante'} as const)[project.cleaning.dustLevel||'moderate']):tr('Deep cleaning','Limpieza profunda')}. {tr('Edit in Step 1.','Editar en el paso 1.')}</Text>
     </View>}
-    <Text style={styles.total}>{project.trade==='cleaning'?'First deep cleaning / Primera limpieza':'Estimated total'}: {money(total.total)}</Text>
-    {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>Recurring price PER VISIT / Por visita: {money(recurringCleaningPrice(project))} · {project.cleaning?.frequency.replace('_',' ')}</Text>}
+    <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {money(total.total)}</Text>
+    {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>{tr('Recurring price per visit','Precio por visita periódica')}: {money(recurringCleaningPrice(project))}</Text>}
     <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
    </View>}
    {stage===3&&<View style={styles.card}>
@@ -475,17 +475,17 @@ export default function App(){
     <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
     <View style={styles.row}><View style={{flex:1}}><Action title="English" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
     <Text style={styles.total}>{project.language==='en'?'Estimated price':'Precio estimado'}: {money(total.total)}</Text>
-    <Text style={styles.hint}>{project.lines.length} work items · {project.exclusions.length} exclusions · {photos.length} private site photos</Text>
+    <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
     {!readiness.ready&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Estimate incomplete","Estimado incompleto")}</Text>
       <Text style={styles.hint}>{tr("Complete missing quantities and rates before sharing.","Completa las cantidades y tarifas pendientes antes de compartir.")}</Text>
       {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
-      {readiness.issues.length>6&&<Text style={styles.hint}>…and {readiness.issues.length-6} more items.</Text>}
+      {readiness.issues.length>6&&<Text style={styles.hint}>{tr('and','y')} {readiness.issues.length-6} {tr('more items','partidas más')}.</Text>}
       <Action title={tr("Review missing quantities","Revisar cantidades pendientes")} secondary onPress={()=>setStage(2)}/>
      </View>}
     {project.trade==='cleaning'&&<Text style={styles.hint}>{tr("Cleaning prices update automatically.","Los precios de limpieza se actualizan automáticamente.")}</Text>}
-    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('estimate')}/>
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):readiness.ready?tr('Share estimate PDF','Compartir estimado PDF'):tr('Complete estimate first','Completar estimado primero')} disabled={busy||!readiness.ready} onPress={()=>sharePdf('estimate')}/>
     <Action title={tr("Track proposal","Dar seguimiento")} secondary onPress={()=>setStage(4)}/>
     {shareDone&&<View style={styles.lineCard}>
      <Text style={styles.h2}>{tr("PDF ready","PDF preparado")}</Text>
@@ -504,7 +504,7 @@ export default function App(){
    {stage===4&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("5 · Follow-up","5 · Seguimiento")}</Text>
     <Text style={styles.hint}>{tr("Track customer decisions and next steps.","Registra la decisión del cliente y los próximos pasos.")}</Text>
-    <Text style={styles.total}>{project.customer||'Customer'} · {money(total.total)}</Text>
+    <Text style={styles.total}>{project.customer||tr('Customer','Cliente')} · {money(total.total)}</Text>
     <Text style={styles.label}>{tr("Status","Estado")}</Text>
     <Text style={styles.notice}>{JOB_STATUSES[project.status||'draft'][businessProfile.language]}</Text>
     <View style={styles.statusGrid}>
@@ -514,10 +514,10 @@ export default function App(){
      </Pressable>)}
     </View>
     <Input label={tr("Follow-up date (YYYY-MM-DD)","Fecha de seguimiento (AAAA-MM-DD)")} value={project.followUpDate||''} onChangeText={x=>patch({followUpDate:x})} placeholder="2026-11-15"/>
-    <Input label={tr("Private follow-up notes","Notas privadas de seguimiento")} multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder="Called customer; waiting for approval..."/>
+    <Input label={tr("Private follow-up notes","Notas privadas de seguimiento")} multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder={tr('Called client; waiting for approval...','Llamé al cliente; esperando aprobación...')}/>
     <Text style={styles.hint}>{tr("Notes stay private. Reminders are not automatic yet.","Las notas son privadas. Los recordatorios todavía no son automáticos.")}</Text>
     <Action title={tr("Save follow-up","Guardar seguimiento")} onPress={()=>saveCurrent(true)}/>
-    <Action title={busy?'Creating PDF...':'Prepare & share formal proposal / Propuesta formal'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('proposal')}/>
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):tr('Share proposal PDF','Compartir propuesta PDF')} disabled={busy||!readiness.ready} onPress={()=>sharePdf('proposal')}/>
     {!readiness.ready&&<Text style={styles.notice}>{tr("Complete quantities and prices before sharing.","Completa cantidades y precios antes de compartir.")}</Text>}
     <View style={styles.row}>
      <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
