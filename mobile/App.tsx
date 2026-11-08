@@ -291,7 +291,10 @@ export default function App(){
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-   <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO</Text>
+   <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO</Text>
+    <Text style={{fontSize:11,color:PALETTE.muted,fontWeight:'800'}}>MOBILE UI 24</Text>
+   </View>
    <View style={styles.row}>
     <View style={{flex:1}}><Action title={tr('New Job','Nuevo trabajo')} onPress={startNewJob}/></View>
     <View style={{flex:1}}><Action title={tr('My Jobs','Mis trabajos')+(savedJobs.length?' ('+savedJobs.length+')':'')} secondary={!showJobs} onPress={goToMyJobs}/></View>
