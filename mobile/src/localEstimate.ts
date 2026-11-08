@@ -104,7 +104,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
    cleaning:['Review cleaning scope','Revisar limpieza']
   };
   const [en,es]=titles[_trade];
-  return {lines:[line('trade-review',en+' — '+description.trim(),es+' — '+description.trim(),1,'job',0)],
+  return {lines:[line('trade-review',en,es,1,'job',0)],
    unknowns:['This trade requires a reviewed scope and verified prices. No bathroom work was inferred.'],recognized:false};
  }
  const all=dims(s),shower=has(s,showerRe),bathroom=has(s,roomRe);
