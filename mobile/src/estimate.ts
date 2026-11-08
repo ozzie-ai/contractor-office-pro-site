@@ -20,6 +20,7 @@ export type Project={
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
  status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
  address?:string;cleaning?:CleaningDetails;cleaningQuoteSignature?:string;
+ propertyArea?:{squareFootage:number;source:string;matchedAddress:string;lookedUpAddress:string;retrievedAt:string};
 };
 export const TRADES:Record<Trade,{en:string;es:string}>={
  electrical:{en:'Electrical',es:'Electricidad'},
@@ -89,6 +90,7 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const sum=totals(p);
  const cleaning=p.trade==='cleaning'?p.cleaning:undefined;
  const recurring=cleaning&&cleaning.frequency!=='once'?cleaning:undefined;
+ const dustLabel=(level:NonNullable<CleaningDetails['dustLevel']>)=>({light:es?'Ligero':'Light',moderate:es?'Moderado':'Moderate',heavy:es?'Abundante':'Heavy'}[level]);
  const frequencyLabel=(value:CleaningFrequency)=>({once:es?'Una sola vez':'One-time service',weekly:es?'Semanal':'Weekly',biweekly:es?'Cada dos semanas':'Every two weeks',twice_monthly:es?'Dos veces al mes':'Twice monthly',monthly:es?'Mensual':'Monthly'}[value]);
  const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||p.unknowns.length>0;
  const list=(title:string,items:string[])=>items.length?'<h3>'+esc(title)+'</h3><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
@@ -106,7 +108,7 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+(p.trade==='cleaning'?(es?'Dirección del servicio':'Service address'):tr.location)+':</b> '+esc(p.address||p.city||'—')+'</p>'+
  '<h3>'+tr.work+' — '+esc(TRADES[p.trade][p.language])+'</h3>'+
  '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th>'+(isCleaning?'':'<th>'+tr.rate+'</th>')+'<th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
- (cleaning?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'PLAN DE LIMPIEZA':'CLEANING SERVICE PLAN')+'</h3><p>'+(es?'Tipo de servicio: ':'Service type: ')+esc(({residential:es?'Residencial':'Residential',office:es?'Oficina':'Office',post_construction:es?'Después de construcción':'Post-construction',specialty:es?'Especializada':'Specialty'} as Record<CleaningType,string>)[cleaning.type])+'<br>'+(es?'Frecuencia: ':'Frequency: ')+esc(frequencyLabel(cleaning.frequency))+'</p>'+(recurring?'<p><b>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</b></p><p class="notice">'+(es?'La primera limpieza profunda y cada visita posterior tienen precios separados. Confirmar alcance y calendario.':'The initial deep clean and subsequent visits are priced separately. Confirm scope and schedule.')+'</p>':'<p class="notice">'+(es?'Estimado de una sola limpieza. No incluye visitas futuras.':'One-time cleaning estimate. Future visits are not included.')+'</p>')+'</section>':'')+
+ (cleaning?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'PLAN DE LIMPIEZA':'CLEANING SERVICE PLAN')+'</h3><p>'+(es?'Tipo de servicio: ':'Service type: ')+esc(({residential:es?'Residencial':'Residential',office:es?'Oficina':'Office',post_construction:es?'Después de construcción':'Post-construction',specialty:es?'Especializada':'Specialty'} as Record<CleaningType,string>)[cleaning.type])+'<br>'+(es?'Frecuencia: ':'Frequency: ')+esc(frequencyLabel(cleaning.frequency))+(cleaning.type==='post_construction'?'<br>'+(es?'Nivel de polvo: ':'Dust level: ')+esc(dustLabel(cleaning.dustLevel||'moderate')):'')+'</p>'+(recurring?'<p><b>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</b></p><p class="notice">'+(es?'La primera limpieza profunda y cada visita posterior tienen precios separados. Confirmar alcance y calendario.':'The initial deep clean and subsequent visits are priced separately. Confirm scope and schedule.')+'</p>':'<p class="notice">'+(es?'Estimado de una sola limpieza. No incluye visitas futuras.':'One-time cleaning estimate. Future visits are not included.')+'</p>')+'</section>':'')+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
  '<section class="summary">'+(isCleaning?'':line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit)))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
