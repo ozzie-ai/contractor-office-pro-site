@@ -1,4 +1,20 @@
 import type {CleaningDetails,EstimateLine,Project} from './estimate';
+export const POST_CONSTRUCTION_TASKS=[
+ {id:'dust',en:'Fine construction dust removal (HEPA vacuum where appropriate)',es:'Retiro de polvo fino de construcción (aspiradora HEPA cuando corresponda)'},
+ {id:'cabinets',en:'Clean inside and outside cabinets and drawers',es:'Limpiar interiores y exteriores de gabinetes y gavetas'},
+ {id:'trim',en:'Detail baseboards, doors, frames and accessible ledges',es:'Limpiar zócalos, puertas, marcos y repisas accesibles'},
+ {id:'glass',en:'Clean interior windows, tracks and sills',es:'Limpiar vidrios interiores, rieles y alféizares'},
+ {id:'fixtures',en:'Detail fixtures, vents and reachable light covers',es:'Detallar accesorios, rejillas y lámparas accesibles'},
+ {id:'floors',en:'Vacuum and wet-clean appropriate finished floors',es:'Aspirar y limpiar pisos terminados según el material'},
+ {id:'residue',en:'Remove accessible paint and adhesive residue where surface-safe',es:'Retirar residuos accesibles de pintura y adhesivo cuando sea seguro'},
+ {id:'touchup',en:'Final touch-up and walkthrough',es:'Retoques finales y revisión del trabajo'}
+] as const;
+export const DEFAULT_POST_CONSTRUCTION_TASKS=['dust','cabinets','trim','glass','fixtures','floors','touchup'];
+export function recommendedPostConstructionWorkerHours(c:CleaningDetails):number{
+ if(c.type!=='post_construction'||!c.areaSqFt)return 0;
+ const sqftPerWorkerHour=c.dustLevel==='heavy'?100:c.dustLevel==='moderate'?160:240;
+ return Math.ceil(c.areaSqFt/sqftPerWorkerHour);
+}
 export type CleaningQuote={initialPrice:number;recurringPrice:number;initialBase:number;recurringBase:number;lines:EstimateLine[];unknowns:string[]};
 const round=(n:number)=>Math.round(n*100)/100;
 const line=(en:string,es:string,rate:number):EstimateLine=>({id:'clean-initial',description_en:en,description_es:es,quantity:1,unit:'visit',rate,status:'allowance_to_confirm'});
@@ -12,10 +28,18 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
  const recurringPrice=round(recurringBase*factor);
  const typeEn={residential:'home',office:'office',post_construction:'post-construction',specialty:'specialty'}[c.type];
  const typeEs={residential:'vivienda',office:'oficina',post_construction:'post-construcción',specialty:'especializada'}[c.type];
- const en='Initial deep cleaning — '+typeEn+'; '+c.bedrooms+' bedrooms, '+c.bathrooms+' bathrooms, '+c.livingRooms+' living rooms'+(c.areaSqFt?' ('+c.areaSqFt+' sq ft)':'')+'; '+c.workers+' worker(s) × '+c.firstHoursPerWorker+' hours; labor, supplies and travel included';
- const es='Limpieza profunda inicial — '+typeEs+'; '+c.bedrooms+' dormitorios, '+c.bathrooms+' baños, '+c.livingRooms+' salas'+(c.areaSqFt?' ('+c.areaSqFt+' pies²)':'')+'; '+c.workers+' persona(s) × '+c.firstHoursPerWorker+' horas; incluye mano de obra, productos y traslado';
+ const scope=(c.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).map(id=>POST_CONSTRUCTION_TASKS.find(t=>t.id===id)).filter((t):t is typeof POST_CONSTRUCTION_TASKS[number]=>Boolean(t));
+ const scopeEn=c.type==='post_construction'?'; included: '+scope.map(t=>t.en).join('; '):'';
+ const scopeEs=c.type==='post_construction'?'; incluye: '+scope.map(t=>t.es).join('; '):'';
+ const en='Initial '+(c.type==='post_construction'?'detailed post-construction':'deep')+' cleaning — '+typeEn+'; '+c.bedrooms+' bedrooms, '+c.bathrooms+' bathrooms, '+c.livingRooms+' living rooms'+(c.areaSqFt?' ('+c.areaSqFt+' sq ft)':'')+scopeEn;
+ const es='Limpieza '+(c.type==='post_construction'?'detallada después de construcción':'profunda')+' — '+typeEs+'; '+c.bedrooms+' dormitorios, '+c.bathrooms+' baños, '+c.livingRooms+' salas'+(c.areaSqFt?' ('+c.areaSqFt+' pies²)':'')+scopeEs;
  const unknowns=['Confirm actual condition, access, supplies, equipment, scope and worker-hours before providing a binding price.'];
- if(c.type==='post_construction')unknowns.push('Confirm dust, debris, glass, paint residue, floors and final walkthrough separately.');
+ if(c.type==='post_construction'){
+  const recommended=recommendedPostConstructionWorkerHours(c);
+  unknowns.push('Confirm construction dust severity, room-by-room tasks, surface conditions and whether rough/final/touch-up phases are required.');
+  if(!c.areaSqFt)unknowns.push('ACTION REQUIRED: Enter measured or reasonably estimated square footage for post-construction scope.');
+  if(recommended&&c.workers*c.firstHoursPerWorker<recommended)unknowns.push('REVIEW LABOR HOURS: '+(c.workers*c.firstHoursPerWorker)+' worker-hours entered versus '+recommended+' suggested for this area and dust level (planning heuristic; adjust after site visit).');
+ }
  if(c.frequency!=='once'&&c.repeatHoursPerWorker<=0)unknowns.push('Enter repeat-visit labor hours before quoting recurring service.');
  if(!c.areaSqFt)unknowns.push('Square footage not provided; measure or verify home size as needed.');
  return {initialPrice,recurringPrice,initialBase,recurringBase,lines:[line(en,es,initialBase)],unknowns};
