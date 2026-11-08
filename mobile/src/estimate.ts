@@ -31,6 +31,12 @@ export const TRADES:Record<Trade,{en:string;es:string}>={
  cleaning:{en:'Cleaning Services',es:'Servicios de limpieza'},
 };
 export const money=(n:number)=>'$'+(Number.isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+export function recurringCleaningPrice(p:Pick<Project,'cleaning'|'overheadPct'|'profitPct'>):number{
+ const c=p.cleaning;
+ if(!c||c.frequency==='once'||c.workers<=0||c.repeatHoursPerWorker<=0)return 0;
+ const base=c.workers*c.repeatHoursPerWorker*c.laborCostPerHour+c.repeatSupplies+c.travelPerVisit;
+ return Math.round(base*(1+Math.max(0,p.overheadPct)/100)*(1+Math.max(0,p.profitPct)/100)*100)/100;
+}
 export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
  const subtotal=p.lines.reduce((sum,x)=>sum+Math.max(0,x.quantity||0)*Math.max(0,x.rate||0),0);
  const overhead=subtotal*Math.max(0,p.overheadPct||0)/100;
@@ -93,7 +99,7 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+tr.location+':</b> '+esc(p.address||p.city||'—')+'</p>'+
  '<h3>'+tr.work+' — '+esc(TRADES[p.trade][p.language])+'</h3>'+
  '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th><th>'+tr.rate+'</th><th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
- (recurring?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'SERVICIO RECURRENTE':'RECURRING SERVICE')+'</h3><p>'+(es?'Frecuencia: ':'Frequency: ')+esc(recurring.frequency.replace('_',' '))+'<br>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurring.repeatPricePerVisit||0))+'</p><p class="notice">'+(es?'Precio separado de la primera limpieza. Sujeto a confirmación de frecuencia, acceso y alcance.':'Separate from initial deep-clean price. Confirm frequency, access and scope before acceptance.')+'</p></section>':'')+
+ (recurring?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'SERVICIO RECURRENTE':'RECURRING SERVICE')+'</h3><p>'+(es?'Frecuencia: ':'Frequency: ')+esc(recurring.frequency.replace('_',' '))+'<br>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</p><p class="notice">'+(es?'Precio separado de la primera limpieza. Sujeto a confirmación de frecuencia, acceso y alcance.':'Separate from initial deep-clean price. Confirm frequency, access and scope before acceptance.')+'</p></section>':'')+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
  '<section class="summary">'+line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
