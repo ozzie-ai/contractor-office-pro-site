@@ -86,8 +86,9 @@ class LocalPricingTests(unittest.TestCase):
                 self.assertIn("Contractor Office Pro",html)
                 self.assertIn("Create work items",html)
                 self.assertIn("Print / Save PDF",html)
-                self.assertIn("Check Mac unit price",html)
-                self.assertIn("Local browser pilot; not a native App Store",html)
+                self.assertNotIn("Check Mac unit price",html)
+                self.assertNotIn("Mac database — optional price lookup",html)
+                self.assertIn("Browser preview.",html)
         finally:
             server.shutdown()
             worker.join(timeout=3)
