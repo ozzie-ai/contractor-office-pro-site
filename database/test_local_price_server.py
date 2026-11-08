@@ -26,7 +26,7 @@ class LocalPricingTests(unittest.TestCase):
     def test_reject_restricted_or_invalid_data(self):
         base={"task_code":"ELEC.PANEL.UPGRADE","region":"US-CA-LA",
               "observed_on":"2026-11-08","source_name":"Internal",
-              "materials":"600","verified":"1","reuse_allowed":"0"}
+              "materials":"600","verified":"1","reuse_allowed":"0","license":"owner_created"}
         with self.assertRaisesRegex(ValueError,"permission"):
             process_row(base)
         base["reuse_allowed"]="1"
