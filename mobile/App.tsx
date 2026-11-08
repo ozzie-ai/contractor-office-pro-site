@@ -326,7 +326,7 @@ export default function App(){
     <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>{patch({address:x,propertyArea:undefined});setPropertyMessage('');}} placeholder="Street address, city, state, ZIP"/>
     <Action title={propertyBusy?'Looking up address… / Buscando…':'Find property sq ft / Buscar pies cuadrados'} disabled={propertyBusy} secondary onPress={lookupProperty}/>
     {!!propertyMessage&&<Text style={styles.hint}>{propertyMessage}</Text>}
-    {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>
+    {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>}
     {project.trade==='cleaning'&&<View style={styles.lineCard}>
      <Text style={styles.h2}>Cleaning details / Detalles de limpieza</Text>
      <Text style={styles.label}>Type of cleaning / Tipo de limpieza</Text>
