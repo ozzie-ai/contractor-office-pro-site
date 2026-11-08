@@ -37,11 +37,11 @@ summary{font-weight:800;cursor:pointer}
 @media print{header,main,.no-print{display:none!important}#report{display:block!important;color:black;font-family:Arial,sans-serif;margin:18px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccc;text-align:left;padding:8px;font-size:12px}h1{font-size:25px;color:black}.print-total{font-size:20px;text-align:right;font-weight:bold}}
 </style></head>
 <body>
-<header><div><div class="eyebrow">CONTRACTOR OFFICE PRO</div><h1 id="title">Your construction office, simplified.</h1><div class="head-sub">Mac-connected beta · Free local test · Bilingual</div></div></header>
+<header><div><div class="eyebrow">CONTRACTOR OFFICE PRO</div><h1 id="title">Your construction office, simplified.</h1><div class="head-sub">Simple estimates · Bilingual</div></div></header>
 <main>
 <div class="card">
  <div style="display:flex;justify-content:space-between;align-items:center;gap:9px">
-  <h2 id="heading">New estimate</h2><span class="pill">MAC LOCAL</span>
+  <h2 id="heading">New estimate</h2><span class="pill">BETA</span>
  </div>
  <div class="row"><div><label for="language">Language / Idioma</label><select id="language"><option value="en">English</option><option value="es">Español</option></select></div><div><label for="region">Pricing region</label><input id="region" value="US-CA-LA" autocomplete="off"/></div></div>
  <label id="chooseLabel">Choose a trade</label><div class="grid" id="trades"></div>
@@ -61,14 +61,7 @@ summary{font-weight:800;cursor:pointer}
  <div class="actions"><button id="save" class="secondary">Save draft on iPhone</button><button id="print">Print / Save PDF</button></div>
  </div>
 </section>
-<details><summary id="macTitle">Mac database — optional price lookup</summary>
- <p class="sub">This uses your Mac on the same private Wi-Fi. Enter the access token from the Mac's terminal. The token stays in memory and is not saved in the estimate or customer PDF.</p>
- <label for="token">Private Mac token</label><input id="token" type="password" autocomplete="off"/>
- <button class="secondary" id="check" style="width:100%;margin-top:12px">Check authenticated server</button>
- <div id="mac-status" class="mini" role="status" style="margin-top:10px"></div>
- <p class="mini">Verified task references may be looked up per work item. Currently the database starts with task definitions, not market prices.</p>
-</details>
-<p class="footer">Local browser pilot; not a native App Store installation. Customer printout excludes the dictated notes and database token. Project drafts stay in this browser.</p>
+<p class="footer">Browser preview. Private notes stay out of customer estimates. Drafts stay in this browser.</p>
 </main>
 <article id="report"></article>
 <script>
@@ -143,31 +136,10 @@ function renderLines(){
  '<div class="row"><div><label>Qty</label><input type="number" data-i="'+i+'" data-field="q" value="'+esc(x.q)+'" step=".01" min="0"/></div>'+
  '<div><label>Unit</label><input data-i="'+i+'" data-field="unit" value="'+esc(x.unit)+'"/></div>'+
  '<div><label>Rate $</label><input type="number" data-i="'+i+'" data-field="rate" value="'+esc(x.rate||"")+'" step=".01" min="0"/></div></div>'+
- '<div class="actions"><button class="secondary" data-lookup="'+i+'">Check Mac unit price</button></div><div class="mini" id="lookup-'+i+'"></div></div>').join("");
+ '</div>').join("");
  $("lines").querySelectorAll("input").forEach(el=>el.oninput=()=>{const i=+el.dataset.i,k=el.dataset.field;lines[i][k]=k==="q"||k==="rate"?Number(el.value):el.value;renderTotals()});
  $("lines").querySelectorAll("[data-remove]").forEach(el=>el.onclick=()=>{lines.splice(+el.dataset.remove,1);renderLines()});
- $("lines").querySelectorAll("[data-lookup]").forEach(el=>el.onclick=()=>lookup(+el.dataset.lookup));
  renderTotals();
-}
-async function lookup(i){
- const x=lines[i],node=$("lookup-"+i),token=$("token").value.trim();
- if(x.id==="OTHER"){node.textContent="No mapped reference task yet.";return}
- if(!token){node.textContent="Enter your private token in Mac database settings below.";return}
- node.textContent="Checking local reference…";
- try{
-  const u="/reference?task="+encodeURIComponent(x.id)+"&region="+encodeURIComponent($("region").value.trim().toUpperCase());
-  const response=await fetch(u,{headers:{"Authorization":"Bearer "+token}});
-  if(!response.ok)throw Error(response.status===401?"Access denied — check token":"Mac API error "+response.status);
-  const data=await response.json();
-  if(!data.found){node.textContent=data.message||"No verified regional price yet.";return}
-  node.textContent=(data.source_name||"Reference")+" · "+(data.observed_on||"Date pending")+(data.direct_cost!=null?" · Direct cost: "+money(data.direct_cost):" · Direct cost incomplete");
-  if(data.cost_complete&&typeof data.direct_cost==="number"&&data.direct_cost>0){
-   const approve=document.createElement("button");
-   approve.textContent="Apply verified direct cost "+money(data.direct_cost);approve.className="secondary";approve.style.marginTop="8px";
-   approve.onclick=()=>{lines[i].rate=data.direct_cost;renderLines();showMessage("Reference applied. Review unit, job scope, overhead and profit.")};
-   node.appendChild(document.createElement("br"));node.appendChild(approve);
-  }
- }catch(e){node.textContent=String(e.message||e)}
 }
 function updateLanguage(){
  $("heading").textContent=text().heading;$("chooseLabel").textContent=text().select;$("scopeLabel").textContent=text().scope;
@@ -196,13 +168,6 @@ $("load").onclick=()=>{
  $("overhead").value=d.overhead??10;$("profit").value=d.profit??20;lines=d.lines;futureWiring=!!d.futureWiring;
  $("results").classList.remove("hidden");updateLanguage();showMessage("Saved browser draft loaded.");
  }catch(e){showMessage("Draft could not be read.")}
-};
-$("check").onclick=async()=>{
- const token=$("token").value.trim(),out=$("mac-status");out.textContent="Checking…";
- if(!token){out.textContent="Enter the private Mac access token.";return}
- try{const r=await fetch("/health",{headers:{"Authorization":"Bearer "+token}});
- const d=await r.json();out.textContent=r.ok&&d.ok?"Connected to local Mac SQLite server.":d.error||"Not connected."}
- catch(e){out.textContent=String(e.message||e)}
 };
 $("print").onclick=()=>{
  const s=totals();if(s.issues.length){showMessage(text().read);return}
