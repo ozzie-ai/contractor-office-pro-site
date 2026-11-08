@@ -15,7 +15,7 @@ export function cleaningDetailsFromNotes(notes:string,existing:CleaningDetails):
   updates.cleaningTypeConfirmed=true;
  }
  if(existing.areaSqFt<=0){
-  const m=/\b(\d{3,6})(?:[,.](\d{3}))?\s*(?:sq\.?\s*ft\.?|square feet|square foot|ft²|ft2|pies cuadrados|pies2|pies²)\b/i.exec(text);
+  const m=/\b(\d{1,6})(?:[,.](\d{3}))?\s*(?:sq\.?\s*ft\.?|square feet|square foot|ft²|ft2|pies cuadrados|pies2|pies²)\b/i.exec(text);
   if(m){
    const area=Number(m[1]+(m[2]||''));
    if(area>=100&&area<=200000)updates.areaSqFt=area;
@@ -32,7 +32,7 @@ export function cleaningDetailsFromNotes(notes:string,existing:CleaningDetails):
    if(count!==undefined&&count>=0&&count<=100)updates[field]=count;
   }
  }
- if(existing.type==='post_construction'||updates.type==='post_construction'){
+ if(updates.type==='post_construction'){
   if(/heavy dust|mucho polvo|polvo abundante|polvo pesado/.test(text))updates.dustLevel='heavy';
   else if(/moderate dust|polvo moderado/.test(text))updates.dustLevel='moderate';
   else if(/light dust|poco polvo|polvo ligero/.test(text))updates.dustLevel='light';
