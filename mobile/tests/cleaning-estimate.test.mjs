@@ -161,3 +161,27 @@ test('post-construction PDF shows dust level in English and Spanish without inte
  assert.ok(!english.includes('Overhead'));
  assert.ok(!english.includes('Profit'));
 });
+
+test('large residential clean uses area-based labor instead of fixed $382.80',()=>{
+ const large={...c,type:'residential',areaSqFt:4034,workers:2,firstHoursPerWorker:5};
+ const quote=priceCleaning(large,10,20);
+ assert.equal(quote.initialBase,465); // 17 worker-hours × $25 + $40
+ assert.equal(quote.initialPrice,613.8);
+ assert.ok(quote.unknowns.some(x=>x.includes('AREA-BASED LABOR APPLIED')));
+});
+test('app interface language does not automatically change customer PDF language',()=>{
+ const app=fs.readFileSync('App.tsx','utf8');
+ assert.match(app,/try\{saveProfile\(updated\);setBusinessProfile\(updated\);\}/);
+ assert.match(app,/contractor:profile\.name,language:'en'/);
+ assert.match(app,/contractor:businessProfile\.name,language:'en'/);
+ assert.match(app,/title="English PDF"/);
+ assert.match(app,/title="PDF Español"/);
+ assert.match(app,/bedrooms:0,bathrooms:0,livingRooms:0/);
+ assert.match(app,/type:'residential',frequency:'once'/);
+ const englishProject={...cleaningToProject(c,{overheadPct:10,profitPct:20}),trade:'cleaning',contractor:'Company',customer:'Dany',city:'Santa Clarita',description:'PRIVATE DICTATION IN SPANISH',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const pdf=proposalHtml(englishProject,'estimate');
+ assert.ok(pdf.includes('WORK ESTIMATE'));
+ assert.ok(pdf.includes('CLEANING SERVICE PLAN'));
+ assert.ok(!pdf.includes('ESTIMADO DE TRABAJO'));
+ assert.ok(!pdf.includes('PRIVATE DICTATION IN SPANISH'));
+});
