@@ -77,6 +77,7 @@ export default function App(){
  const addressRef=useRef('');
 
  const [stage,setStage]=useState<Stage>(0);
+ useEffect(()=>{scrollRef.current?.scrollTo({y:0,animated:false});},[stage]);
  const [photos,setPhotos]=useState<string[]>([]);
  const [busy,setBusy]=useState(false);
  const [propertyBusy,setPropertyBusy]=useState(false);
@@ -417,7 +418,7 @@ export default function App(){
      </View>
     </View>
     <Text style={styles.sectionTitle}>{tr('Service / Trade','Servicio / Oficio')}</Text>
-    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
+    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>{if(t!==project.trade){patch({trade:t,lines:[],unknowns:[],exclusions:[],futureWork:[],cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):undefined});setInfo('');setAiConnected(false);}}} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
      <ServiceGlyph trade={t} selected={project.trade===t}/>
      <Text numberOfLines={2} style={[styles.serviceName,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text>
      {project.trade===t&&<Text style={styles.selectedTick}>✓</Text>}
