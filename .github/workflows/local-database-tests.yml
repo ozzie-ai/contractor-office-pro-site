@@ -18,3 +18,28 @@ jobs:
           python-version: '3.11'
       - name: Test SQLite setup and data validation
         run: python3 -m unittest discover -s database -p 'test_*.py' -v
+      - name: Validate Safari preview JavaScript syntax
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              active=False
+              contents=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=="script":
+                      self.active=True
+              def handle_endtag(self,tag):
+                  if tag=="script":
+                      self.active=False
+              def handle_data(self,data):
+                  if self.active:
+                      self.contents.append(data)
+          parser=Scripts()
+          parser.feed(Path("database/web/estimate.html").read_text())
+          if not parser.contents:
+              raise SystemExit("Missing Safari preview script")
+          Path("/tmp/cop-safari-preview.js").write_text("\n".join(parser.contents))
+          PY
+          node --check /tmp/cop-safari-preview.js
