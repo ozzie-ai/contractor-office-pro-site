@@ -65,7 +65,7 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
   const recommended=recommendedPostConstructionWorkerHours(c);
   unknowns.push('Confirm construction dust severity, room-by-room tasks, surface conditions and whether rough/final/touch-up phases are required.');
   if(!c.areaSqFt)unknowns.push('ACTION REQUIRED: Enter measured or reasonably estimated square footage for post-construction scope.');
-  if(recommended&&entered<recommended&&!c.laborHoursConfirmed)unknowns.push('AREA-BASED LABOR APPLIED: '+workerHours+' total worker-hours used for pricing, instead of '+entered+' entered. Review after site visit.');
+  if(recommended&&entered<recommended&&!(c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2))unknowns.push('AREA-BASED LABOR APPLIED: '+workerHours+' total worker-hours used for pricing, instead of '+entered+' entered. Review after site visit.');
   if(recommended&&entered<recommended&&c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2)unknowns.push('Contractor verified '+entered+' worker-hours below area/dust planning guideline of '+recommended+'.');
  }
  if(c.frequency!=='once'&&c.repeatHoursPerWorker<=0)unknowns.push('Enter repeat-visit labor hours before quoting recurring service.');
