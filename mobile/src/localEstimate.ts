@@ -21,6 +21,46 @@ const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuart
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
 export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
+ // Trade-specific electrical jobs must not pass through bathroom/remodel heuristics.
+ if(_trade==='electrical'){
+  const panel= /\b(panel|tablero|centro de carga|load center|service upgrade|servicio electrico)\b/.test(s);
+  const panelUpgrade=panel&&/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*)\b/.test(s);
+  const amps=Array.from(s.matchAll(/\b(\d{2,3})\s*(?:a|amp|amps|amperios|amperes)\b/g)).map(m=>Number(m[1]));
+  const breakerOnly=/\b(breaker|interruptor termomagnetico|disyuntor)\b/.test(s)&&/\b(posterior\w*|despues|future|later|otro trabajo|only|solo|solamente|nomas)\b/.test(s);
+  const circuitCount=s.match(/\b(\d{1,3})\s*(?:de\s+los\s+)?(?:existing\s+|existentes?\s+|old\s+|viejos?\s+|nuevos?\s+)?(?:circuits?|circuitos?)\b/);
+  const circuitQty=circuitCount?Number(circuitCount[1]):0;
+  const permitMention=/\b(permiso|permit|inspection|inspeccion)\b/.test(s);
+  const permitCost=s.match(/(?:permiso|permit)[^.!?]{0,65}?(?:\$\s*|cost\w*\s*|costara\s*|aproximadamente\s*|about\s*)(\d{2,5})\b/)
+   ||s.match(/(?:\$\s*)(\d{2,5})[^.!?]{0,50}?(?:permiso|permit)/);
+  if(panelUpgrade){
+   const from=amps[0]||0,to=amps[1]||0;
+   lines.push(line('panel-upgrade',from&&to?'Upgrade electrical panel/service from '+from+'A to '+to+'A (equipment and installation; utility coordination to confirm)':'Upgrade electrical service panel (verify existing/new amperage and equipment)',
+    from&&to?'Actualizar panel/servicio electrico de '+from+'A a '+to+'A (equipo e instalacion; confirmar coordinacion con compania electrica)':'Actualizar panel electrico (confirmar amperajes y equipo)',1,'job',0));
+   unknowns.push('Confirm service size, utility requirements, grounding/bonding, panel location and required inspections. Enter a verified panel upgrade rate.');
+  }
+  if(circuitQty>0&&/\b(circuits?|circuitos?)\b/.test(s)){
+   lines.push(line('existing-circuits','Transfer/reconnect '+circuitQty+' existing branch circuits into new panel; verify breakers and labeling','Transferir/reconectar '+circuitQty+' circuitos existentes al panel nuevo; verificar breakers y rotulado',circuitQty,'each',0));
+   unknowns.push('Confirm whether existing branch circuits are transferred or rewired; scope does not assume new home-run wiring.');
+  }
+  if(breakerOnly){
+   const extraAmps=amps.length>2?amps[amps.length-1]:100;
+   lines.push(line('future-breaker','Supply and install '+extraAmps+'A breaker only; future feeder/wiring/terminations excluded','Suministrar e instalar solamente breaker de '+extraAmps+'A; alimentador, cableado y conexiones futuras excluidos',1,'each',0));
+   unknowns.push('Verify breaker compatibility, available capacity and whether installation is allowed before pricing.');
+  }
+  if(permitMention)lines.push(line('permit','Electrical permit and inspection fee (stated allowance)','Permiso electrico e inspeccion (monto indicado)',1,'job',permitCost?Number(permitCost[1]):0));
+  const recessed=/\b(recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|focos?\s*empotrados?)\b/.test(s);
+  if(recessed){
+   const m=s.match(/\b(\d{1,2})\s+(?:recessed\s*lights?|luces?\s*empotradas?|focos?\s*empotrados?)/);
+   lines.push(line('recessed-light','Install recessed lights (verify wiring and ceiling access)','Instalar luces empotradas (verificar cableado y acceso al techo)',m?Number(m[1]):0,'each',0));
+  }
+  if(!lines.length){
+   lines.push(line('unclassified','Review electrical work and define scope','Revisar trabajo electrico y definir alcance',1,'job',0));
+   unknowns.push('Electrical scope not recognized; add or edit items before preparing a customer quote.');
+  }
+  unknowns.push('Enter verified labor/material rates for unpriced work items. Overhead and profit apply after line items are priced.');
+  return {lines,unknowns,recognized:lines[0].id!=='local-unclassified'};
+ }
+
  const all=dims(s),shower=has(s,showerRe),bathroom=has(s,roomRe);
  const showerDim=shower?near(s,all,showerRe):undefined;
  const roomCandidate=near(s,all,roomRe)||(all.length===1&&!showerDim?all[0]:undefined);
