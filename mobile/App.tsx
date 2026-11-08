@@ -312,11 +312,20 @@ export default function App(){
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
   const draft=localEstimate(project.description,project.trade);
   const futureBreaker=draft.lines.some(item=>item.id==='local-future-breaker');
-  patch({lines:draft.lines,unknowns:draft.unknowns,
-   exclusions:futureBreaker?['Future 100A branch-circuit feeder wiring, terminations and connections are not included in this job.']:[],
-   futureWork:futureBreaker?['Future circuit wiring and final connections under a separate scope and price.']:[]});
+  const existing=new Map(project.lines.map(item=>[item.id,item]));
+  const lines=draft.lines.map(item=>{
+   const saved=existing.get(item.id);
+   return saved?{...item,rate:saved.rate,rateSource:saved.rateSource,
+    costHoursPerUnit:saved.costHoursPerUnit,costMaterialsPerUnit:saved.costMaterialsPerUnit,
+    costEquipmentPerUnit:saved.costEquipmentPerUnit,costHourlyWage:saved.costHourlyWage,
+    costLaborBurdenMultiplier:saved.costLaborBurdenMultiplier}:item;
+  });
+  const manual=project.lines.filter(item=>item.id.startsWith('manual-')&&!lines.some(x=>x.id===item.id));
+  patch({lines:[...lines,...manual],unknowns:draft.unknowns,
+   exclusions:futureBreaker?['Future feeder wiring, terminations and final connections are excluded from this job.']:project.exclusions,
+   futureWork:futureBreaker?['Future feeder wiring and final connections are separate work.']:project.futureWork});
   setAiConnected(false);
-  setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
+  setInfo(tr('Work items extracted. Existing prices preserved. Complete missing rates to finish your quote.','Partidas identificadas. Precios anteriores conservados. Completa las tarifas para terminar la cotización.'));
   setStage(2);
  };
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
@@ -557,14 +566,14 @@ export default function App(){
       <Input label={tr("Shower wall height (ft)","Altura de paredes (pies)")} value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
       <Action title={tr("Apply height","Aplicar altura")} onPress={applyWallHeight}/>
      </View>}
-    <Action title={tr("Rebuild from description","Recalcular desde descripción")} secondary onPress={createLocalDraft}/>
+    <Action title={tr("Update scope (keep prices)","Actualizar partidas (conservar precios)")} secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
       <Text style={styles.total}>{plannedCleaningWorkerHours(project.cleaning)} {tr('worker-hours','horas-persona')}</Text>
       <Text style={styles.hint}>{project.cleaning.workers} {tr('workers','personas')} · {project.cleaning.areaSqFt||tr('Area pending','Área pendiente')} {tr('sq ft','pies²')} · {project.cleaning.type==='post_construction'?tr(({light:'Light',moderate:'Moderate',heavy:'Heavy'} as const)[project.cleaning.dustLevel||'moderate'],({light:'Ligero',moderate:'Moderado',heavy:'Abundante'} as const)[project.cleaning.dustLevel||'moderate']):tr('Deep cleaning','Limpieza profunda')}. {tr('Edit in Step 1.','Editar en el paso 1.')}</Text>
     </View>}
-    <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    <Text style={styles.total}>{!cleaningInputsReady?tr('Pending scope','Falta confirmar el trabajo'):pdfReady?(project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado'))+': '+money(total.total):tr('Partial priced amount — not the final estimate','Importe parcial — no es el estimado final')+': '+money(total.total)}</Text>
     {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>{tr('Recurring price per visit','Precio por visita periódica')}: {money(recurringCleaningPrice(project))}</Text>}
     {!pdfReady&&<Text style={styles.notice}>{tr("You can continue to Proposal, but PDF sharing requires prices and quantities for all items. Tap missing items to edit.","Puedes continuar a Propuesta, pero para compartir el PDF debes completar cantidades y precios de todas las partidas.")}</Text>}
     <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
@@ -575,15 +584,15 @@ export default function App(){
     <Text style={styles.label}>{tr('Customer PDF language','Idioma del PDF del cliente')}</Text>
     <Text style={styles.hint}>{tr('Independent of your app language. Default: English.','Independiente del idioma de la aplicación. Predeterminado: inglés.')}</Text>
     <View style={styles.row}><View style={{flex:1}}><Action title="English PDF" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="PDF Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
-    <Text style={styles.total}>{tr('Estimated price','Precio estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    <Text style={styles.total}>{!cleaningInputsReady?tr('Pending scope','Falta confirmar el trabajo'):pdfReady?tr('Estimated price','Precio estimado')+': '+money(total.total):tr('Partial amount — not a client quote','Importe parcial — no es cotización')+': '+money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
     {!pdfReady&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Estimate incomplete","Estimado incompleto")}</Text>
-      <Text style={styles.hint}>{tr("Complete missing quantities and rates before sharing.","Completa las cantidades y tarifas pendientes antes de compartir.")}</Text>
+      <Text style={styles.hint}>{tr("The amount above only includes priced items. Enter missing rates before sharing a complete proposal.","La cantidad anterior solo incluye partidas con precio. Completa las tarifas antes de compartir la propuesta.")}</Text>
       {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
       {readiness.issues.length>6&&<Text style={styles.hint}>{tr('and','y')} {readiness.issues.length-6} {tr('more items','partidas más')}.</Text>}
-      <Action title={tr("Review missing quantities","Revisar cantidades pendientes")} secondary onPress={()=>setStage(2)}/>
+      <Action title={tr("Enter missing prices","Completar precios pendientes")} secondary onPress={()=>setStage(2)}/>
      </View>}
     {project.trade==='cleaning'&&<Text style={styles.hint}>{tr("Cleaning prices update automatically.","Los precios de limpieza se actualizan automáticamente.")}</Text>}
     <Action title={busy?tr('Creating PDF…','Creando PDF…'):pdfReady?tr('Share estimate PDF','Compartir estimado PDF'):tr('Complete estimate first','Completar estimado primero')} disabled={busy||!pdfReady} onPress={()=>sharePdf('estimate')}/>
