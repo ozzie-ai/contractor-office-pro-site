@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import hmac
+import ipaddress
 import secrets
 import os
 from pathlib import Path
@@ -68,6 +69,10 @@ def db_path():
 
 def connect():
     path = db_path()
+    if str(path).startswith("/Volumes/"):
+        pieces=path.parts
+        if len(pieces)<4 or not os.path.ismount(str(Path(*pieces[:3]))):
+            raise RuntimeError("External disk is not mounted; refusing to use a fake drive folder.")
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(path), timeout=10)
     db.row_factory = sqlite3.Row
@@ -207,8 +212,13 @@ def main():
         token=os.environ.get("COP_LOCAL_API_TOKEN","").strip()
         if a.lan and (not token or len(token)<24):
             p.error("--lan requires a secret COP_LOCAL_API_TOKEN with at least 24 characters")
-        if a.lan and a.host in ("0.0.0.0","::"):
-            p.error("Bind explicitly to your Mac's private network IP, not every interface")
+        if a.lan:
+            try:
+                address=ipaddress.ip_address(a.host)
+                if not address.is_private or address.is_loopback or address.is_unspecified:
+                    p.error("Use only your Mac's private LAN IP")
+            except ValueError:
+                p.error("LAN host must be a private IP address")
         with connect():
             pass
         server=ThreadingHTTPServer((a.host,a.port),handler(token))
