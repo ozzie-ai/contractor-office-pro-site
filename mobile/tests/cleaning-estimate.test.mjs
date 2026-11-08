@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
 const load=(name)=>{const filename=path.resolve('src/'+name+'.ts');const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const module={exports:{}};vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url)});return module.exports;};
-const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours,isCleaningQuoteCurrent}=load('cleaningEstimate');
+const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours,isCleaningQuoteCurrent,currentCleaningProject}=load('cleaningEstimate');
 const {proposalHtml,totals,TRADES,recurringCleaningPrice}=load('estimate');
 const c={type:'residential',frequency:'twice_monthly',bedrooms:3,bathrooms:2,livingRooms:2,areaSqFt:1800,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour:25,firstSupplies:25,repeatSupplies:15,travelPerVisit:15};
 test('cleaning calculates first deep clean and repeat visit separately',()=>{
@@ -79,7 +79,7 @@ test('heavy construction dust produces a detailed scope and a labor time review'
  const heavy={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:1800,postConstructionTasks:['dust','cabinets','floors']};
  const priced=priceCleaning(heavy,10,20);
  assert.equal(recommendedPostConstructionWorkerHours(heavy),18);
- assert.ok(priced.unknowns.some(x=>x.includes('REVIEW LABOR HOURS')));
+ assert.ok(priced.unknowns.some(x=>x.includes('AREA-BASED LABOR APPLIED')));
  assert.match(priced.lines[0].description_en,/Fine construction dust removal/);
  assert.match(priced.lines[0].description_en,/cabinets/);
  assert.equal(priced.lines[0].description_en.includes('interior windows'),false);
@@ -99,4 +99,46 @@ test('recalculating updated square footage refreshes quote signature',()=>{
  const quote=cleaningToProject(c2,{overheadPct:10,profitPct:20});
  assert.equal(isCleaningQuoteCurrent({...quote,trade:'cleaning',overheadPct:10,profitPct:20}),true);
  assert.ok(recommendedPostConstructionWorkerHours(c2)>c.workers*c.firstHoursPerWorker);
+});
+
+test('large heavy post-construction quote actually prices 41+ worker hours rather than stale 10',()=>{
+ const c2={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:4034,workers:2,firstHoursPerWorker:5,firstSupplies:25,travelPerVisit:15};
+ const q=priceCleaning(c2,10,20);
+ assert.equal(recommendedPostConstructionWorkerHours(c2),41);
+ assert.equal(q.initialBase,1065);
+ assert.equal(q.initialPrice,1405.8);
+ assert.ok(q.initialPrice>382.8);
+ assert.ok(q.unknowns.some(s=>s.includes('AREA-BASED LABOR APPLIED')));
+});
+test('saved cleaning job, on-screen total, and PDF derive same live quote when area changes',()=>{
+ const old=cleaningToProject({...c,type:'post_construction',dustLevel:'heavy',areaSqFt:1800},{overheadPct:10,profitPct:20});
+ const p={...old,trade:'cleaning',contractor:'Cleaner',customer:'Oswaldo',city:'Santa Clarita',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const bigger={...p,cleaning:{...p.cleaning,areaSqFt:4034}};
+ const repriced=currentCleaningProject(bigger);
+ assert.equal(repriced.lines[0].rate,1065);
+ assert.ok(Math.abs(totals(repriced).total-1405.8)<0.001);
+ const html=proposalHtml(repriced);
+ assert.ok(html.includes('$1,405.80'));
+ assert.equal(html.includes('$382.80'),false);
+ assert.equal(html.includes('$290.00'),false);
+});
+test('verified alternative worker-hours can override suggested planning hours explicitly',()=>{
+ const c2={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:4034,workers:2,firstHoursPerWorker:5,laborHoursConfirmed:true};
+ assert.equal(priceCleaning(c2,10,20).initialBase,290);
+});
+test('changing dust, workers, hours and cost immediately recomputes cleaning quote',()=>{
+ const base={...c,type:'post_construction',areaSqFt:4034,dustLevel:'moderate'};
+ const p={...cleaningToProject(base,{overheadPct:10,profitPct:20}),trade:'cleaning',overheadPct:10,profitPct:20};
+ const before=totals(currentCleaningProject(p)).total;
+ const after=totals(currentCleaningProject({...p,cleaning:{...p.cleaning,dustLevel:'heavy'},profitPct:15})).total;
+ assert.ok(after>before);
+});
+
+test('multiple cleaning work lines still show only one customer bundled total',()=>{
+ const cleaned=cleaningToProject({...c,type:'post_construction',areaSqFt:4034,dustLevel:'heavy'},{overheadPct:10,profitPct:20});
+ const p={...cleaned,trade:'cleaning',contractor:'Cleaner',customer:'Customer',city:'Santa Clarita',description:'',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20,lines:[...cleaned.lines,{id:'extra',description_en:'Special extra cleaning',description_es:'Limpieza adicional',quantity:1,unit:'job',rate:100,status:'included_now'}]};
+ const html=proposalHtml(p);
+ const final=totals(p).total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+ assert.equal(html.split('$'+final).length-1,2); // service row and total, not one price per work item
+ assert.ok(html.includes('Special extra cleaning'));
 });

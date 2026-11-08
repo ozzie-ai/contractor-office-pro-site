@@ -9,7 +9,7 @@ import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,Saved
 import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
-import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,isCleaningQuoteCurrent} from './src/cleaningEstimate';
+import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
@@ -65,7 +65,7 @@ export default function App(){
   setSaveStatus('Saving changes…');
   const t=setTimeout(()=>{
    try{
-    saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project,photos,stage});
+    saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project:currentCleaningProject(project),photos,stage});
     setSavedJobs(readStore().jobs);
     setSaveStatus('Saved on this iPhone');
    }catch(e){
@@ -82,9 +82,9 @@ export default function App(){
    return true;
   }
   try{
-   saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project,photos,stage});
+   saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project:currentCleaningProject(project),photos,stage});
    const disk=readStore();
-   const confirmed=disk.jobs.some(j=>j.id===activeJobId&&j.project.description===project.description&&j.project.lines.length===project.lines.length);
+   const confirmed=disk.jobs.some(j=>j.id===activeJobId&&j.project.description===project.description&&j.project.lines.length===currentCleaningProject(project).lines.length);
    if(!confirmed)throw new Error('Could not verify saved data.');
    setSavedJobs(disk.jobs);
    setSaveStatus('✓ Saved locally · '+new Date().toLocaleTimeString());
@@ -193,17 +193,6 @@ export default function App(){
     Alert.alert('Select scope / Seleccionar alcance','Select at least one cleaning task before preparing a quote.');
     setStage(0);return;
    }
-   if(details.type==='post_construction'){
-    const recommended=recommendedPostConstructionWorkerHours(details);
-    const actual=details.workers*details.firstHoursPerWorker;
-    if(recommended>0&&actual<recommended&&!details.laborHoursConfirmed){
-     Alert.alert('Review crew hours / Revisar horas','For this '+details.areaSqFt+' sq ft '+(details.dustLevel||'moderate')+' dust job, the app suggests '+recommended+' total worker-hours. You entered '+actual+'. Verify the work before estimating.',[
-      {text:'Review hours / Revisar',onPress:()=>setStage(0)},
-      {text:'Keep verified hours / Confirmar',onPress:()=>patchCleaning({laborHoursConfirmed:true})}
-     ]);
-     setStage(0);return;
-    }
-   }
    try{
     const drafted=cleaningToProject(details,project);
     patch({...drafted,exclusions:[],futureWork:[]});
@@ -220,11 +209,12 @@ export default function App(){
   setStage(2);
  };
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
-  if(!isCleaningQuoteCurrent(project)){
-   Alert.alert('Cleaning price needs updating / Actualizar precio','Cleaning details or profit settings changed after the last calculation. Recalculate the cleaning estimate before sharing.',[{text:'Review cleaning details',onPress:()=>setStage(0)},{text:'Recalculate / Recalcular',onPress:()=>setStage(1)}]);
+  const quote=currentCleaningProject(project);
+  if(quote.trade==='cleaning'&&quote.cleaning?.type==='post_construction'&&(!quote.cleaning.areaSqFt||!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length)){
+   Alert.alert('Missing cleaning details','Enter square footage and select the work included before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
    return;
   }
-  const readiness=estimateReadiness(project);
+  const readiness=estimateReadiness(quote);
   if(!readiness.ready){
    Alert.alert('Estimate is incomplete','Finish the missing quantities and prices before exporting. '+readiness.issues.slice(0,2).join(' '),[{text:'Review work items',onPress:()=>setStage(2)}]);
    return;
@@ -232,7 +222,7 @@ export default function App(){
   if(!saveCurrent())return;
   setBusy(true);
   try{
-   const pdf=await Print.printToFileAsync({html:proposalHtml(project,mode)});
+   const pdf=await Print.printToFileAsync({html:proposalHtml(quote,mode)});
    if(await Sharing.isAvailableAsync()){
     await Sharing.shareAsync(pdf.uri,{mimeType:'application/pdf',UTI:'com.adobe.pdf',dialogTitle:'Share Contractor Office Pro Estimate'});
     setShareDone(true);
@@ -246,9 +236,9 @@ export default function App(){
   patch({status});
   setSaveStatus('Status updated — saving on this iPhone');
  };
- const total=totals(project);
- const readiness=estimateReadiness(project);
- const quoteCurrent=isCleaningQuoteCurrent(project);
+ const pricedProject=currentCleaningProject(project);
+ const total=totals(pricedProject);
+ const readiness=estimateReadiness(pricedProject);
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
@@ -344,7 +334,15 @@ export default function App(){
        <Text style={styles.tradeText}>{(project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).includes(task.id)?'☑':'☐'} {task.en}</Text>
        <Text style={styles.tradeSub}>{task.es}</Text>
       </Pressable>)}
-      <Text style={styles.notice}>Suggested planning hours for this area and dust level: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} TOTAL worker-hours. Your entered hours: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. This is a planning heuristic, not a verified market rate or time standard.</Text>
+      <Text style={styles.notice}>Area/dust-based planning hours: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} total worker-hours. Entered: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. Price automatically uses the larger number unless you explicitly confirm your own site-assessed hours.</Text>
+      <Text style={styles.hint}>Currently priced worker-hours: {project.cleaning?.laborHoursConfirmed?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
+      <Action title="Use my measured hours / Confirmar mis horas" secondary onPress={()=>{
+       const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+       Alert.alert('Confirm site-assessed labor / Confirmar horas','Use '+(c.workers*c.firstHoursPerWorker)+' actual worker-hours for this job instead of the area-based guideline only if you assessed the condition and scope.',[
+        {text:'Cancel'},
+        {text:'Confirm measured hours',onPress:()=>patchCleaning({laborHoursConfirmed:true})}
+       ]);
+      }}/>
       <Action title="Use suggested hours / Usar horas sugeridas" secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        if(!c.areaSqFt){Alert.alert('Enter square feet','Measure or estimate the cleanable square footage first.');return;}
@@ -369,13 +367,20 @@ export default function App(){
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>3 · Review quantities and prices</Text>
     <Text style={styles.hint}>{aiConnected?'AI interpretation received. ':'Draft estimate from dictated work or manual entry. '}Offline planning rates are illustrative, not verified supplier quotes. Review quantities and every rate.</Text>
-    {project.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
+    {pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
+     {project.trade==='cleaning'&&line.id==='clean-initial'?<View>
+      <Text style={styles.label}>Cleaning service price / Precio del servicio</Text>
+      <Text style={styles.total}>{money(total.total)}</Text>
+      <Text style={styles.hint}>Updated automatically from your live cleaning area, dust level, crew, labor costs and business margins. Edit those values in Step 1; customer documents show one service price.</Text>
+      <Action title="Review job and labor hours / Revisar horas" secondary onPress={()=>setStage(0)}/>
+     </View>:<>
      <Text style={styles.lineNumber}>WORK ITEM {i+1}</Text>
      <Input label="English customer description" value={line.description_en} onChangeText={x=>setLine(i,{description_en:x})}/>
      <Input label="Descripción profesional en español" value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label="Quantity" value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Unit" value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label="Rate ($)" value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>Line amount: {money(line.quantity*line.rate)}</Text>
-     <Action title="Remove item" secondary onPress={()=>patch({lines:project.lines.filter((_,j)=>j!==i)})}/>
+     <Action title="Remove item" secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
+     </>}
     </View>)}
     {project.trade==='electrical'&&<View style={styles.lineCard}>
       <Text style={styles.h2}>Electrical quick add / Agregar luces</Text>
@@ -416,8 +421,8 @@ export default function App(){
       {readiness.issues.length>6&&<Text style={styles.hint}>…and {readiness.issues.length-6} more items.</Text>}
       <Action title="Review missing quantities / Revisar cantidades" secondary onPress={()=>setStage(2)}/>
      </View>}
-    {!quoteCurrent&&<Text style={styles.notice}>Cleaning price must be recalculated after edits. Go to Step 2 and select Calculate cleaning prices.</Text>}
-    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready||!quoteCurrent} onPress={()=>sharePdf('estimate')}/>
+    {project.trade==='cleaning'&&<Text style={styles.hint}>Cleaning prices update automatically when scope or work hours change.</Text>}
+    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('estimate')}/>
     <Action title="Continue · Track proposal / Seguimiento" secondary onPress={()=>setStage(4)}/>
     {shareDone&&<View style={styles.lineCard}>
      <Text style={styles.h2}>PDF prepared / PDF preparado</Text>
@@ -449,7 +454,7 @@ export default function App(){
     <Input label="Internal follow-up notes / Notas internas" multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder="Called customer; waiting for approval..."/>
     <Text style={styles.hint}>These notes remain private. Dates are saved locally; automated reminders are not included yet.</Text>
     <Action title="Save follow-up / Guardar seguimiento" onPress={()=>saveCurrent(true)}/>
-    <Action title={busy?'Creating PDF...':'Prepare & share formal proposal / Propuesta formal'} disabled={busy||!readiness.ready||!quoteCurrent} onPress={()=>sharePdf('proposal')}/>
+    <Action title={busy?'Creating PDF...':'Prepare & share formal proposal / Propuesta formal'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('proposal')}/>
     {!readiness.ready&&<Text style={styles.notice}>Complete quantities and prices before preparing the customer proposal.</Text>}
     <View style={styles.row}>
      <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
