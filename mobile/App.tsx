@@ -26,19 +26,37 @@ function Action({title,onPress,secondary=false,disabled=false}:{title:string;onP
 function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef,onEndEditing}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<React.ElementRef<typeof TextInput>>;onEndEditing?:()=>void}){
  return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} onEndEditing={onEndEditing} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
 }
+/**
+ * Small vector-like mixer truck, built with native Views so it renders
+ * consistently on iPhone without emoji/font substitutions or a native rebuild.
+ */
+function ConcreteMixerGlyph({selected}:{selected:boolean}){
+ const c=selected?'#FFFFFF':'#087E8B';
+ return <View accessibilityLabel="Concrete mixer truck" style={{width:39,height:31,justifyContent:'flex-end',flexShrink:0}}>
+  <View style={{position:'absolute',left:2,top:20,width:35,height:5,backgroundColor:c,borderRadius:2}}/>
+  <View style={{position:'absolute',left:3,top:10,width:21,height:15,borderWidth:2,borderColor:c,backgroundColor:selected?'#13256F':'#E7F6F8',borderRadius:5,transform:[{rotate:'-23deg'}]}}/>
+  <View style={{position:'absolute',left:12,top:9,width:2,height:16,backgroundColor:c,transform:[{rotate:'-23deg'}]}}/>
+  <View style={{position:'absolute',right:1,top:13,width:11,height:12,borderColor:c,borderWidth:2,borderTopLeftRadius:3,borderTopRightRadius:5,backgroundColor:selected?'#13256F':'#E7F6F8'}}/>
+  <View style={{position:'absolute',right:3,top:15,width:5,height:4,backgroundColor:selected?'#FFFFFF':'#9CDCE0',borderTopRightRadius:2}}/>
+  <View style={{flexDirection:'row',justifyContent:'space-between',paddingHorizontal:7,marginBottom:1}}>
+   <View style={{width:8,height:8,borderRadius:5,borderWidth:2,borderColor:c,backgroundColor:selected?'#13256F':'#FFFFFF'}}/>
+   <View style={{width:8,height:8,borderRadius:5,borderWidth:2,borderColor:c,backgroundColor:selected?'#13256F':'#FFFFFF'}}/>
+  </View>
+ </View>;
+}
+function HouseGlyph({selected}:{selected:boolean}){
+ const c=selected?'#FFFFFF':'#087E8B';
+ return <View accessibilityLabel="House remodeling" style={{width:34,height:32,alignItems:'center',justifyContent:'flex-end',flexShrink:0}}>
+  <View style={{position:'absolute',top:5,left:6,width:23,height:23,borderTopWidth:3,borderLeftWidth:3,borderColor:c,transform:[{rotate:'45deg'}],borderTopLeftRadius:2}}/>
+  <View style={{width:23,height:18,borderWidth:2.5,borderColor:c,borderTopWidth:0,borderRadius:1,alignItems:'center',justifyContent:'flex-end'}}>
+   <View style={{width:7,height:11,borderWidth:2,borderBottomWidth:0,borderColor:c,borderTopLeftRadius:1,borderTopRightRadius:1}}/>
+  </View>
+ </View>;
+}
 function ServiceGlyph({trade,selected}:{trade:Trade;selected:boolean}){
- if(trade==='concrete'){
-  const c=selected?'#FFFFFF':'#0B8E95';
-  return <View style={{width:29,height:27,justifyContent:'flex-end'}}>
-   <View style={{position:'absolute',top:1,left:7,width:17,height:15,borderWidth:2,borderColor:c,borderRadius:6,transform:[{rotate:'-25deg'}]}}/>
-   <View style={{width:25,height:7,borderWidth:2,borderColor:c,borderRadius:2}}/>
-   <View style={{flexDirection:'row',justifyContent:'space-between',width:23,marginLeft:1,marginTop:2}}>
-    <View style={{width:6,height:6,borderRadius:3,backgroundColor:c}}/>
-    <View style={{width:6,height:6,borderRadius:3,backgroundColor:c}}/>
-   </View>
-  </View>;
- }
- return <Text style={[styles.serviceIcon,selected&&{color:PALETTE.white}]}>{({electrical:'ϟ',plumbing:'🚰',painting:'🖌',handyman:'🛠',remodel:'⌂',cleaning:'🧹'} as Partial<Record<Trade,string>>)[trade]}</Text>;
+ if(trade==='concrete')return <ConcreteMixerGlyph selected={selected}/>;
+ if(trade==='remodel')return <HouseGlyph selected={selected}/>;
+ return <Text style={[styles.serviceIcon,selected&&{color:PALETTE.white}]}>{({electrical:'ϟ',plumbing:'🚰',painting:'🖌',handyman:'🛠',cleaning:'🧹'} as Partial<Record<Trade,string>>)[trade]}</Text>;
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
