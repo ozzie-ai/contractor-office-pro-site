@@ -11,6 +11,8 @@ Set COP_DATA_DIR to place it on your external drive. 127.0.0.1 only by default.
 import argparse
 import csv
 import json
+import hmac
+import secrets
 import os
 from pathlib import Path
 import sqlite3
@@ -100,6 +102,8 @@ def process_row(raw):
             raise ValueError(k+" must be 0 or 1")
         row[k] = int(row[k])
     # Only save records we have a documented right to reuse.
+    if row["verified"] and not (row["license"] or row["source_url"]):
+        raise ValueError("verified data requires license or source URL")
     if not row["reuse_allowed"]:
         raise ValueError("Import requires explicit commercial reuse permission (reuse_allowed=1)")
     row["created_utc"] = datetime.now(timezone.utc).isoformat()
@@ -146,7 +150,9 @@ def reference(db, task, region):
             "source_url":o["source_url"],"license":o["license"],
             "notes":o["notes"],"rate_is_not_customer_quote":True}
 
-def handler():
+def handler(token=None):
+    if token is None:
+        token=os.environ.get("COP_LOCAL_API_TOKEN","").strip()
     class Handler(BaseHTTPRequestHandler):
         def respond(self, code, payload):
             body=json.dumps(payload,ensure_ascii=False).encode("utf-8")
@@ -157,6 +163,9 @@ def handler():
             self.end_headers()
             self.wfile.write(body)
         def do_GET(self):
+            supplied=self.headers.get("Authorization","")
+            if token and not hmac.compare_digest(supplied,"Bearer "+token):
+                return self.respond(401,{"error":"Authorization required"})
             u=urlparse(self.path)
             if u.path == "/health":
                 return self.respond(200,{"ok":True,"storage":str(db_path()),"mode":"local"})
@@ -181,6 +190,8 @@ def main():
     p.add_argument("--host",default="127.0.0.1",
         help="Defaults to loopback. Exposing to LAN requires adding authentication first.")
     p.add_argument("--port",type=int,default=8765)
+    p.add_argument("--lan",action="store_true",
+        help="Bind to private Wi-Fi with mandatory bearer token. Never forward the port on the router.")
     a=p.parse_args()
     if a.command=="init":
         with connect() as db:
@@ -191,12 +202,17 @@ def main():
             p.error("import-csv needs a CSV filename")
         import_csv(a.csv_file)
     else:
-        if a.host not in ("127.0.0.1","localhost","::1"):
-            p.error("LAN/public binding disabled until request authentication and firewall controls are implemented")
+        if a.host not in ("127.0.0.1","localhost","::1") and not a.lan:
+            p.error("Non-loopback binding requires --lan and COP_LOCAL_API_TOKEN")
+        token=os.environ.get("COP_LOCAL_API_TOKEN","").strip()
+        if a.lan and (not token or len(token)<24):
+            p.error("--lan requires a secret COP_LOCAL_API_TOKEN with at least 24 characters")
+        if a.lan and a.host in ("0.0.0.0","::"):
+            p.error("Bind explicitly to your Mac's private network IP, not every interface")
         with connect():
             pass
-        server=ThreadingHTTPServer((a.host,a.port),handler())
-        print(f"Local database on http://{a.host}:{a.port} ; Ctrl+C to stop")
+        server=ThreadingHTTPServer((a.host,a.port),handler(token))
+        print(f"Local database on http://{a.host}:{a.port} ; Ctrl+C to stop; token auth: {bool(token)}")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
