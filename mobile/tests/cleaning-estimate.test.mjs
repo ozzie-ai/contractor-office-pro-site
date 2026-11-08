@@ -27,7 +27,8 @@ test('bilingual cleaning proposal displays separate recurring price without priv
  const project={...priced,trade:'cleaning',contractor:'Cleaning Co',customer:'Client',city:'Santa Clarita',address:'123 Sample Street',description:'PRIVATE VOICE DICTATION',customerNotes:'',exclusions:[],futureWork:[],status:'sent',followUpNotes:'PRIVATE FOLLOWUP',language:'es',overheadPct:10,profitPct:20};
  const html=proposalHtml(project,'proposal');
  assert.ok(html.includes('PROPUESTA DE TRABAJO'));
- assert.ok(html.includes('SERVICIO RECURRENTE'));
+ assert.ok(html.includes('PLAN DE LIMPIEZA'));
+ assert.ok(html.includes('Precio por visita posterior:'));
  assert.ok(html.includes('237.60'));
  assert.equal(html.includes('PRIVATE VOICE'),false);
  assert.equal(html.includes('PRIVATE FOLLOWUP'),false);
@@ -41,4 +42,24 @@ test('recurring price recalculates with edited profit setting',()=>{
  const priced=cleaningToProject(c,{overheadPct:10,profitPct:20});
  assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:20}),237.6);
  assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:15}),227.7);
+});
+
+test('one-time cleaning proposal explicitly says one-time and labels service address',()=>{
+ const one={...c,frequency:'once'};
+ const priced=cleaningToProject(one,{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',contractor:'Cleaner',customer:'Clarisse',city:'Santa Clarita',address:'123 Test Road',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const html=proposalHtml(p,'estimate');
+ assert.ok(html.includes('One-time service'));
+ assert.ok(html.includes('Service address:'));
+ assert.ok(html.includes('123 Test Road'));
+ assert.ok(!html.includes('Price per subsequent visit:'));
+});
+test('recurring cleaning proposal names monthly frequency and price per visit',()=>{
+ const monthly={...c,frequency:'twice_monthly'};
+ const priced=cleaningToProject(monthly,{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',contractor:'Cleaner',customer:'Clarisse',city:'Santa Clarita',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const html=proposalHtml(p,'proposal');
+ assert.ok(html.includes('Twice monthly'));
+ assert.ok(html.includes('Price per subsequent visit:'));
+ assert.ok(html.includes('237.60'));
 });
