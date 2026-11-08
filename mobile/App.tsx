@@ -344,13 +344,13 @@ export default function App(){
     <Text style={styles.h2}>{tr("1 · New Job","1 · Nuevo trabajo")}</Text>
     <Text style={styles.hint}>{tr("Choose a service, describe the job, and add photos.","Elige un servicio, describe el trabajo y agrega fotos.")}</Text>
     <View style={styles.tradeGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text></Pressable>)}</View>
-    <Input label={tr("Business","Negocio")} value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name (pre-filled from profile)"/>
-    <Input label={tr("Customer","Cliente")} value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
-    <Input label={tr("City","Ciudad")} value={project.city} onChangeText={x=>patch({city:x})} placeholder="City"/>
-    <Input label={tr("Service address","Dirección del trabajo")} value={project.address||''} onChangeText={x=>{addressRef.current=x;patch({address:x,propertyArea:undefined});setPropertyMessage('');}} onEndEditing={()=>{if(PROPERTY_LOOKUP_URL&&(project.address||'').trim().length>=12)void lookupProperty();}} placeholder="Street address, city, state, ZIP"/>
-    <Action title={propertyBusy?'Looking up address… / Buscando…':'Find property sq ft / Buscar pies cuadrados'} disabled={propertyBusy} secondary onPress={lookupProperty}/>
+    <Input label={tr("Business","Negocio")} value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder={tr('Your business name','Nombre de tu negocio')}/>
+    <Input label={tr("Customer","Cliente")} value={project.customer} onChangeText={x=>patch({customer:x})} placeholder={tr('Customer name','Nombre del cliente')}/>
+    <Input label={tr("City","Ciudad")} value={project.city} onChangeText={x=>patch({city:x})} placeholder={tr('City','Ciudad')}/>
+    <Input label={tr("Service address","Dirección del trabajo")} value={project.address||''} onChangeText={x=>{addressRef.current=x;patch({address:x,propertyArea:undefined});setPropertyMessage('');}} onEndEditing={()=>{if(PROPERTY_LOOKUP_URL&&(project.address||'').trim().length>=12)void lookupProperty();}} placeholder={tr('Street, city, state, ZIP','Calle, ciudad, estado y código postal')}/>
+    <Action title={propertyBusy?tr('Searching…','Buscando…'):tr('Find property size','Buscar tamaño de la propiedad')} disabled={propertyBusy} secondary onPress={lookupProperty}/>
     {!!propertyMessage&&<Text style={styles.hint}>{propertyMessage}</Text>}
-    {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>}
+    {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>{tr('Property record','Registro de propiedad')}: {project.propertyArea.squareFootage.toLocaleString('en-US')} {tr('sq ft','pies²')} · {project.propertyArea.source}. {tr('Address','Dirección')}: {project.propertyArea.matchedAddress}. {tr('Verify the actual area of work.','Confirma el área real del trabajo.')}</Text>}
     {project.trade==='cleaning'&&<View style={styles.lineCard}>
      <Text style={styles.h2}>{tr("Cleaning details","Detalles de limpieza")}</Text>
      <Text style={styles.label}>{tr("Cleaning type","Tipo de limpieza")}</Text>
@@ -392,8 +392,8 @@ export default function App(){
        <Text style={styles.tradeText}>{(project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).includes(task.id)?'☑':'☐'} {task[businessProfile.language]}</Text>
        
       </Pressable>)}
-      <Text style={styles.notice}>Area/dust-based planning hours: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} total worker-hours. Entered: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. Price automatically uses the larger number unless you explicitly confirm your own site-assessed hours.</Text>
-      <Text style={styles.hint}>Currently priced worker-hours: {(project.cleaning?.laborHoursConfirmed&&project.cleaning?.laborHoursVerificationVersion===2)?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
+      <Text style={styles.notice}>{tr('Area-based hours','Horas calculadas por área')}: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))}. {tr('Entered','Ingresadas')}: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. {tr('Pricing uses the higher amount unless you confirm measured hours.','El precio usa la cantidad mayor, salvo que confirmes horas medidas.')}</Text>
+      <Text style={styles.hint}>{tr('Priced labor hours','Horas incluidas en el precio')}: {(project.cleaning?.laborHoursConfirmed&&project.cleaning?.laborHoursVerificationVersion===2)?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. {tr('Planning estimate.','Estimado preliminar.')}</Text>
       <Action title={tr("Use measured hours","Usar horas medidas")} secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        Alert.alert('Confirm site-assessed labor / Confirmar horas','Use '+(c.workers*c.firstHoursPerWorker)+' actual worker-hours for this job instead of the area-based guideline only if you assessed the condition and scope.',[
@@ -412,19 +412,19 @@ export default function App(){
     <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
-    <Text style={styles.hint}>{photos.length} local photos selected. Photos stay on your device and are not uploaded in this pilot.</Text>
+    <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
     <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("2 · Prepare scope","2 · Preparar alcance")}</Text>
-    <Text style={styles.hint}>{project.trade==='cleaning'?'We will price an initial deep clean and a separate price for recurring visits using your crew-hours and cost settings.':'Your dictated notes become editable work items. No backend address, developer code, or AI account is needed for this offline estimate.'}</Text>
-    <Action title={project.trade==='cleaning'?'Calculate cleaning prices / Calcular limpieza':'Build work items from dictation / Crear partidas'} onPress={createLocalDraft}/>
+    <Text style={styles.hint}>{project.trade==='cleaning'?tr('First cleaning and recurring visits are priced separately.','La primera limpieza y las visitas periódicas se calculan por separado.'):tr('Turn your job notes into an editable estimate.','Convierte tus notas en un estimado editable.')}</Text>
+    <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
-    <Text style={styles.hint}>{aiConnected?'AI interpretation received. ':'Draft estimate from dictated work or manual entry. '}Offline planning rates are illustrative, not verified supplier quotes. Review quantities and every rate.</Text>
+    <Text style={styles.hint}>{tr('Review quantities and prices before sharing.','Revisa cantidades y precios antes de compartir.')}</Text>
     {pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
      {project.trade==='cleaning'&&line.id==='clean-initial'?<View>
       <Text style={styles.label}>{tr("Cleaning price","Precio de limpieza")}</Text>
@@ -432,11 +432,11 @@ export default function App(){
       <Text style={styles.hint}>{tr("Price updates automatically as job details change.","El precio se actualiza automáticamente cuando cambia el trabajo.")}</Text>
       <Action title={tr("Review labor hours","Revisar horas de trabajo")} secondary onPress={()=>setStage(0)}/>
      </View>:<>
-     <Text style={styles.lineNumber}>WORK ITEM {i+1}</Text>
+     <Text style={styles.lineNumber}>{tr('ITEM','PARTIDA')} {i+1}</Text>
      <Input label={tr("Description in English","Descripción en inglés")} value={line.description_en} onChangeText={x=>setLine(i,{description_en:x})}/>
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
-     <Text style={styles.rate}>Line amount: {money(line.quantity*line.rate)}</Text>
+     <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
@@ -452,7 +452,7 @@ export default function App(){
     <Action title={tr("Add work item","Agregar partida")} secondary onPress={addLine}/>
     <Input label={tr("Exclusions (one per line)","Exclusiones (una por línea)")} multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label={tr("Future work (excluded)","Trabajo futuro (no incluido)")} multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
-    {project.unknowns.length>0&&<Text style={styles.notice}>Planning estimate — confirm before pricing: {project.unknowns.join('; ')}</Text>}
+    {project.unknowns.length>0&&<Text style={styles.notice}>{tr('Check before sharing','Revisar antes de compartir')}: {project.unknowns.join('; ')}</Text>}
     {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Missing measurement","Falta una medida")}</Text>
       <Text style={styles.hint}>{tr("Enter the measured shower wall height in feet.","Ingresa la altura medida de las paredes de la regadera, en pies.")}</Text>
