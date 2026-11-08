@@ -11,7 +11,7 @@ import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
-import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
+import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
@@ -474,7 +474,7 @@ export default function App(){
     <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
-      <Text style={styles.total}>{project.cleaning.type==='post_construction'&&!(project.cleaning.laborHoursConfirmed&&project.cleaning.laborHoursVerificationVersion===2)?Math.max(project.cleaning.workers*project.cleaning.firstHoursPerWorker,recommendedPostConstructionWorkerHours(project.cleaning)):project.cleaning.workers*project.cleaning.firstHoursPerWorker} {tr('worker-hours','horas-persona')}</Text>
+      <Text style={styles.total}>{plannedCleaningWorkerHours(project.cleaning)} {tr('worker-hours','horas-persona')}</Text>
       <Text style={styles.hint}>{project.cleaning.workers} {tr('workers','personas')} · {project.cleaning.areaSqFt||tr('Area pending','Área pendiente')} {tr('sq ft','pies²')} · {project.cleaning.type==='post_construction'?tr(({light:'Light',moderate:'Moderate',heavy:'Heavy'} as const)[project.cleaning.dustLevel||'moderate'],({light:'Ligero',moderate:'Moderado',heavy:'Abundante'} as const)[project.cleaning.dustLevel||'moderate']):tr('Deep cleaning','Limpieza profunda')}. {tr('Edit in Step 1.','Editar en el paso 1.')}</Text>
     </View>}
     <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {money(total.total)}</Text>
