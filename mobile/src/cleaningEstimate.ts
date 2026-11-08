@@ -27,6 +27,12 @@ export function cleaningQuoteFingerprint(c:CleaningDetails,overheadPct:number,pr
  */
 export function currentCleaningProject(p:Project):Project{
  if(p.trade!=='cleaning'||!p.cleaning)return p;
+ // A new cleaning job is not a quote until service type and required inputs are confirmed.
+ // Legacy saved estimates have no confirmation flag and remain compatible.
+ if(p.cleaning.cleaningTypeConfirmed===false||p.cleaning.workers<1||
+   (p.cleaning.type==='post_construction'&&p.cleaning.areaSqFt<=0)||
+   (p.cleaning.firstHoursPerWorker<=0&&p.cleaning.type!=='post_construction'))
+  return {...p,lines:p.lines.filter(x=>x.id!=='clean-initial'),cleaningQuoteSignature:undefined};
  const priced=cleaningToProject(p.cleaning,p);
  const otherLines=p.lines.filter(x=>x.id!=='clean-initial');
  return {...p,...priced,lines:[...priced.lines,...otherLines]};
@@ -41,7 +47,7 @@ const round=(n:number)=>Math.round(n*100)/100;
 const line=(en:string,es:string,rate:number):EstimateLine=>({id:'clean-initial',description_en:en,description_es:es,quantity:1,unit:'visit',rate,status:'allowance_to_confirm'});
 export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:number):CleaningQuote{
  const nums=[c.bedrooms,c.bathrooms,c.livingRooms,c.areaSqFt,c.workers,c.firstHoursPerWorker,c.repeatHoursPerWorker,c.laborCostPerHour,c.firstSupplies,c.repeatSupplies,c.travelPerVisit,overheadPct,profitPct];
- if(nums.some(n=>!Number.isFinite(n)||n<0)||c.workers<1||c.firstHoursPerWorker<=0)throw new Error('Check crew size, hours, and cost values.');
+ if(nums.some(n=>!Number.isFinite(n)||n<0)||c.workers<1||(c.firstHoursPerWorker<=0&&!(c.type==='post_construction'&&c.areaSqFt>0)))throw new Error('Check crew size, hours, and cost values.');
  // For construction cleans, area and dust change the actual priced worker-hours, not merely a warning.
  // The user can deliberately use fewer hours only after confirming their own site-assessed hours.
  const suggested=recommendedPostConstructionWorkerHours(c);
