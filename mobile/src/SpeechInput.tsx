@@ -1,26 +1,27 @@
 import React,{useRef,useState} from 'react';
 import {Keyboard,Pressable,StyleSheet,Text,TextInput,View} from 'react-native';
 
-type Props={description:string;onChange:(text:string)=>void};
+type Props={description:string;onChange:(text:string)=>void;language?:'en'|'es'};
 
 /**
  * Stable keyboard dictation UI while investigating the iOS native speech crash.
  * Both the button and the editable field are inside this component, so focus
  * does not depend on a cross-component ref.
  */
-export default function SpeechInput({description,onChange}:Props){
+export default function SpeechInput({description,onChange,language='en'}:Props){
+  const tr=(en:string,es:string)=>language==='es'?es:en;
   const field=useRef<React.ElementRef<typeof TextInput>>(null);
   const [focused,setFocused]=useState(false);
   const activate=()=>{
     field.current?.focus();
   };
   return <View style={styles.container}>
-    <Text style={styles.title}>🎙 Dictado / Speech-to-text</Text>
-    <Text style={styles.note}>Toca el botón verde. Cuando aparezca el teclado, toca su micrófono y describe tu trabajo en español o inglés.</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel="Open transcript keyboard" onPress={activate} style={styles.button}>
-      <Text style={styles.buttonText}>🎙 Abrir teclado / Open keyboard</Text>
+    <Text style={styles.title}>{tr('🎙 Describe the job','🎙 Describe el trabajo')}</Text>
+    <Text style={styles.note}>{tr('Tap the button, then use your keyboard microphone to dictate.','Toca el botón y luego el micrófono del teclado para dictar.')}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={tr("Open keyboard","Abrir teclado")} onPress={activate} style={styles.button}>
+      <Text style={styles.buttonText}>{tr('🎙 Open keyboard','🎙 Abrir teclado')}</Text>
     </Pressable>
-    <Text style={styles.label}>Descripción del trabajo / Editable job transcript</Text>
+    <Text style={styles.label}>{tr('Job description','Descripción del trabajo')}</Text>
     <TextInput
       ref={field}
       style={styles.input}
@@ -31,13 +32,13 @@ export default function SpeechInput({description,onChange}:Props){
       onChangeText={onChange}
       onFocus={()=>setFocused(true)}
       onBlur={()=>setFocused(false)}
-      placeholder="Describe tu trabajo aquí. Usa el micrófono del teclado para dictar."
+      placeholder={tr("Describe the work, or use keyboard dictation.","Describe el trabajo o usa el micrófono del teclado.")}
       placeholderTextColor="#84969a"
-      accessibilityLabel="Editable job description"
+      accessibilityLabel={tr("Editable job description","Descripción de trabajo editable")}
       returnKeyType="default"
     />
-    <Text style={styles.help}>{focused?'Teclado abierto: toca el micrófono del iPhone para hablar.':'También puedes tocar directamente la caja blanca y escribir o dictar.'}</Text>
-    <Text style={styles.small}>El dictado nativo directo está desactivado temporalmente para evitar el cierre de la aplicación.</Text>
+    <Text style={styles.help}>{focused?tr('Tap the iPhone microphone to speak.','Toca el micrófono del iPhone para hablar.'):tr('You can type or dictate your description.','Puedes escribir o dictar la descripción.')}</Text>
+    <Text style={styles.small}>{tr('Keyboard dictation is available.','Puedes usar el dictado del teclado.')}</Text>
   </View>;
 }
 const styles=StyleSheet.create({
