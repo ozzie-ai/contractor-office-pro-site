@@ -15,6 +15,13 @@ export function recommendedPostConstructionWorkerHours(c:CleaningDetails):number
  const sqftPerWorkerHour=c.dustLevel==='heavy'?100:c.dustLevel==='moderate'?160:240;
  return Math.ceil(c.areaSqFt/sqftPerWorkerHour);
 }
+export function plannedCleaningWorkerHours(c:CleaningDetails):number{
+ const entered=c.workers*c.firstHoursPerWorker;
+ const suggested=c.type==='post_construction'
+  ?recommendedPostConstructionWorkerHours(c)
+  :c.areaSqFt>0?Math.ceil(c.areaSqFt/(c.type==='office'?300:c.type==='specialty'?180:250)):0;
+ return c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2?entered:Math.max(entered,suggested);
+}
 /** Input fingerprint for the most recently calculated cleaning price.
  * An old saved draft without this marker must be recalculated before sharing.
  */
@@ -51,7 +58,7 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
  const standardAreaHours=c.areaSqFt>0?Math.ceil(c.areaSqFt/(c.type==='office'?300:c.type==='specialty'?180:250)):0;
  const planningHours=c.type==='post_construction'?suggested:standardAreaHours;
  const verified=c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2;
- const workerHours=verified?entered:Math.max(entered,planningHours);
+ const workerHours=plannedCleaningWorkerHours(c);
  const initialBase=round(workerHours*c.laborCostPerHour+c.firstSupplies+c.travelPerVisit);
  const recurringBase=round(c.workers*c.repeatHoursPerWorker*c.laborCostPerHour+c.repeatSupplies+c.travelPerVisit);
  const factor=(1+overheadPct/100)*(1+profitPct/100);
