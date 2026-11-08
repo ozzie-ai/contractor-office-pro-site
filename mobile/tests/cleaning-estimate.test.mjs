@@ -79,7 +79,7 @@ test('heavy construction dust produces a detailed scope and a labor time review'
  const heavy={...c,type:'post_construction',dustLevel:'heavy',areaSqFt:1800,postConstructionTasks:['dust','cabinets','floors']};
  const priced=priceCleaning(heavy,10,20);
  assert.equal(recommendedPostConstructionWorkerHours(heavy),18);
- assert.ok(priced.unknowns.some(x=>x.includes('REVIEW LABOR HOURS')));
+ assert.ok(priced.unknowns.some(x=>x.includes('AREA-BASED LABOR APPLIED')));
  assert.match(priced.lines[0].description_en,/Fine construction dust removal/);
  assert.match(priced.lines[0].description_en,/cabinets/);
  assert.equal(priced.lines[0].description_en.includes('interior windows'),false);
