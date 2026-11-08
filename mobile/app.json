@@ -39,7 +39,8 @@
       ]
     ],
     "extra": {
-      "apiUrl": ""
+      "apiUrl": "",
+      "propertyLookupUrl": ""
     },
     "newArchEnabled": true
   }
