@@ -19,7 +19,7 @@ export type Project={
  lines:EstimateLine[];exclusions:string[];futureWork:string[];unknowns:string[];
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
  status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
- address?:string;cleaning?:CleaningDetails;
+ address?:string;cleaning?:CleaningDetails;cleaningQuoteSignature?:string;
 };
 export const TRADES:Record<Trade,{en:string;es:string}>={
  electrical:{en:'Electrical',es:'Electricidad'},
