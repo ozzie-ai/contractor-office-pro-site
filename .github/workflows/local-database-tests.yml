@@ -1,0 +1,20 @@
+name: Free local pricing database tests
+on:
+  push:
+    paths:
+      - 'database/**'
+      - '.github/workflows/local-database-tests.yml'
+  pull_request:
+    paths:
+      - 'database/**'
+      - '.github/workflows/local-database-tests.yml'
+jobs:
+  local-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test SQLite setup and data validation
+        run: python3 -m unittest discover -s database -p 'test_*.py' -v
