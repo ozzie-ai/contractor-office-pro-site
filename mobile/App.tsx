@@ -266,7 +266,7 @@ export default function App(){
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote={...currentCleaningProject(project),language:pdfLanguage};
   if(quote.trade==='cleaning'&&quote.cleaning?.cleaningTypeConfirmed===false){Alert.alert(tr('Choose cleaning type','Elige tipo de limpieza'),tr('Select a service before sharing.','Selecciona un servicio antes de compartir.'));setStage(0);return;}
-  if(quote.trade='cleaning'&&quote.cleaning?.type==='post_construction'&&(!quote.cleaning.areaSqFt||!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length)){
+  if(quote.trade==='cleaning'&&quote.cleaning?.type==='post_construction'&&(!quote.cleaning.areaSqFt||!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length)){
    Alert.alert('Missing cleaning details','Enter square footage and select the work included before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
    return;
   }
