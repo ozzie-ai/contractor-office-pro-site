@@ -30,6 +30,7 @@ export default function App(){
  const [project,setProject]=useState<Project>(initial);
  const [businessProfile,setBusinessProfile]=useState<BusinessProfile>(defaultProfile);
  const [showProfile,setShowProfile]=useState(false);
+ const [showJobs,setShowJobs]=useState(false);
  const [profileSaved,setProfileSaved]=useState('');
 
  const [activeJobId,setActiveJobId]=useState(newJobId);
@@ -64,7 +65,8 @@ export default function App(){
   setStage(0);
   addressRef.current='';
   makeActive(null);
-  setSaveStatus('New job — ready to start. Previous jobs are listed below.');
+  setShowJobs(false);
+  setSaveStatus('New job — ready to start.');
   setLoaded(true);
  },[]);
  useEffect(()=>{
@@ -105,7 +107,9 @@ export default function App(){
   }
  };
  const goToMyJobs=()=>{
-  saveCurrent();
+  if(!saveCurrent())return;
+  setShowProfile(false);
+  setShowJobs(true);
   scrollRef.current?.scrollTo({y:0,animated:true});
  };
  const openSaved=(job:SavedJob)=>{
@@ -118,6 +122,8 @@ export default function App(){
   setAiConnected(false);
   makeActive(job.id);
   setShareDone(false);
+  setShowJobs(false);
+  setShowProfile(false);
   setSaveStatus('Opened saved job');
   scrollRef.current?.scrollTo({y:0,animated:true});
  };
@@ -133,11 +139,20 @@ export default function App(){
   setInfo('');
   makeActive(null);
   setShareDone(false);
+  setShowJobs(false);
+  setShowProfile(false);
   setSaveStatus('New job — ready to dictate');
   scrollRef.current?.scrollTo({y:0,animated:true});
  };
 
  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
+ const tr=(en:string,es:string)=>businessProfile.language==='es'?es:en;
+ const chooseLanguage=(language:Language)=>{
+  const updated={...businessProfile,language};
+  try{saveProfile(updated);setBusinessProfile(updated);patch({language});}
+  catch{Alert.alert('Language','Could not save your language preference.');}
+ };
+
  const patchProfile=(updates:Partial<BusinessProfile>)=>setBusinessProfile(prev=>({...prev,...updates}));
  const commitProfile=()=>{
   try{
@@ -276,14 +291,21 @@ export default function App(){
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-   <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO · MOBILE PILOT</Text>
-   <Text style={styles.title}>You Build.{'\n'}We Handle the Office.</Text>
-   <View style={styles.card}>
-    <Text style={styles.h2}>Business setup / Mi negocio</Text>
-    <Text style={styles.hint}>{businessProfile.name||'Set your business name and select your services once.'} · {businessProfile.enabledTrades.length} selected services</Text>
-    <Action title={showProfile?'Close settings':'Edit business profile / Configurar negocio'} secondary onPress={()=>setShowProfile(v=>!v)}/>
+   <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO</Text>
+   <View style={styles.row}>
+    <View style={{flex:1}}><Action title={tr('New Job','Nuevo trabajo')} onPress={startNewJob}/></View>
+    <View style={{flex:1}}><Action title={tr('My Jobs','Mis trabajos')+(savedJobs.length?' ('+savedJobs.length+')':'')} secondary={!showJobs} onPress={goToMyJobs}/></View>
+   </View>
+   <View style={styles.row}>
+    <View style={{flex:1}}><Action title="English" secondary={businessProfile.language!=='en'} onPress={()=>chooseLanguage('en')}/></View>
+    <View style={{flex:1}}><Action title="Español" secondary={businessProfile.language!=='es'} onPress={()=>chooseLanguage('es')}/></View>
+    <View style={{flex:1}}><Action title={tr('Settings','Ajustes')} secondary onPress={()=>{setShowJobs(false);setShowProfile(x=>!x);}}/></View>
+   </View>
+   {showProfile&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr('Business settings','Configuración del negocio')}</Text>
+    <Text style={styles.hint}>{businessProfile.name||tr('Set up your business once.','Configura tu negocio una sola vez.')} · {businessProfile.enabledTrades.length} {tr('services','servicios')}</Text>
     {!!profileSaved&&<Text style={styles.hint}>{profileSaved}</Text>}
-    {showProfile&&<View>
+    <View>
       <Input label="My company or professional name / Mi negocio" value={businessProfile.name} onChangeText={x=>patchProfile({name:x})}/>
       <Text style={styles.label}>Services I offer / Servicios que ofrezco</Text>
       <View style={styles.tradeGrid}>
@@ -302,24 +324,26 @@ export default function App(){
       {businessProfile.enabledTrades.includes('cleaning')&&<Input label="Cleaning labor cost per worker-hour ($), NOT client rate" number value={String(businessProfile.cleaningLaborCostPerHour)} onChangeText={x=>patchProfile({cleaningLaborCostPerHour:cleaningInput(x)})}/>}
       <Action title="Save business settings / Guardar preferencias" onPress={commitProfile}/>
       <Text style={styles.hint}>These defaults apply to NEW jobs; existing saved estimates keep their rates and scope.</Text>
-    </View>}
-   </View>
-   <View style={styles.card}>
-    <Text style={styles.h2}>My Jobs / Mis trabajos</Text>
-    <Text style={styles.hint}>Save a job and return to it later. Drafts are stored on this iPhone, not in the cloud.</Text>
-    <Text style={styles.hint}>{saveStatus||'Local drafts · Not synced to the cloud'}</Text>
+    </View>
+   </View>}
+   {showJobs&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr('My Jobs','Mis trabajos')}</Text>
+    <Text style={styles.hint}>{tr('Tap a saved job to continue. Jobs are stored on this phone.','Toca un trabajo guardado para continuar. Los trabajos están en este teléfono.')}</Text>
+    <Text style={styles.hint}>{saveStatus}</Text>
     <View style={styles.row}>
      <View style={{flex:1}}><Action title="Save now / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
      <View style={{flex:1}}><Action title="+ New job / Nuevo" onPress={startNewJob}/></View>
     </View>
-    {savedJobs.length===0?<Text style={styles.hint}>No saved jobs yet. Dictate your first job below.</Text>:
+    {savedJobs.length===0?<Text style={styles.hint}>{tr('No saved jobs yet.','Aún no hay trabajos guardados.')}</Text>:
     savedJobs.slice(0,10).map(j=><Pressable key={j.id} accessibilityRole="button" onPress={()=>openSaved(j)} style={[styles.savedJob,j.id===activeJobId&&{borderColor:PALETTE.accent}]}>
      <Text style={{fontWeight:'800',color:PALETTE.ink}}>{j.project.customer||j.project.city||j.project.description.slice(0,42)||'Untitled job'}{j.id===activeJobId?' · Current':''}</Text>
      <Text style={styles.hint}>{TRADES[j.project.trade].en} · {JOB_STATUSES[j.project.status||'draft'].en} · {j.project.lines.length} items · {new Date(j.updatedAt).toLocaleString()}</Text>
      <Text style={{color:PALETTE.accent,fontWeight:'700'}}>Open / Continuar</Text>
     </Pressable>)}
    </View>
-   <View style={styles.steps}>{['Job','Scope','Price','Send','Follow up'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
+   {!showJobs&&<>
+   <Text style={styles.h2}>{stage===0?tr('New Job','Nuevo trabajo'):tr('Job workspace','Área de trabajo')}{project.customer?' · '+project.customer:''}</Text>
+   <View style={styles.steps}>{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguimiento']:['Job','Scope','Price','Send','Follow up']).map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
     <Text style={styles.h2}>1 · Start a job</Text>
     <Text style={styles.hint}>Choose the trade, describe the work in Spanish or English, and add site photos.</Text>
@@ -505,6 +529,7 @@ export default function App(){
     </View>
     <Action title="Back to estimate / Volver al estimado" secondary onPress={()=>setStage(3)}/>
    </View>}
+   </>}
    <Text style={styles.footer}>Drafts are stored on this phone only. Uninstalling removes local drafts. Keyboard dictation works offline. Planning rates are editable and not verified supplier bids.</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
