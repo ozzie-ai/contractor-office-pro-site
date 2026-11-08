@@ -15,7 +15,7 @@ import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASK
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
-const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
+const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
 const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'once',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:0,bathrooms:0,livingRooms:0,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
 type Stage=0|1|2|3|4;
@@ -304,18 +304,36 @@ export default function App(){
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-   <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO</Text>
-    <Text style={{fontSize:11,color:PALETTE.muted,fontWeight:'800'}}>MOBILE UI 24</Text>
+   <View style={styles.hero}>
+    <View style={styles.heroDecoration}/>
+    <View style={styles.heroTop}>
+     <View style={styles.brandMark}><Text style={styles.brandGlyph}>⌂</Text></View>
+     <View style={{flex:1,minWidth:0}}>
+      <Text style={styles.brandTitle} numberOfLines={2}>Contractor Office Pro</Text>
+      <Text style={styles.brandSubtitle}>{tr('Your office, simplified','Tu oficina, simplificada')}</Text>
+     </View>
+     <Pressable accessibilityRole="button" accessibilityLabel={tr('Business settings','Ajustes del negocio')} onPress={()=>{setShowJobs(false);setShowProfile(x=>!x);}} style={styles.settingsButton}>
+      <Text style={styles.settingsGlyph}>⚙</Text>
+     </Pressable>
+    </View>
+    <View style={styles.heroBottom}>
+     <Text style={styles.heroVersion}>UI 27 · PILOT</Text>
+     <View style={styles.languageSwitch}>
+      {(['en','es'] as const).map(lang=><Pressable key={lang} accessibilityRole="button" accessibilityLabel={lang==='en'?'English':'Español'} accessibilityState={{selected:businessProfile.language===lang}} onPress={()=>chooseLanguage(lang)} style={[styles.languageOption,businessProfile.language===lang&&styles.languageSelected]}>
+       <Text style={[styles.languageText,businessProfile.language===lang&&styles.languageTextSelected]}>{lang.toUpperCase()}</Text>
+      </Pressable>)}
+     </View>
+    </View>
    </View>
-   <View style={styles.row}>
-    <View style={{flex:1}}><Action title={tr('New Job','Nuevo trabajo')} onPress={startNewJob}/></View>
-    <View style={{flex:1}}><Action title={tr('My Jobs','Mis trabajos')+(savedJobs.length?' ('+savedJobs.length+')':'')} secondary={!showJobs} onPress={goToMyJobs}/></View>
-   </View>
-   <View style={styles.row}>
-    <View style={{flex:1}}><Action title="English" secondary={businessProfile.language!=='en'} onPress={()=>chooseLanguage('en')}/></View>
-    <View style={{flex:1}}><Action title="Español" secondary={businessProfile.language!=='es'} onPress={()=>chooseLanguage('es')}/></View>
-    <View style={{flex:1}}><Action title={tr('Settings','Ajustes')} secondary onPress={()=>{setShowJobs(false);setShowProfile(x=>!x);}}/></View>
+   <View style={styles.homeNavigation}>
+    <Pressable accessibilityRole="button" onPress={startNewJob} style={[styles.navTile,!showJobs&&styles.navTileActive]}>
+     <Text style={[styles.navGlyph,!showJobs&&{color:PALETTE.white}]}>＋</Text>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.navText,!showJobs&&{color:PALETTE.white}]}>{tr('New Job','Nuevo trabajo')}</Text>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={goToMyJobs} style={[styles.navTile,showJobs&&styles.navTileActive]}>
+     <Text style={[styles.navGlyph,showJobs&&{color:PALETTE.white}]}>▤</Text>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.navText,showJobs&&{color:PALETTE.white}]}>{tr('My Jobs','Mis trabajos')}{savedJobs.length?' ('+savedJobs.length+')':''}</Text>
+    </Pressable>
    </View>
    {showProfile&&<View style={styles.card}>
     <Text style={styles.h2}>{tr('Business settings','Configuración del negocio')}</Text>
@@ -354,12 +372,24 @@ export default function App(){
     </Pressable>)}
    </View>}
    {!showJobs&&<>
-   <Text style={styles.h2}>{stage===0?tr('New Job','Nuevo trabajo'):tr('Job workspace','Área de trabajo')}{project.customer?' · '+project.customer:''}</Text>
-   <View style={styles.steps}>{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguimiento']:['Job','Scope','Price','Send','Follow up']).map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
+   <View style={styles.steps} accessibilityRole="tablist">{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguir']:['Job','Scope','Price','Send','Follow-up']).map((name,i)=><Pressable key={i} accessibilityRole="tab" accessibilityLabel={name} accessibilityState={{selected:stage===i}} onPress={()=>setStage(i as Stage)} style={styles.step}>
+     <View style={[styles.stepCircle,stage===i&&styles.stepActive,stage>i&&styles.stepComplete]}><Text style={[styles.stepNumber,(stage===i||stage>i)&&{color:PALETTE.white}]}>{i+1}</Text></View>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.stepText,stage===i&&styles.stepTextActive]}>{name}</Text>
+    </Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
-    <Text style={styles.h2}>{tr("1 · New Job","1 · Nuevo trabajo")}</Text>
-    <Text style={styles.hint}>{tr("Choose a service, describe the job, and add photos.","Elige un servicio, describe el trabajo y agrega fotos.")}</Text>
-    <View style={styles.tradeGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text></Pressable>)}</View>
+    <View style={styles.cardIntro}>
+     <View style={styles.introIcon}><Text style={styles.introGlyph}>▤</Text></View>
+     <View style={{flex:1}}>
+      <Text style={styles.h2}>{tr('New Job','Nuevo trabajo')}</Text>
+      <Text style={styles.hint}>{tr('Choose a service, describe the work and add photos.','Elige un servicio, describe el trabajo y agrega fotos.')}</Text>
+     </View>
+    </View>
+    <Text style={styles.sectionTitle}>{tr('Service / Trade','Servicio / Oficio')}</Text>
+    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
+     <Text style={[styles.serviceIcon,project.trade===t&&{color:PALETTE.white}]}>{({electrical:'ϟ',plumbing:'🚰',painting:'🖌',concrete:'🚛',handyman:'🛠',remodel:'⌂',cleaning:'🧹'} as Record<Trade,string>)[t]}</Text>
+     <Text numberOfLines={2} style={[styles.serviceName,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text>
+     {project.trade===t&&<Text style={styles.selectedTick}>✓</Text>}
+    </Pressable>)}</View>
     <Input label={tr("Business","Negocio")} value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder={tr('Your business name','Nombre de tu negocio')}/>
     <Input label={tr("Customer","Cliente")} value={project.customer} onChangeText={x=>patch({customer:x})} placeholder={tr('Customer name','Nombre del cliente')}/>
     <Input label={tr("City","Ciudad")} value={project.city} onChangeText={x=>patch({city:x})} placeholder={tr('City','Ciudad')}/>
