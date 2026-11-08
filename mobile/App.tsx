@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
+import {calculateUnitRate,explainLine,LA_ELECTRICIAN_MEAN_WAGE_Q1_2026,LA_WAGE_SOURCE} from './src/pricingReference';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
@@ -227,6 +228,20 @@ export default function App(){
  const cleaningInput=(v:string)=>Number(v)||0;
  const setLine=(index:number,part:Partial<EstimateLine>)=>setProject(prev=>({...prev,lines:prev.lines.map((x,i)=>i===index?{...x,...part}:x)}));
  const addLine=()=>patch({lines:[...project.lines,{id:'manual-'+Date.now(),description_en:'',description_es:'',quantity:1,unit:'job',rate:0,status:'included_now'}]});
+ const applyReferencePrice=(index:number)=>{
+  const item=project.lines[index];
+  if(!item)return;
+  const hours=item.costHoursPerUnit||0,materials=item.costMaterialsPerUnit||0,equipment=item.costEquipmentPerUnit||0;
+  if(hours<=0&&materials<=0&&equipment<=0){Alert.alert('Enter costs','Enter labor hours or actual materials/equipment costs first.');return;}
+  try{
+   const hourlyWage=item.costHourlyWage??LA_ELECTRICIAN_MEAN_WAGE_Q1_2026;
+   const burden=item.costLaborBurdenMultiplier??1.35;
+   const calculation=calculateUnitRate({hoursPerUnit:hours,materialsPerUnit:materials,equipmentPerUnit:equipment,hourlyWage,laborBurdenMultiplier:burden});
+   setLine(index,{rate:calculation.rate,rateSource:LA_WAGE_SOURCE+'; contractor-entered hours, burden and direct costs'});
+   setInfo('Unit cost calculated. Confirm materials, labor assumptions, equipment and taxes before sharing.');
+  }catch(e){Alert.alert('Invalid cost inputs',e instanceof Error?e.message:'Check inputs.');}
+ };
+
  const addPhoto=async(camera=false)=>{
   try{
    const result=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.7}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.7,allowsMultipleSelection:true});
@@ -516,6 +531,357 @@ export default function App(){
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
+     {project.trade==='electrical'&&line.id!=='local-permit'&&<View style={styles.lineCard}>
+      <Text style={styles.label}>{tr('Unit-cost worksheet (optional)','Hoja de costos por unidad (opcional)')}</Text>
+      <Text style={styles.hint}>{explainLine(line)} {tr('Employee wage reference:','Sueldo de referencia:')} $40.57/hr — {LA_WAGE_SOURCE}. {tr('Burden 1.35 is an editable example, NOT a verified employer burden.','El factor 1.35 es un ejemplo editable, NO una carga laboral verificada.')}</Text>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label={tr('Hours / unit','Horas / unidad')} number value={String(line.costHoursPerUnit??'')} onChangeText={x=>setLine(i,{costHoursPerUnit:Number(x)||0})}/></View>
+       <View style={{flex:1}}><Input label={tr('Materials $ / unit','Materiales $ / unidad')} number value={String(line.costMaterialsPerUnit??'')} onChangeText={x=>setLine(i,{costMaterialsPerUnit:Number(x)||0})}/></View>
+      </View>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label={tr('Equipment $ / unit','Equipo $ / unidad')} number value={String(line.costEquipmentPerUnit??'')} onChangeText={x=>setLine(i,{costEquipmentPerUnit:Number(x)||0})}/></View>
+       <View style={{flex:1}}><Input label={tr('Hourly wage reference 
+     <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
+     </>}
+    </View>)}
+    {project.trade==='electrical'&&/\b(recessed|empotradas?|downlights?)\b/i.test(project.description)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Recessed lights","Luces empotradas")}</Text>
+      <Text style={styles.hint}>{tr("Add lights without removing other electrical items.","Agrega luces sin borrar otras partidas eléctricas.")}</Text>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label={tr("Number of lights","Cantidad de luces")} number value={lightCount} onChangeText={setLightCount}/></View>
+       <View style={{flex:1}}><Input label={tr("Ceiling height (ft)","Altura de techo (pies)")} number value={electricalCeilingHeight} onChangeText={setElectricalCeilingHeight}/></View>
+      </View>
+      <Action title={tr("Add recessed lights","Agregar luces empotradas")} onPress={addElectricalLights}/>
+     </View>}
+    <Action title={tr("Add work item","Agregar partida")} secondary onPress={addLine}/>
+    <Input label={tr("Exclusions (one per line)","Exclusiones (una por línea)")} multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
+    <Input label={tr("Future work (excluded)","Trabajo futuro (no incluido)")} multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
+    {project.unknowns.length>0&&<Text style={styles.notice}>{tr('Check before sharing','Revisar antes de compartir')}: {project.unknowns.join('; ')}</Text>}
+    {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Missing measurement","Falta una medida")}</Text>
+      <Text style={styles.hint}>{tr("Enter the measured shower wall height in feet.","Ingresa la altura medida de las paredes de la regadera, en pies.")}</Text>
+      <Input label={tr("Shower wall height (ft)","Altura de paredes (pies)")} value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
+      <Action title={tr("Apply height","Aplicar altura")} onPress={applyWallHeight}/>
+     </View>}
+    <Action title={tr("Rebuild from description","Recalcular desde descripción")} secondary onPress={createLocalDraft}/>
+    <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
+    {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
+      <Text style={styles.total}>{plannedCleaningWorkerHours(project.cleaning)} {tr('worker-hours','horas-persona')}</Text>
+      <Text style={styles.hint}>{project.cleaning.workers} {tr('workers','personas')} · {project.cleaning.areaSqFt||tr('Area pending','Área pendiente')} {tr('sq ft','pies²')} · {project.cleaning.type==='post_construction'?tr(({light:'Light',moderate:'Moderate',heavy:'Heavy'} as const)[project.cleaning.dustLevel||'moderate'],({light:'Ligero',moderate:'Moderado',heavy:'Abundante'} as const)[project.cleaning.dustLevel||'moderate']):tr('Deep cleaning','Limpieza profunda')}. {tr('Edit in Step 1.','Editar en el paso 1.')}</Text>
+    </View>}
+    <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>{tr('Recurring price per visit','Precio por visita periódica')}: {money(recurringCleaningPrice(project))}</Text>}
+    {!pdfReady&&<Text style={styles.notice}>{tr("You can continue to Proposal, but PDF sharing requires prices and quantities for all items. Tap missing items to edit.","Puedes continuar a Propuesta, pero para compartir el PDF debes completar cantidades y precios de todas las partidas.")}</Text>}
+    <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
+   </View>}
+   {stage===3&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr("4 · Customer proposal","4 · Propuesta al cliente")}</Text>
+    <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
+    <Text style={styles.label}>{tr('Customer PDF language','Idioma del PDF del cliente')}</Text>
+    <Text style={styles.hint}>{tr('Independent of your app language. Default: English.','Independiente del idioma de la aplicación. Predeterminado: inglés.')}</Text>
+    <View style={styles.row}><View style={{flex:1}}><Action title="English PDF" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="PDF Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
+    <Text style={styles.total}>{tr('Estimated price','Precio estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
+    <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
+    {!pdfReady&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Estimate incomplete","Estimado incompleto")}</Text>
+      <Text style={styles.hint}>{tr("Complete missing quantities and rates before sharing.","Completa las cantidades y tarifas pendientes antes de compartir.")}</Text>
+      {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
+      {readiness.issues.length>6&&<Text style={styles.hint}>{tr('and','y')} {readiness.issues.length-6} {tr('more items','partidas más')}.</Text>}
+      <Action title={tr("Review missing quantities","Revisar cantidades pendientes")} secondary onPress={()=>setStage(2)}/>
+     </View>}
+    {project.trade==='cleaning'&&<Text style={styles.hint}>{tr("Cleaning prices update automatically.","Los precios de limpieza se actualizan automáticamente.")}</Text>}
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):pdfReady?tr('Share estimate PDF','Compartir estimado PDF'):tr('Complete estimate first','Completar estimado primero')} disabled={busy||!pdfReady} onPress={()=>sharePdf('estimate')}/>
+    <Action title={tr("Track proposal","Dar seguimiento")} secondary onPress={()=>setStage(4)}/>
+    {shareDone&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr("PDF ready","PDF preparado")}</Text>
+     <Text style={styles.hint}>{tr("Your job is saved. Check the sharing app to confirm delivery.","Tu trabajo está guardado. Confirma el envío en la aplicación que elegiste.")}</Text>
+     <Action title={tr("My Jobs","Mis trabajos")} onPress={goToMyJobs}/>
+     <Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/>
+     <Action title={tr("Share PDF again","Compartir PDF de nuevo")} secondary onPress={()=>sharePdf('estimate')}/>
+     <Action title={tr("Track this job","Dar seguimiento")} onPress={()=>setStage(4)}/>
+    </View>}
+    {!shareDone&&<View style={styles.row}>
+     <View style={{flex:1}}><Action title={tr("Save job","Guardar trabajo")} secondary onPress={()=>saveCurrent(true)}/></View>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
+    </View>}
+    <Action title={tr("Back to prices","Volver a precios")} secondary onPress={()=>setStage(2)}/>
+   </View>}
+   {stage===4&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr("5 · Follow-up","5 · Seguimiento")}</Text>
+    <Text style={styles.hint}>{tr("Track customer decisions and next steps.","Registra la decisión del cliente y los próximos pasos.")}</Text>
+    <Text style={styles.total}>{project.customer||tr('Customer','Cliente')} · {money(total.total)}</Text>
+    <Text style={styles.label}>{tr("Status","Estado")}</Text>
+    <Text style={styles.notice}>{JOB_STATUSES[project.status||'draft'][businessProfile.language]}</Text>
+    <View style={styles.statusGrid}>
+     {(Object.keys(JOB_STATUSES) as JobStatus[]).map(status=><Pressable key={status} accessibilityRole="button" accessibilityState={{selected:(project.status||'draft')===status}} onPress={()=>setStatus(status)} style={[styles.statusChoice,(project.status||'draft')===status&&styles.selectedTrade]}>
+      <Text style={[styles.tradeText,(project.status||'draft')===status&&{color:PALETTE.white}]}>{JOB_STATUSES[status][businessProfile.language]}</Text>
+      
+     </Pressable>)}
+    </View>
+    <Input label={tr("Follow-up date (YYYY-MM-DD)","Fecha de seguimiento (AAAA-MM-DD)")} value={project.followUpDate||''} onChangeText={x=>patch({followUpDate:x})} placeholder="2026-11-15"/>
+    <Input label={tr("Private follow-up notes","Notas privadas de seguimiento")} multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder={tr('Called client; waiting for approval...','Llamé al cliente; esperando aprobación...')}/>
+    <Text style={styles.hint}>{tr("Notes stay private. Reminders are not automatic yet.","Las notas son privadas. Los recordatorios todavía no son automáticos.")}</Text>
+    <Action title={tr("Save follow-up","Guardar seguimiento")} onPress={()=>saveCurrent(true)}/>
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):tr('Share proposal PDF','Compartir propuesta PDF')} disabled={busy||!pdfReady} onPress={()=>sharePdf('proposal')}/>
+    {!pdfReady&&<Text style={styles.notice}>{tr("Complete quantities and prices before sharing.","Completa cantidades y precios antes de compartir.")}</Text>}
+    <View style={styles.row}>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
+     <View style={{flex:1}}><Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/></View>
+    </View>
+    <Action title={tr("Back to estimate","Volver al estimado")} secondary onPress={()=>setStage(3)}/>
+   </View>}
+   </>}
+   <Text style={styles.footer}>{tr("Jobs are saved on this phone, not the cloud. Prices are editable estimates.","Los trabajos se guardan en este teléfono, no en la nube. Los precios son estimados editables.")}</Text>
+  </ScrollView>
+ </KeyboardAvoidingView>;
+}
+const styles=StyleSheet.create({
+ container:{paddingTop:46,paddingHorizontal:16,paddingBottom:78,maxWidth:750,width:'100%',alignSelf:'center'},
+ eyebrow:{fontSize:11,letterSpacing:1.2,color:PALETTE.teal,fontWeight:'800'},
+ title:{fontWeight:'900',fontSize:27,lineHeight:33,color:PALETTE.ink,marginTop:6,marginBottom:16},
+ hero:{backgroundColor:'#101F52',borderRadius:24,padding:17,paddingBottom:15,marginBottom:16,overflow:'hidden',shadowColor:'#13256F',shadowOpacity:0.16,shadowRadius:15,shadowOffset:{width:0,height:7},elevation:4},
+ heroDecoration:{position:'absolute',width:175,height:175,borderRadius:90,right:-55,top:-92,backgroundColor:'#205D93',opacity:0.5},
+ heroTop:{flexDirection:'row',alignItems:'center',gap:10},
+ brandMark:{width:42,height:42,borderRadius:12,backgroundColor:'#2B478E',alignItems:'center',justifyContent:'center',borderColor:'#5474A5',borderWidth:1},
+ brandGlyph:{fontSize:34,lineHeight:39,color:PALETTE.white,fontWeight:'900'},
+ brandTitle:{color:PALETTE.white,fontSize:18,lineHeight:23,fontWeight:'900',letterSpacing:-0.35},
+ brandSubtitle:{color:'#BACCE8',fontSize:11,lineHeight:16,marginTop:2},
+ settingsButton:{width:42,height:42,alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:'#263C72',borderWidth:1,borderColor:'#6380A8'},
+ settingsGlyph:{fontSize:24,color:PALETTE.white},
+ heroBottom:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:14},
+ heroVersion:{fontSize:10,fontWeight:'700',letterSpacing:1.2,color:'#9DB2D1'},
+ languageSwitch:{flexDirection:'row',backgroundColor:'#253D72',borderRadius:24,padding:3,borderWidth:1,borderColor:'#6685AA'},
+ languageOption:{minWidth:48,minHeight:30,alignItems:'center',justifyContent:'center',borderRadius:20,paddingHorizontal:12},
+ languageSelected:{backgroundColor:PALETTE.white},
+ languageText:{color:'#DCEAFF',fontSize:12,fontWeight:'800'},
+ languageTextSelected:{color:PALETTE.accentDark},
+ homeNavigation:{flexDirection:'row',gap:10,marginBottom:17},
+ navTile:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,backgroundColor:PALETTE.white,minHeight:57,borderRadius:16,borderWidth:1,borderColor:PALETTE.line,paddingHorizontal:6,shadowColor:'#1C3166',shadowOpacity:0.04,shadowRadius:5,shadowOffset:{width:0,height:3},elevation:1},
+ navTileActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowOpacity:0.16,elevation:3},
+ navGlyph:{fontSize:23,fontWeight:'800',color:PALETTE.accentDark},
+ navText:{flexShrink:1,fontSize:14,fontWeight:'800',color:PALETTE.ink,textAlign:'center'},
+ steps:{flexDirection:'row',marginBottom:16,paddingHorizontal:4,alignItems:'flex-start'},
+ step:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',gap:5,paddingVertical:3},
+ stepCircle:{width:31,height:31,borderRadius:16,backgroundColor:PALETTE.white,borderWidth:1.5,borderColor:'#C4CEDF',alignItems:'center',justifyContent:'center'},
+ stepActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ stepComplete:{backgroundColor:PALETTE.teal,borderColor:PALETTE.teal},
+ stepNumber:{fontSize:14,fontWeight:'800',color:PALETTE.muted},
+ stepText:{fontSize:10.5,color:PALETTE.muted,fontWeight:'700',textAlign:'center',width:'100%'},
+ stepTextActive:{color:PALETTE.accentDark,fontWeight:'900'},
+ card:{borderRadius:22,backgroundColor:PALETTE.white,padding:17,borderWidth:1,borderColor:'#E7ECF5',marginBottom:16,shadowColor:'#16306A',shadowOpacity:0.07,shadowRadius:14,shadowOffset:{width:0,height:7},elevation:2},
+ cardIntro:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:17},
+ introIcon:{height:47,width:47,backgroundColor:'#E6F4F2',borderRadius:14,alignItems:'center',justifyContent:'center'},
+ introGlyph:{fontSize:26,color:PALETTE.teal,fontWeight:'800'},
+ h2:{fontSize:21,lineHeight:27,fontWeight:'900',color:PALETTE.ink,marginBottom:3,letterSpacing:-0.4},
+ sectionTitle:{fontSize:15,fontWeight:'800',color:PALETTE.ink,marginTop:7,marginBottom:11},
+ hint:{fontSize:13,lineHeight:19,color:PALETTE.muted,marginVertical:6},
+ label:{fontSize:13,fontWeight:'800',color:PALETTE.ink,marginBottom:6},
+ input:{borderWidth:1,borderColor:'#CCD6E5',borderRadius:13,minHeight:49,paddingHorizontal:13,paddingVertical:10,color:PALETTE.ink,fontSize:15,backgroundColor:'#FBFCFF'},
+ serviceGrid:{flexDirection:'row',flexWrap:'wrap',gap:9,marginBottom:20},
+ serviceTile:{width:'48.5%',minHeight:63,flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#FBFCFF',borderWidth:1.1,borderColor:'#D7DEEB',borderRadius:14,paddingHorizontal:10,paddingVertical:8},
+ serviceTileFull:{width:'100%'},
+ serviceTileSelected:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowColor:'#13256F',shadowOpacity:0.17,shadowRadius:7,shadowOffset:{width:0,height:4},elevation:3},
+ serviceIcon:{fontSize:22,minWidth:27,textAlign:'center',color:PALETTE.teal},
+ serviceName:{fontSize:13,fontWeight:'800',color:PALETTE.ink,flex:1,lineHeight:17},
+ selectedTick:{fontSize:14,color:PALETTE.white,fontWeight:'900'},
+ tradeGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginVertical:10},
+ trade:{width:'48%',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,backgroundColor:'#F9FBFF'},
+ selectedTrade:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ tradeText:{fontWeight:'800',color:PALETTE.ink},tradeSub:{fontSize:12,color:PALETTE.muted,marginTop:2},
+ button:{backgroundColor:PALETTE.accentDark,minHeight:49,borderRadius:13,alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginTop:12,shadowColor:'#1B3590',shadowOpacity:0.12,shadowRadius:6,shadowOffset:{width:0,height:3},elevation:1},
+ buttonSecondary:{backgroundColor:'#EBF0FA',borderWidth:1,borderColor:'#D2DBEE',shadowOpacity:0,elevation:0},
+ buttonText:{fontSize:14,fontWeight:'800',color:PALETTE.white,textAlign:'center'},
+ voiceCard:{borderWidth:1,borderColor:'#B5DDE0',backgroundColor:'#EFF8F9',borderRadius:15,padding:13,marginVertical:12},
+ row:{flexDirection:'row',gap:9},
+ photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},
+ photo:{width:82,height:82,borderRadius:10},
+ remove:{fontSize:10,color:'#A04E57',textAlign:'center'},
+ notice:{fontSize:13,color:'#71571F',backgroundColor:'#FFF7E7',padding:12,borderRadius:12,marginTop:12},
+ savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,marginTop:10,backgroundColor:'#F8FAFF'},
+ statusGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:10,marginBottom:12},
+ statusChoice:{width:'48%',backgroundColor:'#F8FAFF',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:11},
+ lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:13,marginTop:12,backgroundColor:'#FCFDFF'},
+ lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},
+ rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},
+ total:{fontWeight:'900',fontSize:23,color:PALETTE.accentDark,marginVertical:16},
+ footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:10}
+});
+,'Sueldo base por hora 
+     <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
+     </>}
+    </View>)}
+    {project.trade==='electrical'&&/\b(recessed|empotradas?|downlights?)\b/i.test(project.description)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Recessed lights","Luces empotradas")}</Text>
+      <Text style={styles.hint}>{tr("Add lights without removing other electrical items.","Agrega luces sin borrar otras partidas eléctricas.")}</Text>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label={tr("Number of lights","Cantidad de luces")} number value={lightCount} onChangeText={setLightCount}/></View>
+       <View style={{flex:1}}><Input label={tr("Ceiling height (ft)","Altura de techo (pies)")} number value={electricalCeilingHeight} onChangeText={setElectricalCeilingHeight}/></View>
+      </View>
+      <Action title={tr("Add recessed lights","Agregar luces empotradas")} onPress={addElectricalLights}/>
+     </View>}
+    <Action title={tr("Add work item","Agregar partida")} secondary onPress={addLine}/>
+    <Input label={tr("Exclusions (one per line)","Exclusiones (una por línea)")} multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
+    <Input label={tr("Future work (excluded)","Trabajo futuro (no incluido)")} multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
+    {project.unknowns.length>0&&<Text style={styles.notice}>{tr('Check before sharing','Revisar antes de compartir')}: {project.unknowns.join('; ')}</Text>}
+    {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Missing measurement","Falta una medida")}</Text>
+      <Text style={styles.hint}>{tr("Enter the measured shower wall height in feet.","Ingresa la altura medida de las paredes de la regadera, en pies.")}</Text>
+      <Input label={tr("Shower wall height (ft)","Altura de paredes (pies)")} value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
+      <Action title={tr("Apply height","Aplicar altura")} onPress={applyWallHeight}/>
+     </View>}
+    <Action title={tr("Rebuild from description","Recalcular desde descripción")} secondary onPress={createLocalDraft}/>
+    <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
+    {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
+      <Text style={styles.total}>{plannedCleaningWorkerHours(project.cleaning)} {tr('worker-hours','horas-persona')}</Text>
+      <Text style={styles.hint}>{project.cleaning.workers} {tr('workers','personas')} · {project.cleaning.areaSqFt||tr('Area pending','Área pendiente')} {tr('sq ft','pies²')} · {project.cleaning.type==='post_construction'?tr(({light:'Light',moderate:'Moderate',heavy:'Heavy'} as const)[project.cleaning.dustLevel||'moderate'],({light:'Ligero',moderate:'Moderado',heavy:'Abundante'} as const)[project.cleaning.dustLevel||'moderate']):tr('Deep cleaning','Limpieza profunda')}. {tr('Edit in Step 1.','Editar en el paso 1.')}</Text>
+    </View>}
+    <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>{tr('Recurring price per visit','Precio por visita periódica')}: {money(recurringCleaningPrice(project))}</Text>}
+    {!pdfReady&&<Text style={styles.notice}>{tr("You can continue to Proposal, but PDF sharing requires prices and quantities for all items. Tap missing items to edit.","Puedes continuar a Propuesta, pero para compartir el PDF debes completar cantidades y precios de todas las partidas.")}</Text>}
+    <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
+   </View>}
+   {stage===3&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr("4 · Customer proposal","4 · Propuesta al cliente")}</Text>
+    <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
+    <Text style={styles.label}>{tr('Customer PDF language','Idioma del PDF del cliente')}</Text>
+    <Text style={styles.hint}>{tr('Independent of your app language. Default: English.','Independiente del idioma de la aplicación. Predeterminado: inglés.')}</Text>
+    <View style={styles.row}><View style={{flex:1}}><Action title="English PDF" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="PDF Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
+    <Text style={styles.total}>{tr('Estimated price','Precio estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
+    <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
+    <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
+    {!pdfReady&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr("Estimate incomplete","Estimado incompleto")}</Text>
+      <Text style={styles.hint}>{tr("Complete missing quantities and rates before sharing.","Completa las cantidades y tarifas pendientes antes de compartir.")}</Text>
+      {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
+      {readiness.issues.length>6&&<Text style={styles.hint}>{tr('and','y')} {readiness.issues.length-6} {tr('more items','partidas más')}.</Text>}
+      <Action title={tr("Review missing quantities","Revisar cantidades pendientes")} secondary onPress={()=>setStage(2)}/>
+     </View>}
+    {project.trade==='cleaning'&&<Text style={styles.hint}>{tr("Cleaning prices update automatically.","Los precios de limpieza se actualizan automáticamente.")}</Text>}
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):pdfReady?tr('Share estimate PDF','Compartir estimado PDF'):tr('Complete estimate first','Completar estimado primero')} disabled={busy||!pdfReady} onPress={()=>sharePdf('estimate')}/>
+    <Action title={tr("Track proposal","Dar seguimiento")} secondary onPress={()=>setStage(4)}/>
+    {shareDone&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr("PDF ready","PDF preparado")}</Text>
+     <Text style={styles.hint}>{tr("Your job is saved. Check the sharing app to confirm delivery.","Tu trabajo está guardado. Confirma el envío en la aplicación que elegiste.")}</Text>
+     <Action title={tr("My Jobs","Mis trabajos")} onPress={goToMyJobs}/>
+     <Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/>
+     <Action title={tr("Share PDF again","Compartir PDF de nuevo")} secondary onPress={()=>sharePdf('estimate')}/>
+     <Action title={tr("Track this job","Dar seguimiento")} onPress={()=>setStage(4)}/>
+    </View>}
+    {!shareDone&&<View style={styles.row}>
+     <View style={{flex:1}}><Action title={tr("Save job","Guardar trabajo")} secondary onPress={()=>saveCurrent(true)}/></View>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
+    </View>}
+    <Action title={tr("Back to prices","Volver a precios")} secondary onPress={()=>setStage(2)}/>
+   </View>}
+   {stage===4&&<View style={styles.card}>
+    <Text style={styles.h2}>{tr("5 · Follow-up","5 · Seguimiento")}</Text>
+    <Text style={styles.hint}>{tr("Track customer decisions and next steps.","Registra la decisión del cliente y los próximos pasos.")}</Text>
+    <Text style={styles.total}>{project.customer||tr('Customer','Cliente')} · {money(total.total)}</Text>
+    <Text style={styles.label}>{tr("Status","Estado")}</Text>
+    <Text style={styles.notice}>{JOB_STATUSES[project.status||'draft'][businessProfile.language]}</Text>
+    <View style={styles.statusGrid}>
+     {(Object.keys(JOB_STATUSES) as JobStatus[]).map(status=><Pressable key={status} accessibilityRole="button" accessibilityState={{selected:(project.status||'draft')===status}} onPress={()=>setStatus(status)} style={[styles.statusChoice,(project.status||'draft')===status&&styles.selectedTrade]}>
+      <Text style={[styles.tradeText,(project.status||'draft')===status&&{color:PALETTE.white}]}>{JOB_STATUSES[status][businessProfile.language]}</Text>
+      
+     </Pressable>)}
+    </View>
+    <Input label={tr("Follow-up date (YYYY-MM-DD)","Fecha de seguimiento (AAAA-MM-DD)")} value={project.followUpDate||''} onChangeText={x=>patch({followUpDate:x})} placeholder="2026-11-15"/>
+    <Input label={tr("Private follow-up notes","Notas privadas de seguimiento")} multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder={tr('Called client; waiting for approval...','Llamé al cliente; esperando aprobación...')}/>
+    <Text style={styles.hint}>{tr("Notes stay private. Reminders are not automatic yet.","Las notas son privadas. Los recordatorios todavía no son automáticos.")}</Text>
+    <Action title={tr("Save follow-up","Guardar seguimiento")} onPress={()=>saveCurrent(true)}/>
+    <Action title={busy?tr('Creating PDF…','Creando PDF…'):tr('Share proposal PDF','Compartir propuesta PDF')} disabled={busy||!pdfReady} onPress={()=>sharePdf('proposal')}/>
+    {!pdfReady&&<Text style={styles.notice}>{tr("Complete quantities and prices before sharing.","Completa cantidades y precios antes de compartir.")}</Text>}
+    <View style={styles.row}>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
+     <View style={{flex:1}}><Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/></View>
+    </View>
+    <Action title={tr("Back to estimate","Volver al estimado")} secondary onPress={()=>setStage(3)}/>
+   </View>}
+   </>}
+   <Text style={styles.footer}>{tr("Jobs are saved on this phone, not the cloud. Prices are editable estimates.","Los trabajos se guardan en este teléfono, no en la nube. Los precios son estimados editables.")}</Text>
+  </ScrollView>
+ </KeyboardAvoidingView>;
+}
+const styles=StyleSheet.create({
+ container:{paddingTop:46,paddingHorizontal:16,paddingBottom:78,maxWidth:750,width:'100%',alignSelf:'center'},
+ eyebrow:{fontSize:11,letterSpacing:1.2,color:PALETTE.teal,fontWeight:'800'},
+ title:{fontWeight:'900',fontSize:27,lineHeight:33,color:PALETTE.ink,marginTop:6,marginBottom:16},
+ hero:{backgroundColor:'#101F52',borderRadius:24,padding:17,paddingBottom:15,marginBottom:16,overflow:'hidden',shadowColor:'#13256F',shadowOpacity:0.16,shadowRadius:15,shadowOffset:{width:0,height:7},elevation:4},
+ heroDecoration:{position:'absolute',width:175,height:175,borderRadius:90,right:-55,top:-92,backgroundColor:'#205D93',opacity:0.5},
+ heroTop:{flexDirection:'row',alignItems:'center',gap:10},
+ brandMark:{width:42,height:42,borderRadius:12,backgroundColor:'#2B478E',alignItems:'center',justifyContent:'center',borderColor:'#5474A5',borderWidth:1},
+ brandGlyph:{fontSize:34,lineHeight:39,color:PALETTE.white,fontWeight:'900'},
+ brandTitle:{color:PALETTE.white,fontSize:18,lineHeight:23,fontWeight:'900',letterSpacing:-0.35},
+ brandSubtitle:{color:'#BACCE8',fontSize:11,lineHeight:16,marginTop:2},
+ settingsButton:{width:42,height:42,alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:'#263C72',borderWidth:1,borderColor:'#6380A8'},
+ settingsGlyph:{fontSize:24,color:PALETTE.white},
+ heroBottom:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:14},
+ heroVersion:{fontSize:10,fontWeight:'700',letterSpacing:1.2,color:'#9DB2D1'},
+ languageSwitch:{flexDirection:'row',backgroundColor:'#253D72',borderRadius:24,padding:3,borderWidth:1,borderColor:'#6685AA'},
+ languageOption:{minWidth:48,minHeight:30,alignItems:'center',justifyContent:'center',borderRadius:20,paddingHorizontal:12},
+ languageSelected:{backgroundColor:PALETTE.white},
+ languageText:{color:'#DCEAFF',fontSize:12,fontWeight:'800'},
+ languageTextSelected:{color:PALETTE.accentDark},
+ homeNavigation:{flexDirection:'row',gap:10,marginBottom:17},
+ navTile:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,backgroundColor:PALETTE.white,minHeight:57,borderRadius:16,borderWidth:1,borderColor:PALETTE.line,paddingHorizontal:6,shadowColor:'#1C3166',shadowOpacity:0.04,shadowRadius:5,shadowOffset:{width:0,height:3},elevation:1},
+ navTileActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowOpacity:0.16,elevation:3},
+ navGlyph:{fontSize:23,fontWeight:'800',color:PALETTE.accentDark},
+ navText:{flexShrink:1,fontSize:14,fontWeight:'800',color:PALETTE.ink,textAlign:'center'},
+ steps:{flexDirection:'row',marginBottom:16,paddingHorizontal:4,alignItems:'flex-start'},
+ step:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',gap:5,paddingVertical:3},
+ stepCircle:{width:31,height:31,borderRadius:16,backgroundColor:PALETTE.white,borderWidth:1.5,borderColor:'#C4CEDF',alignItems:'center',justifyContent:'center'},
+ stepActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ stepComplete:{backgroundColor:PALETTE.teal,borderColor:PALETTE.teal},
+ stepNumber:{fontSize:14,fontWeight:'800',color:PALETTE.muted},
+ stepText:{fontSize:10.5,color:PALETTE.muted,fontWeight:'700',textAlign:'center',width:'100%'},
+ stepTextActive:{color:PALETTE.accentDark,fontWeight:'900'},
+ card:{borderRadius:22,backgroundColor:PALETTE.white,padding:17,borderWidth:1,borderColor:'#E7ECF5',marginBottom:16,shadowColor:'#16306A',shadowOpacity:0.07,shadowRadius:14,shadowOffset:{width:0,height:7},elevation:2},
+ cardIntro:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:17},
+ introIcon:{height:47,width:47,backgroundColor:'#E6F4F2',borderRadius:14,alignItems:'center',justifyContent:'center'},
+ introGlyph:{fontSize:26,color:PALETTE.teal,fontWeight:'800'},
+ h2:{fontSize:21,lineHeight:27,fontWeight:'900',color:PALETTE.ink,marginBottom:3,letterSpacing:-0.4},
+ sectionTitle:{fontSize:15,fontWeight:'800',color:PALETTE.ink,marginTop:7,marginBottom:11},
+ hint:{fontSize:13,lineHeight:19,color:PALETTE.muted,marginVertical:6},
+ label:{fontSize:13,fontWeight:'800',color:PALETTE.ink,marginBottom:6},
+ input:{borderWidth:1,borderColor:'#CCD6E5',borderRadius:13,minHeight:49,paddingHorizontal:13,paddingVertical:10,color:PALETTE.ink,fontSize:15,backgroundColor:'#FBFCFF'},
+ serviceGrid:{flexDirection:'row',flexWrap:'wrap',gap:9,marginBottom:20},
+ serviceTile:{width:'48.5%',minHeight:63,flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#FBFCFF',borderWidth:1.1,borderColor:'#D7DEEB',borderRadius:14,paddingHorizontal:10,paddingVertical:8},
+ serviceTileFull:{width:'100%'},
+ serviceTileSelected:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowColor:'#13256F',shadowOpacity:0.17,shadowRadius:7,shadowOffset:{width:0,height:4},elevation:3},
+ serviceIcon:{fontSize:22,minWidth:27,textAlign:'center',color:PALETTE.teal},
+ serviceName:{fontSize:13,fontWeight:'800',color:PALETTE.ink,flex:1,lineHeight:17},
+ selectedTick:{fontSize:14,color:PALETTE.white,fontWeight:'900'},
+ tradeGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginVertical:10},
+ trade:{width:'48%',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,backgroundColor:'#F9FBFF'},
+ selectedTrade:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ tradeText:{fontWeight:'800',color:PALETTE.ink},tradeSub:{fontSize:12,color:PALETTE.muted,marginTop:2},
+ button:{backgroundColor:PALETTE.accentDark,minHeight:49,borderRadius:13,alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginTop:12,shadowColor:'#1B3590',shadowOpacity:0.12,shadowRadius:6,shadowOffset:{width:0,height:3},elevation:1},
+ buttonSecondary:{backgroundColor:'#EBF0FA',borderWidth:1,borderColor:'#D2DBEE',shadowOpacity:0,elevation:0},
+ buttonText:{fontSize:14,fontWeight:'800',color:PALETTE.white,textAlign:'center'},
+ voiceCard:{borderWidth:1,borderColor:'#B5DDE0',backgroundColor:'#EFF8F9',borderRadius:15,padding:13,marginVertical:12},
+ row:{flexDirection:'row',gap:9},
+ photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},
+ photo:{width:82,height:82,borderRadius:10},
+ remove:{fontSize:10,color:'#A04E57',textAlign:'center'},
+ notice:{fontSize:13,color:'#71571F',backgroundColor:'#FFF7E7',padding:12,borderRadius:12,marginTop:12},
+ savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,marginTop:10,backgroundColor:'#F8FAFF'},
+ statusGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:10,marginBottom:12},
+ statusChoice:{width:'48%',backgroundColor:'#F8FAFF',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:11},
+ lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:13,marginTop:12,backgroundColor:'#FCFDFF'},
+ lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},
+ rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},
+ total:{fontWeight:'900',fontSize:23,color:PALETTE.accentDark,marginVertical:16},
+ footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:10}
+});
+)} number value={String(line.costHourlyWage??LA_ELECTRICIAN_MEAN_WAGE_Q1_2026)} onChangeText={x=>setLine(i,{costHourlyWage:Number(x)||0})}/></View>
+      </View>
+      <Input label={tr('Labor burden multiplier','Factor de carga laboral')} number value={String(line.costLaborBurdenMultiplier??1.35)} onChangeText={x=>setLine(i,{costLaborBurdenMultiplier:Number(x)||0})}/>
+      <Action title={tr('Calculate and apply unit rate','Calcular y aplicar precio unitario')} secondary onPress={()=>applyReferencePrice(i)}/>
+     </View>}
+
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
