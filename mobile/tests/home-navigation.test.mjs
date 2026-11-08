@@ -16,7 +16,8 @@ test('new job keeps default business information while jobs stay in store',()=>{
  assert.doesNotMatch(app,/setProject\(active\.project\)/);
 });
 test('one explicit language switch persists preference and localizes speech input',()=>{
- assert.match(app,/saveProfile\(updated\);setBusinessProfile\(updated\);patch\(\{language\}\)/);
+ assert.match(app,/saveProfile\(updated\);setBusinessProfile\(updated\)/);
+ assert.doesNotMatch(app,/saveProfile\(updated\);setBusinessProfile\(updated\);patch\(\{language\}\)/);
  assert.match(app,/<SpeechInput language=\{businessProfile\.language\}/);
  assert.match(speech,/language='en'/);
  assert.doesNotMatch(speech,/Dictado \/ Speech-to-text/);
