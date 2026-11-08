@@ -54,10 +54,10 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const oldMirror=hasRemovalVerb&&has(demoSection,/\b(espejo|mirror)\b/);
  const lightRecessed=has(s,/\b(recessed\s*(?:lights?|lighting|luz|luces)?|luces?\s*empotradas?|focos?\s*empotrados?|can lights?|downlights?)\b/);
  const dimmer=has(s,/\b(dimmer|dimer|dimmers|regulador(?: de intensidad)?|atenuador)\b/);
- const dimmerReplacement=dimmer&&has(s,/\b(reemplaz\w*|cambi\w*|sustitu\w*|replace|instead of|en lugar de(?:l| la)?)\b/);
- const ceilingHeightMatch=s.match(/\b(?:ceiling|techo|cielo raso|altura del techo)\b[^.!?]{0,35}?\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft)\b/)
-  ||s.match(/\b(\d{1,2}(?:[.,]\d+)?)\s*(?:pies?|feet|ft)\s*(?:de altura)?\s*(?:del?\s*)?(?:ceiling|techo)\b/);
- const ceilingHeight=ceilingHeightMatch?number(ceilingHeightMatch[1]):undefined;
+ const dimmerReplacement=dimmer&&has(s,/\b(reemplaz\w*|cambi\w*|sustitu\w*|replace|instead(?: of| del?| la)?|en lugar de(?:l| la)?)\b/);
+ const ceilingHeightMatch=s.match(/\b(?:ceiling|techo|cielo raso|altura del techo)\b[^.!?]{0,35}?\b(\d{1,2}(?:[.,]\d+)?|ocho|eight|nueve|nine|diez|ten)\s*(?:pies?|feet|ft)\b/)
+  ||s.match(/\b(\d{1,2}(?:[.,]\d+)?|ocho|eight|nueve|nine|diez|ten)\s*(?:pies?|feet|ft)\s*(?:de altura)?\s*(?:del?\s*)?(?:ceiling|techo)\b/);
+ const ceilingHeight=ceilingHeightMatch?({ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10}[ceilingHeightMatch[1]]||number(ceilingHeightMatch[1])):undefined;
  const countWords:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10};
  const countMatch=s.match(/\b(\d{1,2}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten)\s+(?:nuev[oa]s?\s+)?(?:recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|focos?\s*empotrados?|downlights?|can lights?)\b/)
   ||s.match(/\b(?:recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|focos?\s*empotrados?)\b[^.!?]{0,30}?\b(\d{1,2})\s*(?:luces?|lights?|focos?|unidades?)\b/);
