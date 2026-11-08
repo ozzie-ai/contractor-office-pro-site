@@ -30,8 +30,8 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   const circuitCount=s.match(/\b(\d{1,3})\s*(?:de\s+los\s+)?(?:existing\s+|existentes?\s+|old\s+|viejos?\s+|nuevos?\s+)?(?:circuits?|circuitos?)\b/);
   const circuitQty=circuitCount?Number(circuitCount[1]):0;
   const permitMention=/\b(permiso|permit|inspection|inspeccion)\b/.test(s);
-  const permitCost=s.match(/(?:permiso|permit)[^.!?]{0,65}?(?:\$\s*|cost\w*\s*|costara\s*|aproximadamente\s*|about\s*)(\d{2,5})\b/)
-   ||s.match(/(?:\$\s*)(\d{2,5})[^.!?]{0,50}?(?:permiso|permit)/);
+  const permitCost=s.match(/(?:permiso|permit)[^.!?\n]{0,85}?(?:\$\s*)?(\d{2,5})\b/)
+   ||s.match(/\$\s*(\d{2,5})[^.!?\n]{0,50}?(?:permiso|permit)/);
   if(panelUpgrade){
    const from=amps[0]||0,to=amps[1]||0;
    lines.push(line('panel-upgrade',from&&to?'Upgrade electrical panel/service from '+from+'A to '+to+'A (equipment and installation; utility coordination to confirm)':'Upgrade electrical service panel (verify existing/new amperage and equipment)',
