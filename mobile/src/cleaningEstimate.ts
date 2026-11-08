@@ -46,7 +46,7 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
  // The user can deliberately use fewer hours only after confirming their own site-assessed hours.
  const suggested=recommendedPostConstructionWorkerHours(c);
  const entered=c.workers*c.firstHoursPerWorker;
- const workerHours=c.type==='post_construction'&&!c.laborHoursConfirmed?Math.max(entered,suggested):entered;
+ const workerHours=c.type==='post_construction'&&!(c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2)?Math.max(entered,suggested):entered;
  const initialBase=round(workerHours*c.laborCostPerHour+c.firstSupplies+c.travelPerVisit);
  const recurringBase=round(c.workers*c.repeatHoursPerWorker*c.laborCostPerHour+c.repeatSupplies+c.travelPerVisit);
  const factor=(1+overheadPct/100)*(1+profitPct/100);
@@ -66,7 +66,7 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
   unknowns.push('Confirm construction dust severity, room-by-room tasks, surface conditions and whether rough/final/touch-up phases are required.');
   if(!c.areaSqFt)unknowns.push('ACTION REQUIRED: Enter measured or reasonably estimated square footage for post-construction scope.');
   if(recommended&&entered<recommended&&!c.laborHoursConfirmed)unknowns.push('AREA-BASED LABOR APPLIED: '+workerHours+' total worker-hours used for pricing, instead of '+entered+' entered. Review after site visit.');
-  if(recommended&&entered<recommended&&c.laborHoursConfirmed)unknowns.push('Contractor verified '+entered+' worker-hours below area/dust planning guideline of '+recommended+'.');
+  if(recommended&&entered<recommended&&c.laborHoursConfirmed&&c.laborHoursVerificationVersion===2)unknowns.push('Contractor verified '+entered+' worker-hours below area/dust planning guideline of '+recommended+'.');
  }
  if(c.frequency!=='once'&&c.repeatHoursPerWorker<=0)unknowns.push('Enter repeat-visit labor hours before quoting recurring service.');
  if(!c.areaSqFt)unknowns.push('Square footage not provided; measure or verify home size as needed.');
