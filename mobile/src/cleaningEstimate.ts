@@ -28,10 +28,10 @@ export function explicitCleaningNumbers(notes:string):Partial<Pick<CleaningDetai
   }
   return undefined;
  };
- const areaSqFt=read([/\\b(\\d{3,6})\\s*(?:sq\\.?\\s*ft\\.?|square\\s*feet|square\\s*foot|pies\\s*cuadrados|pies\\s*²|ft\\s*²)\\b/i,/\\b(?:area|superficie|área)\\s*(?:of|de|:)?\\s*(\\d{3,6})\\s*(?:sq\\.?\\s*ft\\.?|square\\s*feet|pies\\s*cuadrados)\\b/i],100,200000);
- const bedrooms=read([/\\b(\\d{1,2})\\s*(?:bedrooms?|beds|dormitorios?|rec[aá]maras?)\\b/i],0,30);
- const bathrooms=read([/\\b(\\d{1,2})\\s*(?:bathrooms?|baths|ba[ñn]os?)\\b/i],0,30);
- const livingRooms=read([/\\b(\\d{1,2})\\s*(?:living\\s*rooms?|salas?)\\b/i],0,30);
+ const areaSqFt=read([/\b(\d{3,6})\s*(?:sq\.?\s*ft\.?|square\s*feet|square\s*foot|pies\s*cuadrados|pies\s*²|ft\s*²)\b/i,/\b(?:area|superficie|área)\s*(?:of|de|:)?\s*(\d{3,6})\s*(?:sq\.?\s*ft\.?|square\s*feet|pies\s*cuadrados)\b/i],100,200000);
+ const bedrooms=read([/\b(\d{1,2})\s*(?:bedrooms?|beds|dormitorios?|rec[aá]maras?)\b/i],0,30);
+ const bathrooms=read([/\b(\d{1,2})\s*(?:bathrooms?|baths|ba[ñn]os?)\b/i],0,30);
+ const livingRooms=read([/\b(\d{1,2})\s*(?:living\s*rooms?|salas?)\b/i],0,30);
  return {...(areaSqFt!==undefined?{areaSqFt}:{}),...(bedrooms!==undefined?{bedrooms}:{}),...(bathrooms!==undefined?{bathrooms}:{}),...(livingRooms!==undefined?{livingRooms}:{})};
 }
 export function plannedCleaningWorkerHours(c:CleaningDetails):number{
