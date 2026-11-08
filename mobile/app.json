@@ -12,7 +12,11 @@
         "NSPhotoLibraryUsageDescription": "Attach job photos to your estimate.",
         "NSCameraUsageDescription": "Take photos of the worksite for your estimate.",
         "NSMicrophoneUsageDescription": "Record spoken job descriptions for your estimates.",
-        "NSSpeechRecognitionUsageDescription": "Turn spoken job descriptions into editable text without OpenAI."
+        "NSSpeechRecognitionUsageDescription": "Turn spoken job descriptions into editable text without OpenAI.",
+        "NSLocalNetworkUsageDescription": "Connect to your own Mac pricing database on the same private Wi-Fi.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
