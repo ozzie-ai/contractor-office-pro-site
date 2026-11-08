@@ -8,6 +8,7 @@ export const JOB_STATUSES:Record<JobStatus,{en:string;es:string}>={draft:{en:'Dr
 export type EstimateLine={
  id:string;description_en:string;description_es:string;
  quantity:number;unit:string;rate:number;status:'included_now'|'allowance_to_confirm';
+ costHoursPerUnit?:number;costMaterialsPerUnit?:number;costEquipmentPerUnit?:number;costHourlyWage?:number;costLaborBurdenMultiplier?:number;rateSource?:string;
 };
 export type Interpretation={
  trade?:string;project_summary_en?:string;project_summary_es?:string;
