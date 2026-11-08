@@ -1,6 +1,7 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Alert,Image,KeyboardAvoidingView,Platform,Pressable,ScrollView,StyleSheet,Text,TextInput,View} from 'react-native';
 import {StatusBar} from 'expo-status-bar';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -9,9 +10,11 @@ import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,Saved
 import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
+import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
+const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
 const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'weekly',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:3,bathrooms:2,livingRooms:1,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
@@ -42,6 +45,8 @@ export default function App(){
  const [stage,setStage]=useState<Stage>(0);
  const [photos,setPhotos]=useState<string[]>([]);
  const [busy,setBusy]=useState(false);
+ const [propertyBusy,setPropertyBusy]=useState(false);
+ const [propertyMessage,setPropertyMessage]=useState('');
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
  useEffect(()=>{
@@ -139,6 +144,31 @@ export default function App(){
    setShowProfile(false);
    Alert.alert('Business profile saved','Your company name, trades, language, overhead and profit will be defaults for NEW projects.');
   }catch(e){Alert.alert('Save failed','Could not save business profile.');}
+ };
+ const lookupProperty=async()=>{
+  if(propertyBusy)return;
+  setPropertyBusy(true);
+  setPropertyMessage('Finding property records…');
+  const address=project.address||'';
+  const result=await findPropertyArea(address,PROPERTY_LOOKUP_URL);
+  setPropertyBusy(false);
+  if(result.status!=='found'){setPropertyMessage(result.message);return;}
+  const record=result.property;
+  if(!areaMatchesAddress(record,project.address||'')){
+   setPropertyMessage('Property address changed. Search again for the new address.');
+   return;
+  }
+  patch({propertyArea:record});
+  setPropertyMessage('Record found: '+record.squareFootage.toLocaleString('en-US')+' sq ft ('+record.source+').');
+  if(project.trade==='cleaning'){
+   Alert.alert('Building area found / Área encontrada',
+    record.squareFootage.toLocaleString('en-US')+' sq ft recorded for '+record.matchedAddress+'. This is reported property living area, not necessarily the area to clean. Use it as the cleaning-area starting value?',[
+      {text:'Keep current area'},
+      {text:'Use this area',onPress:()=>patchCleaning({areaSqFt:record.squareFootage})}
+    ]);
+  }else{
+   Alert.alert('Property size found',record.squareFootage.toLocaleString('en-US')+' sq ft reported building living area. This is NOT the measured floor or remodel area. Use as reference only until scope is measured.');
+  }
  };
  const patchCleaning=(updates:Partial<CleaningDetails>)=>patch({cleaning:{...(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)),...updates, laborHoursConfirmed:updates.laborHoursConfirmed??false}});
  
@@ -293,7 +323,10 @@ export default function App(){
     <Input label="Contractor or cleaning business / Negocio" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name (pre-filled from profile)"/>
     <Input label="Customer / Cliente" value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
     <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City"/>
-    <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>patch({address:x})} placeholder="Street address, city, ZIP"/>
+    <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>{patch({address:x,propertyArea:undefined});setPropertyMessage('');}} placeholder="Street address, city, state, ZIP"/>
+    <Action title={propertyBusy?'Looking up address… / Buscando…':'Find property sq ft / Buscar pies cuadrados'} disabled={propertyBusy} secondary onPress={lookupProperty}/>
+    {!!propertyMessage&&<Text style={styles.hint}>{propertyMessage}</Text>}
+    {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>
     {project.trade==='cleaning'&&<View style={styles.lineCard}>
      <Text style={styles.h2}>Cleaning details / Detalles de limpieza</Text>
      <Text style={styles.label}>Type of cleaning / Tipo de limpieza</Text>
@@ -323,6 +356,7 @@ export default function App(){
      </View>
      {project.cleaning?.type==='post_construction'&&<View style={styles.lineCard}>
       <Text style={styles.h2}>Construction dust / Polvo de construcción</Text>
+      <Text style={styles.hint}>One choice affects the working hours and the customer estimate.</Text>
       <View style={styles.tradeGrid}>
        {(['light','moderate','heavy'] as const).map(level=><Pressable key={level} onPress={()=>patchCleaning({dustLevel:level})} style={[styles.trade,(project.cleaning?.dustLevel||'moderate')===level&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.dustLevel||'moderate')===level&&{color:PALETTE.white}]}>{level==='light'?'Light / Poco':level==='heavy'?'Heavy / Mucho':'Moderate / Medio'}</Text></Pressable>)}
       </View>
@@ -403,6 +437,11 @@ export default function App(){
      </View>}
     <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label="Overhead %" number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Profit %" number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
+    {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Labor calculation / Cálculo de horas</Text>
+      <Text style={styles.total}>{project.cleaning.type==='post_construction'&&!(project.cleaning.laborHoursConfirmed&&project.cleaning.laborHoursVerificationVersion===2)?Math.max(project.cleaning.workers*project.cleaning.firstHoursPerWorker,recommendedPostConstructionWorkerHours(project.cleaning)):project.cleaning.workers*project.cleaning.firstHoursPerWorker} total worker-hours</Text>
+      <Text style={styles.hint}>{project.cleaning.workers} workers · {project.cleaning.areaSqFt||'Area not entered'} sq ft · {project.cleaning.type==='post_construction'?(project.cleaning.dustLevel||'moderate')+' dust':'Standard deep cleaning'}. Automatically recalculated from your job details. Adjust the plan in Step 1 if needed.</Text>
+    </View>}
     <Text style={styles.total}>{project.trade==='cleaning'?'First deep cleaning / Primera limpieza':'Estimated total'}: {money(total.total)}</Text>
     {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>Recurring price PER VISIT / Por visita: {money(recurringCleaningPrice(project))} · {project.cleaning?.frequency.replace('_',' ')}</Text>}
     <Action title="Next · Customer estimate" onPress={()=>setStage(3)}/>
