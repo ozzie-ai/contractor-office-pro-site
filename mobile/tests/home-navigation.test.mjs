@@ -12,11 +12,11 @@ test('new job remains the default and saved list is opened explicitly',()=>{
 });
 test('new job keeps default business information while jobs stay in store',()=>{
  assert.match(app,/const stored=readStore\(\);\s*setSavedJobs\(stored\.jobs\)/);
- assert.match(app,/setProject\(\{\.\.\.initial,contractor:profile\.name,language:profile\.language/);
+ assert.match(app,/setProject\(\{\.\.\.initial,contractor:profile\.name,language:'en'/);
  assert.doesNotMatch(app,/setProject\(active\.project\)/);
 });
 test('one explicit language switch persists preference and localizes speech input',()=>{
- assert.match(app,/saveProfile\(updated\);setBusinessProfile\(updated\);patch\(\{language\}\)/);
+ assert.match(app,/saveProfile\(updated\);setBusinessProfile\(updated\);\}/);
  assert.match(app,/<SpeechInput language=\{businessProfile\.language\}/);
  assert.match(speech,/language='en'/);
  assert.doesNotMatch(speech,/Dictado \/ Speech-to-text/);
