@@ -1,5 +1,29 @@
 # Free Mac pricing database — $0/month
 
+## Recommended one-command private Wi-Fi setup
+
+From your Mac Terminal, after updating the repository:
+
+```sh
+cd ~/contractor-office-pro-site
+git pull --ff-only origin main
+python3 database/start_mac_server.py
+```
+
+This command initializes the local database, detects the Mac's private Wi-Fi address, creates a long random secret the first time, and starts an authenticated lookup server. Copy the displayed Mac URL and token into the mobile application's **Business Settings → Local Mac price database** fields. Set region `US-CA-LA` for the LA metro reference; other regions must have verified records before a price is returned.
+
+**Important:** This is a local-network prototype: the Mac and phone must be on the same trusted Wi-Fi, and traffic uses HTTP protected by a bearer token but not encrypted TLS. Do not use guest/shared Wi-Fi, open router port forwarding, or expose it to the public internet. iOS local-network permission and potentially a fresh native app build are required. The Mac must remain powered on to serve queries. Production multi-user access will need HTTPS and stronger identity controls.
+
+## Backups to an external disk
+
+1. Connect the drive to the Mac and run `ls /Volumes` to identify its exact volume name.
+2. Create a folder on that volume, for example `mkdir -p "/Volumes/YourDriveName/COPBackups"`.
+3. Run `python3 database/backup_local_database.py "/Volumes/YourDriveName/COPBackups"`.
+4. The backup utility uses SQLite's online backup API and verifies integrity. The Mac server can remain running.
+
+**Scope:** The mobile app can request catalog observations for supported electrical tasks and show the date, region, source and direct cost. It does not automatically accept a reference as the customer's selling price. No licensed third-party prices have been imported yet, and connectivity has not been validated on a physical iPhone.
+
+
 Contractor Office Pro now includes a **local SQLite catalog** you can run on your Mac. It is not yet connected to your phone app. No Supabase account, paid cloud, or external API key is needed to initialize it.
 
 The Mac can run the database even when an external drive is not plugged in. Later, transfer the data directory to the drive or specify it using COP_DATA_DIR. An external drive is **storage**, not a cloud service by itself. A Mac-based server only operates while the Mac is powered on, and the current version intentionally serves the Mac itself only for security. Phone access needs an authenticated LAN API or secure private network connection, not a port opened on the public internet.
