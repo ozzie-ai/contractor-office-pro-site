@@ -15,6 +15,25 @@ export function recommendedPostConstructionWorkerHours(c:CleaningDetails):number
  const sqftPerWorkerHour=c.dustLevel==='heavy'?100:c.dustLevel==='moderate'?160:240;
  return Math.ceil(c.areaSqFt/sqftPerWorkerHour);
 }
+
+/** Extract only explicit quantities from notes. Does not expose or copy the private transcript.
+ * A contractor still reviews these quantities before customer delivery.
+ */
+export function explicitCleaningNumbers(notes:string):Partial<Pick<CleaningDetails,'areaSqFt'|'bedrooms'|'bathrooms'|'livingRooms'>>{
+ const normalized=notes.toLowerCase().replace(/,/g,'');
+ const read=(patterns:RegExp[],min:number,max:number):number|undefined=>{
+  for(const pattern of patterns){
+   const match=normalized.match(pattern);
+   if(match){const n=Number(match[1]);if(Number.isInteger(n)&&n>=min&&n<=max)return n;}
+  }
+  return undefined;
+ };
+ const areaSqFt=read([/\\b(\\d{3,6})\\s*(?:sq\\.?\\s*ft\\.?|square\\s*feet|square\\s*foot|pies\\s*cuadrados|pies\\s*²|ft\\s*²)\\b/i,/\\b(?:area|superficie|área)\\s*(?:of|de|:)?\\s*(\\d{3,6})\\s*(?:sq\\.?\\s*ft\\.?|square\\s*feet|pies\\s*cuadrados)\\b/i],100,200000);
+ const bedrooms=read([/\\b(\\d{1,2})\\s*(?:bedrooms?|beds|dormitorios?|rec[aá]maras?)\\b/i],0,30);
+ const bathrooms=read([/\\b(\\d{1,2})\\s*(?:bathrooms?|baths|ba[ñn]os?)\\b/i],0,30);
+ const livingRooms=read([/\\b(\\d{1,2})\\s*(?:living\\s*rooms?|salas?)\\b/i],0,30);
+ return {...(areaSqFt!==undefined?{areaSqFt}:{}),...(bedrooms!==undefined?{bedrooms}:{}),...(bathrooms!==undefined?{bathrooms}:{}),...(livingRooms!==undefined?{livingRooms}:{})};
+}
 export function plannedCleaningWorkerHours(c:CleaningDetails):number{
  const entered=c.workers*c.firstHoursPerWorker;
  const suggested=c.type==='post_construction'
