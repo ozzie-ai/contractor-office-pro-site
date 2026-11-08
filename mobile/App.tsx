@@ -334,7 +334,15 @@ export default function App(){
        <Text style={styles.tradeText}>{(project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).includes(task.id)?'☑':'☐'} {task.en}</Text>
        <Text style={styles.tradeSub}>{task.es}</Text>
       </Pressable>)}
-      <Text style={styles.notice}>Suggested planning hours for this area and dust level: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} TOTAL worker-hours. Your entered hours: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. This is a planning heuristic, not a verified market rate or time standard.</Text>
+      <Text style={styles.notice}>Area/dust-based planning hours: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} total worker-hours. Entered: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. Price automatically uses the larger number unless you explicitly confirm your own site-assessed hours.</Text>
+      <Text style={styles.hint}>Currently priced worker-hours: {project.cleaning?.laborHoursConfirmed?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
+      <Action title="Use my measured hours / Confirmar mis horas" secondary onPress={()=>{
+       const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+       Alert.alert('Confirm site-assessed labor / Confirmar horas','Use '+(c.workers*c.firstHoursPerWorker)+' actual worker-hours for this job instead of the area-based guideline only if you assessed the condition and scope.',[
+        {text:'Cancel'},
+        {text:'Confirm measured hours',onPress:()=>patchCleaning({laborHoursConfirmed:true})}
+       ]);
+      }}/>
       <Action title="Use suggested hours / Usar horas sugeridas" secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        if(!c.areaSqFt){Alert.alert('Enter square feet','Measure or estimate the cleanable square footage first.');return;}
