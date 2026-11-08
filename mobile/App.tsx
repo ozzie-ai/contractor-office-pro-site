@@ -15,7 +15,7 @@ import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASK
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
-const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
+const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
 const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'once',dustLevel:'moderate',postConstructionTasks:[...DEFAULT_POST_CONSTRUCTION_TASKS],bedrooms:0,bathrooms:0,livingRooms:0,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
 type Stage=0|1|2|3|4;
@@ -25,6 +25,20 @@ function Action({title,onPress,secondary=false,disabled=false}:{title:string;onP
 }
 function Input({label,value,onChangeText,placeholder,multiline=false,number=false,secure=false,inputRef,onEndEditing}:{label:string;value:string;onChangeText:(x:string)=>void;placeholder?:string;multiline?:boolean;number?:boolean;secure?:boolean;inputRef?:React.Ref<React.ElementRef<typeof TextInput>>;onEndEditing?:()=>void}){
  return <View style={{marginTop:12}}><Text style={styles.label}>{label}</Text><TextInput ref={inputRef} autoCapitalize="sentences" value={value} onChangeText={onChangeText} onEndEditing={onEndEditing} placeholder={placeholder} placeholderTextColor="#84969a" keyboardType={number?'decimal-pad':'default'} secureTextEntry={secure} multiline={multiline} style={[styles.input,multiline&&{minHeight:100,textAlignVertical:'top'}]}/></View>;
+}
+function ServiceGlyph({trade,selected}:{trade:Trade;selected:boolean}){
+ if(trade==='concrete'){
+  const c=selected?'#FFFFFF':'#0B8E95';
+  return <View style={{width:29,height:27,justifyContent:'flex-end'}}>
+   <View style={{position:'absolute',top:1,left:7,width:17,height:15,borderWidth:2,borderColor:c,borderRadius:6,transform:[{rotate:'-25deg'}]}}/>
+   <View style={{width:25,height:7,borderWidth:2,borderColor:c,borderRadius:2}}/>
+   <View style={{flexDirection:'row',justifyContent:'space-between',width:23,marginLeft:1,marginTop:2}}>
+    <View style={{width:6,height:6,borderRadius:3,backgroundColor:c}}/>
+    <View style={{width:6,height:6,borderRadius:3,backgroundColor:c}}/>
+   </View>
+  </View>;
+ }
+ return <Text style={[styles.serviceIcon,selected&&{color:PALETTE.white}]}>{({electrical:'ϟ',plumbing:'🚰',painting:'🖌',handyman:'🛠',remodel:'⌂',cleaning:'🧹'} as Partial<Record<Trade,string>>)[trade]}</Text>;
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
@@ -304,18 +318,36 @@ export default function App(){
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-   <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO</Text>
-    <Text style={{fontSize:11,color:PALETTE.muted,fontWeight:'800'}}>MOBILE UI 24</Text>
+   <View style={styles.hero}>
+    <View style={styles.heroDecoration}/>
+    <View style={styles.heroTop}>
+     <View style={styles.brandMark}><Text style={styles.brandGlyph}>⌂</Text></View>
+     <View style={{flex:1,minWidth:0}}>
+      <Text style={styles.brandTitle} numberOfLines={2}>Contractor Office Pro</Text>
+      <Text style={styles.brandSubtitle}>{tr('Your office, simplified','Tu oficina, simplificada')}</Text>
+     </View>
+     <Pressable accessibilityRole="button" accessibilityLabel={tr('Business settings','Ajustes del negocio')} onPress={()=>{setShowJobs(false);setShowProfile(x=>!x);}} style={styles.settingsButton}>
+      <Text style={styles.settingsGlyph}>⚙</Text>
+     </Pressable>
+    </View>
+    <View style={styles.heroBottom}>
+     <Text style={styles.heroVersion}>UI 27 · PILOT</Text>
+     <View style={styles.languageSwitch}>
+      {(['en','es'] as const).map(lang=><Pressable key={lang} accessibilityRole="button" accessibilityLabel={lang==='en'?'English':'Español'} accessibilityState={{selected:businessProfile.language===lang}} onPress={()=>chooseLanguage(lang)} style={[styles.languageOption,businessProfile.language===lang&&styles.languageSelected]}>
+       <Text style={[styles.languageText,businessProfile.language===lang&&styles.languageTextSelected]}>{lang.toUpperCase()}</Text>
+      </Pressable>)}
+     </View>
+    </View>
    </View>
-   <View style={styles.row}>
-    <View style={{flex:1}}><Action title={tr('New Job','Nuevo trabajo')} onPress={startNewJob}/></View>
-    <View style={{flex:1}}><Action title={tr('My Jobs','Mis trabajos')+(savedJobs.length?' ('+savedJobs.length+')':'')} secondary={!showJobs} onPress={goToMyJobs}/></View>
-   </View>
-   <View style={styles.row}>
-    <View style={{flex:1}}><Action title="English" secondary={businessProfile.language!=='en'} onPress={()=>chooseLanguage('en')}/></View>
-    <View style={{flex:1}}><Action title="Español" secondary={businessProfile.language!=='es'} onPress={()=>chooseLanguage('es')}/></View>
-    <View style={{flex:1}}><Action title={tr('Settings','Ajustes')} secondary onPress={()=>{setShowJobs(false);setShowProfile(x=>!x);}}/></View>
+   <View style={styles.homeNavigation}>
+    <Pressable accessibilityRole="button" onPress={startNewJob} style={[styles.navTile,!showJobs&&styles.navTileActive]}>
+     <Text style={[styles.navGlyph,!showJobs&&{color:PALETTE.white}]}>＋</Text>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.navText,!showJobs&&{color:PALETTE.white}]}>{tr('New Job','Nuevo trabajo')}</Text>
+    </Pressable>
+    <Pressable accessibilityRole="button" onPress={goToMyJobs} style={[styles.navTile,showJobs&&styles.navTileActive]}>
+     <Text style={[styles.navGlyph,showJobs&&{color:PALETTE.white}]}>▤</Text>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.navText,showJobs&&{color:PALETTE.white}]}>{tr('My Jobs','Mis trabajos')}{savedJobs.length?' ('+savedJobs.length+')':''}</Text>
+    </Pressable>
    </View>
    {showProfile&&<View style={styles.card}>
     <Text style={styles.h2}>{tr('Business settings','Configuración del negocio')}</Text>
@@ -354,12 +386,24 @@ export default function App(){
     </Pressable>)}
    </View>}
    {!showJobs&&<>
-   <Text style={styles.h2}>{stage===0?tr('New Job','Nuevo trabajo'):tr('Job workspace','Área de trabajo')}{project.customer?' · '+project.customer:''}</Text>
-   <View style={styles.steps}>{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguimiento']:['Job','Scope','Price','Send','Follow up']).map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
+   <View style={styles.steps} accessibilityRole="tablist">{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguir']:['Job','Scope','Price','Send','Follow-up']).map((name,i)=><Pressable key={i} accessibilityRole="tab" accessibilityLabel={name} accessibilityState={{selected:stage===i}} onPress={()=>setStage(i as Stage)} style={styles.step}>
+     <View style={[styles.stepCircle,stage===i&&styles.stepActive,stage>i&&styles.stepComplete]}><Text style={[styles.stepNumber,(stage===i||stage>i)&&{color:PALETTE.white}]}>{i+1}</Text></View>
+     <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.stepText,stage===i&&styles.stepTextActive]}>{name}</Text>
+    </Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
-    <Text style={styles.h2}>{tr("1 · New Job","1 · Nuevo trabajo")}</Text>
-    <Text style={styles.hint}>{tr("Choose a service, describe the job, and add photos.","Elige un servicio, describe el trabajo y agrega fotos.")}</Text>
-    <View style={styles.tradeGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text></Pressable>)}</View>
+    <View style={styles.cardIntro}>
+     <View style={styles.introIcon}><Text style={styles.introGlyph}>▤</Text></View>
+     <View style={{flex:1}}>
+      <Text style={styles.h2}>{tr('New Job','Nuevo trabajo')}</Text>
+      <Text style={styles.hint}>{tr('Choose a service, describe the work and add photos.','Elige un servicio, describe el trabajo y agrega fotos.')}</Text>
+     </View>
+    </View>
+    <Text style={styles.sectionTitle}>{tr('Service / Trade','Servicio / Oficio')}</Text>
+    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
+     <ServiceGlyph trade={t} selected={project.trade===t}/>
+     <Text numberOfLines={2} style={[styles.serviceName,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text>
+     {project.trade===t&&<Text style={styles.selectedTick}>✓</Text>}
+    </Pressable>)}</View>
     <Input label={tr("Business","Negocio")} value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder={tr('Your business name','Nombre de tu negocio')}/>
     <Input label={tr("Customer","Cliente")} value={project.customer} onChangeText={x=>patch({customer:x})} placeholder={tr('Customer name','Nombre del cliente')}/>
     <Input label={tr("City","Ciudad")} value={project.city} onChangeText={x=>patch({city:x})} placeholder={tr('City','Ciudad')}/>
@@ -549,19 +593,73 @@ export default function App(){
  </KeyboardAvoidingView>;
 }
 const styles=StyleSheet.create({
- container:{paddingTop:55,paddingHorizontal:16,paddingBottom:70,maxWidth:750,width:'100%',alignSelf:'center'},
- eyebrow:{fontSize:11,letterSpacing:1.5,color:PALETTE.accent,fontWeight:'800'},title:{fontWeight:'900',fontSize:29,lineHeight:35,color:PALETTE.ink,marginTop:8,marginBottom:16},
- steps:{flexDirection:'row',gap:4,marginBottom:12},step:{flex:1,backgroundColor:'#e0ebe7',paddingVertical:11,borderRadius:9,alignItems:'center'},stepActive:{backgroundColor:PALETTE.accent},stepText:{fontSize:11,color:PALETTE.ink,fontWeight:'700'},
- card:{borderRadius:16,backgroundColor:PALETTE.white,padding:16,borderWidth:1,borderColor:PALETTE.line,marginBottom:14},
- h2:{fontSize:20,fontWeight:'800',color:PALETTE.ink,marginBottom:4},hint:{fontSize:13,lineHeight:19,color:PALETTE.muted,marginVertical:8},label:{fontSize:13,fontWeight:'700',color:PALETTE.ink,marginBottom:6},
- input:{borderWidth:1,borderColor:'#b8c9c6',borderRadius:9,minHeight:44,padding:10,color:PALETTE.ink,fontSize:15,backgroundColor:'#fff'},
- tradeGrid:{flexDirection:'row',flexWrap:'wrap',gap:7,marginVertical:9},trade:{width:'48%',borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:11,backgroundColor:'#f8fbfa'},selectedTrade:{backgroundColor:PALETTE.accent},tradeText:{fontWeight:'800',color:PALETTE.ink},tradeSub:{fontSize:12,color:PALETTE.muted,marginTop:2},
- button:{backgroundColor:PALETTE.accent,minHeight:45,borderRadius:10,alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginTop:12},buttonSecondary:{backgroundColor:'#e3f0ed',borderWidth:1,borderColor:'#c5ded6'},buttonText:{fontSize:14,fontWeight:'800',color:PALETTE.white,textAlign:'center'},
- voiceCard:{borderWidth:1,borderColor:'#9ecdc1',backgroundColor:'#edf8f5',borderRadius:12,padding:12,marginVertical:12},
- row:{flexDirection:'row',gap:9},photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},photo:{width:82,height:82,borderRadius:8},remove:{fontSize:10,color:'#9a4545',textAlign:'center'},
- notice:{fontSize:13,color:'#775d21',backgroundColor:'#fdf6e1',padding:12,borderRadius:9,marginTop:12},
- savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:9,padding:10,marginTop:9,backgroundColor:'#f6fbf9'},
- statusGrid:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:10,marginBottom:12},
- statusChoice:{width:'48%',backgroundColor:'#f6fbf9',borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:10},
- lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:12,marginTop:12},lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},total:{fontWeight:'900',fontSize:22,color:PALETTE.accent,marginVertical:17},footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:8}
+ container:{paddingTop:46,paddingHorizontal:16,paddingBottom:78,maxWidth:750,width:'100%',alignSelf:'center'},
+ eyebrow:{fontSize:11,letterSpacing:1.2,color:PALETTE.teal,fontWeight:'800'},
+ title:{fontWeight:'900',fontSize:27,lineHeight:33,color:PALETTE.ink,marginTop:6,marginBottom:16},
+ hero:{backgroundColor:'#101F52',borderRadius:24,padding:17,paddingBottom:15,marginBottom:16,overflow:'hidden',shadowColor:'#13256F',shadowOpacity:0.16,shadowRadius:15,shadowOffset:{width:0,height:7},elevation:4},
+ heroDecoration:{position:'absolute',width:175,height:175,borderRadius:90,right:-55,top:-92,backgroundColor:'#205D93',opacity:0.5},
+ heroTop:{flexDirection:'row',alignItems:'center',gap:10},
+ brandMark:{width:42,height:42,borderRadius:12,backgroundColor:'#2B478E',alignItems:'center',justifyContent:'center',borderColor:'#5474A5',borderWidth:1},
+ brandGlyph:{fontSize:34,lineHeight:39,color:PALETTE.white,fontWeight:'900'},
+ brandTitle:{color:PALETTE.white,fontSize:18,lineHeight:23,fontWeight:'900',letterSpacing:-0.35},
+ brandSubtitle:{color:'#BACCE8',fontSize:11,lineHeight:16,marginTop:2},
+ settingsButton:{width:42,height:42,alignItems:'center',justifyContent:'center',borderRadius:12,backgroundColor:'#263C72',borderWidth:1,borderColor:'#6380A8'},
+ settingsGlyph:{fontSize:24,color:PALETTE.white},
+ heroBottom:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginTop:14},
+ heroVersion:{fontSize:10,fontWeight:'700',letterSpacing:1.2,color:'#9DB2D1'},
+ languageSwitch:{flexDirection:'row',backgroundColor:'#253D72',borderRadius:24,padding:3,borderWidth:1,borderColor:'#6685AA'},
+ languageOption:{minWidth:48,minHeight:30,alignItems:'center',justifyContent:'center',borderRadius:20,paddingHorizontal:12},
+ languageSelected:{backgroundColor:PALETTE.white},
+ languageText:{color:'#DCEAFF',fontSize:12,fontWeight:'800'},
+ languageTextSelected:{color:PALETTE.accentDark},
+ homeNavigation:{flexDirection:'row',gap:10,marginBottom:17},
+ navTile:{flex:1,minWidth:0,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5,backgroundColor:PALETTE.white,minHeight:57,borderRadius:16,borderWidth:1,borderColor:PALETTE.line,paddingHorizontal:6,shadowColor:'#1C3166',shadowOpacity:0.04,shadowRadius:5,shadowOffset:{width:0,height:3},elevation:1},
+ navTileActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowOpacity:0.16,elevation:3},
+ navGlyph:{fontSize:23,fontWeight:'800',color:PALETTE.accentDark},
+ navText:{flexShrink:1,fontSize:14,fontWeight:'800',color:PALETTE.ink,textAlign:'center'},
+ steps:{flexDirection:'row',marginBottom:16,paddingHorizontal:4,alignItems:'flex-start'},
+ step:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',gap:5,paddingVertical:3},
+ stepCircle:{width:31,height:31,borderRadius:16,backgroundColor:PALETTE.white,borderWidth:1.5,borderColor:'#C4CEDF',alignItems:'center',justifyContent:'center'},
+ stepActive:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ stepComplete:{backgroundColor:PALETTE.teal,borderColor:PALETTE.teal},
+ stepNumber:{fontSize:14,fontWeight:'800',color:PALETTE.muted},
+ stepText:{fontSize:10.5,color:PALETTE.muted,fontWeight:'700',textAlign:'center',width:'100%'},
+ stepTextActive:{color:PALETTE.accentDark,fontWeight:'900'},
+ card:{borderRadius:22,backgroundColor:PALETTE.white,padding:17,borderWidth:1,borderColor:'#E7ECF5',marginBottom:16,shadowColor:'#16306A',shadowOpacity:0.07,shadowRadius:14,shadowOffset:{width:0,height:7},elevation:2},
+ cardIntro:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:17},
+ introIcon:{height:47,width:47,backgroundColor:'#E6F4F2',borderRadius:14,alignItems:'center',justifyContent:'center'},
+ introGlyph:{fontSize:26,color:PALETTE.teal,fontWeight:'800'},
+ h2:{fontSize:21,lineHeight:27,fontWeight:'900',color:PALETTE.ink,marginBottom:3,letterSpacing:-0.4},
+ sectionTitle:{fontSize:15,fontWeight:'800',color:PALETTE.ink,marginTop:7,marginBottom:11},
+ hint:{fontSize:13,lineHeight:19,color:PALETTE.muted,marginVertical:6},
+ label:{fontSize:13,fontWeight:'800',color:PALETTE.ink,marginBottom:6},
+ input:{borderWidth:1,borderColor:'#CCD6E5',borderRadius:13,minHeight:49,paddingHorizontal:13,paddingVertical:10,color:PALETTE.ink,fontSize:15,backgroundColor:'#FBFCFF'},
+ serviceGrid:{flexDirection:'row',flexWrap:'wrap',gap:9,marginBottom:20},
+ serviceTile:{width:'48.5%',minHeight:63,flexDirection:'row',alignItems:'center',gap:7,backgroundColor:'#FBFCFF',borderWidth:1.1,borderColor:'#D7DEEB',borderRadius:14,paddingHorizontal:10,paddingVertical:8},
+ serviceTileFull:{width:'100%'},
+ serviceTileSelected:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark,shadowColor:'#13256F',shadowOpacity:0.17,shadowRadius:7,shadowOffset:{width:0,height:4},elevation:3},
+ serviceIcon:{fontSize:22,minWidth:27,textAlign:'center',color:PALETTE.teal},
+ serviceName:{fontSize:13,fontWeight:'800',color:PALETTE.ink,flex:1,lineHeight:17},
+ selectedTick:{fontSize:14,color:PALETTE.white,fontWeight:'900'},
+ tradeGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginVertical:10},
+ trade:{width:'48%',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,backgroundColor:'#F9FBFF'},
+ selectedTrade:{backgroundColor:PALETTE.accentDark,borderColor:PALETTE.accentDark},
+ tradeText:{fontWeight:'800',color:PALETTE.ink},tradeSub:{fontSize:12,color:PALETTE.muted,marginTop:2},
+ button:{backgroundColor:PALETTE.accentDark,minHeight:49,borderRadius:13,alignItems:'center',justifyContent:'center',paddingHorizontal:12,marginTop:12,shadowColor:'#1B3590',shadowOpacity:0.12,shadowRadius:6,shadowOffset:{width:0,height:3},elevation:1},
+ buttonSecondary:{backgroundColor:'#EBF0FA',borderWidth:1,borderColor:'#D2DBEE',shadowOpacity:0,elevation:0},
+ buttonText:{fontSize:14,fontWeight:'800',color:PALETTE.white,textAlign:'center'},
+ voiceCard:{borderWidth:1,borderColor:'#B5DDE0',backgroundColor:'#EFF8F9',borderRadius:15,padding:13,marginVertical:12},
+ row:{flexDirection:'row',gap:9},
+ photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},
+ photo:{width:82,height:82,borderRadius:10},
+ remove:{fontSize:10,color:'#A04E57',textAlign:'center'},
+ notice:{fontSize:13,color:'#71571F',backgroundColor:'#FFF7E7',padding:12,borderRadius:12,marginTop:12},
+ savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:12,marginTop:10,backgroundColor:'#F8FAFF'},
+ statusGrid:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:10,marginBottom:12},
+ statusChoice:{width:'48%',backgroundColor:'#F8FAFF',borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:11},
+ lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:13,padding:13,marginTop:12,backgroundColor:'#FCFDFF'},
+ lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},
+ rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},
+ total:{fontWeight:'900',fontSize:23,color:PALETTE.accentDark,marginVertical:16},
+ footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:10}
 });
