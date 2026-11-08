@@ -311,7 +311,10 @@ export default function App(){
   }
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
   const draft=localEstimate(project.description,project.trade);
-  patch({lines:draft.lines,unknowns:draft.unknowns,exclusions:[],futureWork:[]});
+  const futureBreaker=draft.lines.some(item=>item.id==='local-future-breaker');
+  patch({lines:draft.lines,unknowns:draft.unknowns,
+   exclusions:futureBreaker?['Future 100A branch-circuit feeder wiring, terminations and connections are not included in this job.']:[],
+   futureWork:futureBreaker?['Future circuit wiring and final connections under a separate scope and price.']:[]});
   setAiConnected(false);
   setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
   setStage(2);
