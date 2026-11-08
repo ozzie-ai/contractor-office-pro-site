@@ -133,3 +133,12 @@ test('changing dust, workers, hours and cost immediately recomputes cleaning quo
  const after=totals(currentCleaningProject({...p,cleaning:{...p.cleaning,dustLevel:'heavy'},profitPct:15})).total;
  assert.ok(after>before);
 });
+
+test('multiple cleaning work lines still show only one customer bundled total',()=>{
+ const cleaned=cleaningToProject({...c,type:'post_construction',areaSqFt:4034,dustLevel:'heavy'},{overheadPct:10,profitPct:20});
+ const p={...cleaned,trade:'cleaning',contractor:'Cleaner',customer:'Customer',city:'Santa Clarita',description:'',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20,lines:[...cleaned.lines,{id:'extra',description_en:'Special extra cleaning',description_es:'Limpieza adicional',quantity:1,unit:'job',rate:100,status:'included_now'}]};
+ const html=proposalHtml(p);
+ const final=totals(p).total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+ assert.equal(html.split('$'+final).length-1,2); // service row and total, not one price per work item
+ assert.ok(html.includes('Special extra cleaning'));
+});
