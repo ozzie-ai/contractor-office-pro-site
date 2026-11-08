@@ -17,7 +17,7 @@ test('Los Angeles wage reference has explicit source and does not invent hours',
 });
 test('Calculate transparent direct costs before overhead and profit',()=>{
  const out=calculateUnitRate({hoursPerUnit:2,materialsPerUnit:75,equipmentPerUnit:10,hourlyWage:40.57,laborBurdenMultiplier:1.35});
- assert.equal(out.laborPerUnit,109.53900000000002);
+ assert.ok(Math.abs(out.laborPerUnit-109.539)<0.000001);
  assert.equal(out.rate,194.54);
 });
 test('Reject negative inputs and unreasonable burden multiplier',()=>{
