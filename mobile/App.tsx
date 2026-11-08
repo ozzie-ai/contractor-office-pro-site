@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
+import {upsertRecessedLights} from './src/electricalItems';
 import {Language,Project,Trade,TRADES,EstimateLine,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
@@ -26,6 +27,8 @@ export default function App(){
  const [loaded,setLoaded]=useState(false);
  const [saveStatus,setSaveStatus]=useState('');
  const [wallHeight,setWallHeight]=useState('');
+ const [lightCount,setLightCount]=useState('5');
+ const [electricalCeilingHeight,setElectricalCeilingHeight]=useState('8');
  const [shareDone,setShareDone]=useState(false);
  const scrollRef=useRef<React.ElementRef<typeof ScrollView>>(null);
 
@@ -146,6 +149,15 @@ export default function App(){
   setWallHeight('');
   setInfo('Shower wall area recalculated. Review the updated quantity and all rates.');
  };
+ const addElectricalLights=()=>{
+  const qty=Number(lightCount),height=electricalCeilingHeight.trim()?Number(electricalCeilingHeight):undefined;
+  try{
+   const lines=upsertRecessedLights(project.lines,qty,height);
+   patch({lines});
+   setInfo('Added '+qty+' recessed lights. Other items and edited rates were preserved.');
+   Alert.alert('Lights added / Luces agregadas',qty+' recessed lights are now included. Review their rate and save this job.');
+  }catch(e){Alert.alert('Check quantities',e instanceof Error?e.message:'Please check the values.');}
+ };
  const createLocalDraft=()=>{
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
   const draft=localEstimate(project.description,project.trade);
@@ -226,6 +238,15 @@ export default function App(){
      <Text style={styles.rate}>Line amount: {money(line.quantity*line.rate)}</Text>
      <Action title="Remove item" secondary onPress={()=>patch({lines:project.lines.filter((_,j)=>j!==i)})}/>
     </View>)}
+    {project.trade==='electrical'&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>Electrical quick add / Agregar luces</Text>
+      <Text style={styles.hint}>Add missing recessed lights without replacing your existing dimmer or other priced work.</Text>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label="Number of lights / Cantidad" number value={lightCount} onChangeText={setLightCount}/></View>
+       <View style={{flex:1}}><Input label="Ceiling height (ft)" number value={electricalCeilingHeight} onChangeText={setElectricalCeilingHeight}/></View>
+      </View>
+      <Action title="+ Add recessed lights / Agregar luces" onPress={addElectricalLights}/>
+     </View>}
     <Action title="+ Add work item" secondary onPress={addLine}/>
     <Input label="Not included (one per line)" multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label="Future work (not part of this estimate)" multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
