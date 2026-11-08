@@ -336,7 +336,7 @@ export default function App(){
      <Text style={styles.hint}>{TRADES[j.project.trade][businessProfile.language]} · {JOB_STATUSES[j.project.status||'draft'][businessProfile.language]} · {j.project.lines.length} {tr('items','partidas')} · {new Date(j.updatedAt).toLocaleString()}</Text>
      <Text style={{color:PALETTE.accent,fontWeight:'700'}}>{tr('Open','Abrir')}</Text>
     </Pressable>)}
-   </View>
+   </View>}
    {!showJobs&&<>
    <Text style={styles.h2}>{stage===0?tr('New Job','Nuevo trabajo'):tr('Job workspace','Área de trabajo')}{project.customer?' · '+project.customer:''}</Text>
    <View style={styles.steps}>{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguimiento']:['Job','Scope','Price','Send','Follow up']).map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
