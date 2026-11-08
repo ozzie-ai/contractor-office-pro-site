@@ -148,3 +148,16 @@ test('old saved low-hours confirmation does not silently authorize outdated pric
  assert.equal(priceCleaning(older,10,20).initialPrice,1405.8);
  assert.ok(priceCleaning(older,10,20).unknowns.some(x=>x.includes('AREA-BASED LABOR APPLIED')));
 });
+
+test('post-construction PDF shows dust level in English and Spanish without internal markup',()=>{
+ const c2={...c,type:'post_construction',dustLevel:'moderate',areaSqFt:4034};
+ const price=cleaningToProject(c2,{overheadPct:10,profitPct:20});
+ const p={...price,trade:'cleaning',contractor:'Cleaner',customer:'Customer',city:'Santa Clarita',address:'123 Test Ave',description:'Private',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const english=proposalHtml(p);
+ const spanish=proposalHtml({...p,language:'es'});
+ assert.ok(english.includes('Dust level: Moderate'));
+ assert.ok(spanish.includes('Nivel de polvo: Moderado'));
+ assert.ok(english.includes('26 total worker-hours'));
+ assert.ok(!english.includes('Overhead'));
+ assert.ok(!english.includes('Profit'));
+});
