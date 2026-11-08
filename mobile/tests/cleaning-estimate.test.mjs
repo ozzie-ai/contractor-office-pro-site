@@ -27,7 +27,8 @@ test('bilingual cleaning proposal displays separate recurring price without priv
  const project={...priced,trade:'cleaning',contractor:'Cleaning Co',customer:'Client',city:'Santa Clarita',address:'123 Sample Street',description:'PRIVATE VOICE DICTATION',customerNotes:'',exclusions:[],futureWork:[],status:'sent',followUpNotes:'PRIVATE FOLLOWUP',language:'es',overheadPct:10,profitPct:20};
  const html=proposalHtml(project,'proposal');
  assert.ok(html.includes('PROPUESTA DE TRABAJO'));
- assert.ok(html.includes('SERVICIO RECURRENTE'));
+ assert.ok(html.includes('PLAN DE LIMPIEZA'));
+ assert.ok(html.includes('Precio por visita posterior:'));
  assert.ok(html.includes('237.60'));
  assert.equal(html.includes('PRIVATE VOICE'),false);
  assert.equal(html.includes('PRIVATE FOLLOWUP'),false);
