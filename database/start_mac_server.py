@@ -51,6 +51,7 @@ def main():
     print("Database:",db_path(),flush=True)
     print("In iPhone Business Settings, enter:",flush=True)
     print("  Mac URL: http://"+ip+":"+str(PORT),flush=True)
+    print("  Open on iPhone Safari: http://"+ip+":"+str(PORT)+"/app",flush=True)
     print("  Region: US-CA-LA (change for actual work location)",flush=True)
     print("  Private access token:",token,flush=True)
     print("The token is saved on this Mac at",TOKEN_FILE,flush=True)
