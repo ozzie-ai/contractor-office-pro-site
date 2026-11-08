@@ -11,6 +11,7 @@ import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
+import {cleaningDetailsFromNotes} from './src/cleaningNotes';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
@@ -236,7 +237,7 @@ export default function App(){
  };
  const createLocalDraft=()=>{
   if(project.trade==='cleaning'){
-   const details=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+   const details=cleaningDetailsFromNotes(project.description,project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour));
    if(details.cleaningTypeConfirmed===false){Alert.alert(tr('Choose cleaning type','Elige tipo de limpieza'),tr('Select a cleaning service before pricing.','Selecciona un servicio de limpieza antes de calcular el precio.'));setStage(0);return;}
    if(details.type!=='post_construction'&&details.firstHoursPerWorker<=0){Alert.alert(tr('Enter worker hours','Ingresa las horas'),tr('Enter estimated hours per worker for the first visit.','Ingresa horas estimadas por persona para la primera visita.'));setStage(0);return;}
    if(details.type==='post_construction'&&details.areaSqFt<=0){
@@ -423,7 +424,7 @@ export default function App(){
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
-    <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
+    <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>{if(project.trade==='cleaning'){const c=cleaningDetailsFromNotes(project.description,project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour));patch({cleaning:c});}setStage(1);}}/>
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("2 · Prepare scope","2 · Preparar alcance")}</Text>
