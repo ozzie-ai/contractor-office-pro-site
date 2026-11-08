@@ -70,8 +70,8 @@ export default function App(){
  const [loaded,setLoaded]=useState(false);
  const [saveStatus,setSaveStatus]=useState('');
  const [wallHeight,setWallHeight]=useState('');
- const [lightCount,setLightCount]=useState('5');
- const [electricalCeilingHeight,setElectricalCeilingHeight]=useState('8');
+ const [lightCount,setLightCount]=useState('');
+ const [electricalCeilingHeight,setElectricalCeilingHeight]=useState('');
  const [shareDone,setShareDone]=useState(false);
  const scrollRef=useRef<React.ElementRef<typeof ScrollView>>(null);
  const addressRef=useRef('');
@@ -518,7 +518,7 @@ export default function App(){
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
-    {project.trade==='electrical'&&<View style={styles.lineCard}>
+    {project.trade==='electrical'&&/\b(recessed|empotradas?|downlights?)\b/i.test(project.description)&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr("Recessed lights","Luces empotradas")}</Text>
       <Text style={styles.hint}>{tr("Add lights without removing other electrical items.","Agrega luces sin borrar otras partidas eléctricas.")}</Text>
       <View style={styles.row}>
@@ -546,6 +546,7 @@ export default function App(){
     </View>}
     <Text style={styles.total}>{project.trade==='cleaning'?tr('First cleaning','Primera limpieza'):tr('Estimated total','Total estimado')}: {cleaningInputsReady?money(total.total):tr('Pending scope','Falta confirmar el trabajo')}</Text>
     {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>{tr('Recurring price per visit','Precio por visita periódica')}: {money(recurringCleaningPrice(project))}</Text>}
+    {!pdfReady&&<Text style={styles.notice}>{tr("You can continue to Proposal, but PDF sharing requires prices and quantities for all items. Tap missing items to edit.","Puedes continuar a Propuesta, pero para compartir el PDF debes completar cantidades y precios de todas las partidas.")}</Text>}
     <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
    </View>}
    {stage===3&&<View style={styles.card}>
