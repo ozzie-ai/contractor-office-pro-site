@@ -91,3 +91,43 @@ test('Electrical: one light is not mistaken for an 8-foot ceiling quantity',()=>
  const r=localEstimate('Instalar un recessed light en techo de 8 pies.','electrical');
  assert.equal(find(r,'recessed-light').quantity,1);
 });
+
+
+test('Real customer panel dictation: 100A to 200A, 20 existing circuits, breaker only, $500 permit',()=>{
+ const t='Ok voy a hacer un upgrade de un panel eléctrico. Panel actualmente es de 100 A y lo voy a upgrade a 200 A. El permiso costará aproximadamente $500 y necesito cambiar 20 de los existen circuitos a nuevos circuitos. Voy a agregar un breaker de 100 A solamente para posteriormente en otro trabajo hacer las conexiones.';
+ const r=localEstimate(t,'electrical');
+ assert.equal(r.lines.length,4);
+ assert.match(find(r,'panel-upgrade').description_en,/100A to 200A/);
+ assert.equal(find(r,'existing-circuits').quantity,20);
+ assert.match(find(r,'future-breaker').description_en,/100A breaker only/);
+ assert.equal(find(r,'permit').rate,500);
+ assert.equal(find(r,'recessed-light'),undefined);
+ assert.equal(find(r,'shower'),undefined);
+ assert.equal(find(r,'floor'),undefined);
+});
+test('Electrical: recessed fixture and dimmer counts remain recognized',()=>{
+ const r=localEstimate('Quiero cinco recessed lights en un apartamento, en un ceiling de ocho pies de altura, y necesito un dimmer instead del apagador.','electrical');
+ assert.equal(find(r,'recessed-light').quantity,5);
+ assert.match(find(r,'recessed-light').description_en,/8 ft ceiling/);
+ assert.equal(find(r,'dimmer').quantity,1);
+ assert.match(find(r,'dimmer').description_en,/Replace existing wall switch/);
+ assert.equal(r.lines.length,2);
+});
+test('Electrical: never invent recessed lights or bathroom tasks for panel jobs',()=>{
+ const r=localEstimate('Upgrade main panel from 100A to 200A, move 20 existing circuits and install 100A breaker only for later wiring. Permit $500.','electrical');
+ assert.equal(find(r,'recessed-light'),undefined);
+ assert.equal(find(r,'wall-tile'),undefined);
+ assert.equal(find(r,'panel-upgrade').quantity,1);
+ assert.equal(find(r,'existing-circuits').quantity,20);
+ assert.equal(find(r,'permit').rate,500);
+});
+test('Concrete and plumbing descriptions cannot silently become bathroom items',()=>{
+ const c=localEstimate('Pour a concrete driveway 600 square feet','concrete');
+ const p=localEstimate('Replace water heater and connect supply pipes','plumbing');
+ assert.equal(c.lines.length,1);
+ assert.equal(p.lines.length,1);
+ assert.equal(c.lines[0].rate,0);
+ assert.equal(p.lines[0].rate,0);
+ assert.equal(find(c,'shower'),undefined);
+ assert.equal(find(p,'shower'),undefined);
+});
