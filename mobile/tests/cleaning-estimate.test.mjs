@@ -7,7 +7,7 @@ import {createRequire} from 'node:module';
 import ts from 'typescript';
 const load=(name)=>{const filename=path.resolve('src/'+name+'.ts');const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const module={exports:{}};vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url)});return module.exports;};
 const {priceCleaning,cleaningToProject}=load('cleaningEstimate');
-const {proposalHtml,totals,TRADES}=load('estimate');
+const {proposalHtml,totals,TRADES,recurringCleaningPrice}=load('estimate');
 const c={type:'residential',frequency:'twice_monthly',bedrooms:3,bathrooms:2,livingRooms:2,areaSqFt:1800,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour:25,firstSupplies:25,repeatSupplies:15,travelPerVisit:15};
 test('cleaning calculates first deep clean and repeat visit separately',()=>{
  const q=priceCleaning(c,10,20);
@@ -35,4 +35,10 @@ test('bilingual cleaning proposal displays separate recurring price without priv
 });
 test('rejects invalid crew-size so no misleading zero price',()=>{
  assert.throws(()=>priceCleaning({...c,workers:0},10,20));
+});
+
+test('recurring price recalculates with edited profit setting',()=>{
+ const priced=cleaningToProject(c,{overheadPct:10,profitPct:20});
+ assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:20}),237.6);
+ assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:15}),227.7);
 });
