@@ -8,9 +8,12 @@ import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
-import {Language,Project,Trade,TRADES,EstimateLine,JobStatus,JOB_STATUSES,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
+import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
+import {cleaningToProject} from './src/cleaningEstimate';
+import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
+const defaultCleaning=(laborCostPerHour:number):CleaningDetails=>({type:'residential',frequency:'weekly',bedrooms:3,bathrooms:2,livingRooms:1,areaSqFt:0,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour,firstSupplies:25,repeatSupplies:15,travelPerVisit:15});
 const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
 type Stage=0|1|2|3|4;
 
@@ -22,6 +25,10 @@ function Input({label,value,onChangeText,placeholder,multiline=false,number=fals
 }
 export default function App(){
  const [project,setProject]=useState<Project>(initial);
+ const [businessProfile,setBusinessProfile]=useState<BusinessProfile>(defaultProfile);
+ const [showProfile,setShowProfile]=useState(false);
+ const [profileSaved,setProfileSaved]=useState('');
+
  const [activeJobId,setActiveJobId]=useState(newJobId);
  const [savedJobs,setSavedJobs]=useState<SavedJob[]>([]);
  const [loaded,setLoaded]=useState(false);
@@ -38,6 +45,8 @@ export default function App(){
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
  useEffect(()=>{
+  const profile=readProfile();
+  setBusinessProfile(profile);
   const stored=readStore();
   setSavedJobs(stored.jobs);
   const active=stored.jobs.find(x=>x.id===stored.activeId);
@@ -48,6 +57,7 @@ export default function App(){
    setStage(active.stage);
    setSaveStatus('Previous job restored from this iPhone.');
   }
+  if(!active&&profile.name)setProject(prev=>({...prev,contractor:profile.name,language:profile.language,overheadPct:profile.overheadPct,profitPct:profile.profitPct,trade:profile.enabledTrades[0]}));
   setLoaded(true);
  },[]);
  useEffect(()=>{
@@ -107,7 +117,7 @@ export default function App(){
   if(!saveCurrent())return;
   const id=newJobId();
   setActiveJobId(id);
-  setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[]});
+  setProject({...initial,lines:[],exclusions:[],futureWork:[],unknowns:[],contractor:businessProfile.name,language:businessProfile.language,overheadPct:businessProfile.overheadPct,profitPct:businessProfile.profitPct,trade:businessProfile.enabledTrades[0]});
   setPhotos([]);
   setStage(0);
   setAiConnected(false);
@@ -119,6 +129,19 @@ export default function App(){
  };
 
  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
+ const patchProfile=(updates:Partial<BusinessProfile>)=>setBusinessProfile(prev=>({...prev,...updates}));
+ const commitProfile=()=>{
+  try{
+   if(!businessProfile.enabledTrades.length){Alert.alert('Choose services','Select at least one trade or service.');return;}
+   if([businessProfile.overheadPct,businessProfile.profitPct,businessProfile.cleaningLaborCostPerHour].some(x=>!Number.isFinite(x)||x<0)){Alert.alert('Check defaults','Use valid nonnegative numbers.');return;}
+   saveProfile(businessProfile);
+   setProfileSaved('Business settings saved on this iPhone.');
+   setShowProfile(false);
+   Alert.alert('Business profile saved','Your company name, trades, language, overhead and profit will be defaults for NEW projects.');
+  }catch(e){Alert.alert('Save failed','Could not save business profile.');}
+ };
+ const patchCleaning=(updates:Partial<CleaningDetails>)=>patch({cleaning:{...(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)),...updates}});
+ const cleaningInput=(v:string)=>Number(v)||0;
  const setLine=(index:number,part:Partial<EstimateLine>)=>setProject(prev=>({...prev,lines:prev.lines.map((x,i)=>i===index?{...x,...part}:x)}));
  const addLine=()=>patch({lines:[...project.lines,{id:'manual-'+Date.now(),description_en:'',description_es:'',quantity:1,unit:'job',rate:0,status:'included_now'}]});
  const addPhoto=async(camera=false)=>{
@@ -159,6 +182,16 @@ export default function App(){
   }catch(e){Alert.alert('Check quantities',e instanceof Error?e.message:'Please check the values.');}
  };
  const createLocalDraft=()=>{
+  if(project.trade==='cleaning'){
+   const details=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+   try{
+    const drafted=cleaningToProject(details,project);
+    patch({...drafted,exclusions:[],futureWork:[]});
+    setInfo('Initial deep cleaning and recurring-visit price prepared separately. Review labor costs, hours and client scope.');
+    setStage(2);
+   }catch(e){Alert.alert('Check cleaning details',e instanceof Error?e.message:'Check service details.');setStage(0);}
+   return;
+  }
   if(project.description.trim().length<10){Alert.alert('Describe the job','Dictate or type the job description first.');setStage(0);return;}
   const draft=localEstimate(project.description,project.trade);
   patch({lines:draft.lines,unknowns:draft.unknowns,exclusions:[],futureWork:[]});
@@ -197,6 +230,32 @@ export default function App(){
    <Text style={styles.eyebrow}>CONTRACTOR OFFICE PRO · MOBILE PILOT</Text>
    <Text style={styles.title}>You Build.{'\n'}We Handle the Office.</Text>
    <View style={styles.card}>
+    <Text style={styles.h2}>Business setup / Mi negocio</Text>
+    <Text style={styles.hint}>{businessProfile.name||'Set your business name and select your services once.'} · {businessProfile.enabledTrades.length} selected services</Text>
+    <Action title={showProfile?'Close settings':'Edit business profile / Configurar negocio'} secondary onPress={()=>setShowProfile(v=>!v)}/>
+    {!!profileSaved&&<Text style={styles.hint}>{profileSaved}</Text>}
+    {showProfile&&<View>
+      <Input label="My company or professional name / Mi negocio" value={businessProfile.name} onChangeText={x=>patchProfile({name:x})}/>
+      <Text style={styles.label}>Services I offer / Servicios que ofrezco</Text>
+      <View style={styles.tradeGrid}>
+       {(Object.keys(TRADES) as Trade[]).map(t=><Pressable key={t} onPress={()=>patchProfile({enabledTrades:businessProfile.enabledTrades.includes(t)?businessProfile.enabledTrades.filter(x=>x!==t):[...businessProfile.enabledTrades,t]})} style={[styles.trade,businessProfile.enabledTrades.includes(t)&&styles.selectedTrade]}>
+        <Text style={[styles.tradeText,businessProfile.enabledTrades.includes(t)&&{color:PALETTE.white}]}>{TRADES[t].en}</Text>
+       </Pressable>)}
+      </View>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Action title="English" secondary={businessProfile.language!=='en'} onPress={()=>patchProfile({language:'en'})}/></View>
+       <View style={{flex:1}}><Action title="Español" secondary={businessProfile.language!=='es'} onPress={()=>patchProfile({language:'es'})}/></View>
+      </View>
+      <View style={styles.row}>
+       <View style={{flex:1}}><Input label="Default overhead %" number value={String(businessProfile.overheadPct)} onChangeText={x=>patchProfile({overheadPct:cleaningInput(x)})}/></View>
+       <View style={{flex:1}}><Input label="Default profit %" number value={String(businessProfile.profitPct)} onChangeText={x=>patchProfile({profitPct:cleaningInput(x)})}/></View>
+      </View>
+      {businessProfile.enabledTrades.includes('cleaning')&&<Input label="Cleaning labor cost per worker-hour ($), NOT client rate" number value={String(businessProfile.cleaningLaborCostPerHour)} onChangeText={x=>patchProfile({cleaningLaborCostPerHour:cleaningInput(x)})}/>}
+      <Action title="Save business settings / Guardar preferencias" onPress={commitProfile}/>
+      <Text style={styles.hint}>These defaults apply to NEW jobs; existing saved estimates keep their rates and scope.</Text>
+    </View>}
+   </View>
+   <View style={styles.card}>
     <Text style={styles.h2}>My Jobs / Mis trabajos</Text>
     <Text style={styles.hint}>Save a job and return to it later. Drafts are stored on this iPhone, not in the cloud.</Text>
     <Text style={styles.hint}>{saveStatus||'Local drafts · Not synced to the cloud'}</Text>
@@ -215,10 +274,40 @@ export default function App(){
    {stage===0&&<View style={styles.card}>
     <Text style={styles.h2}>1 · Start a job</Text>
     <Text style={styles.hint}>Choose the trade, describe the work in Spanish or English, and add site photos.</Text>
-    <View style={styles.tradeGrid}>{(Object.keys(TRADES) as Trade[]).map(t=><Pressable key={t} onPress={()=>patch({trade:t})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t].en}</Text><Text style={[styles.tradeSub,project.trade===t&&{color:'#e2fbf3'}]}>{TRADES[t].es}</Text></Pressable>)}</View>
-    <Input label="Contractor / Contratista" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name"/>
+    <View style={styles.tradeGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t].en}</Text><Text style={[styles.tradeSub,project.trade===t&&{color:'#e2fbf3'}]}>{TRADES[t].es}</Text></Pressable>)}</View>
+    <Input label="Contractor or cleaning business / Negocio" value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name (pre-filled from profile)"/>
     <Input label="Customer / Cliente" value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
-    <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City only"/>
+    <Input label="City / Ciudad" value={project.city} onChangeText={x=>patch({city:x})} placeholder="City"/>
+    <Input label="Service address / Dirección del trabajo" value={project.address||''} onChangeText={x=>patch({address:x})} placeholder="Street address, city, ZIP"/>
+    {project.trade==='cleaning'&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>Cleaning details / Detalles de limpieza</Text>
+     <Text style={styles.label}>Type of cleaning / Tipo de limpieza</Text>
+     <View style={styles.tradeGrid}>
+      {([{id:'residential',en:'House / Casa'},{id:'office',en:'Office / Oficina'},{id:'post_construction',en:'Post-construction'},{id:'specialty',en:'Specialty / Especial'}] as {id:CleaningType;en:string}[]).map(item=><Pressable key={item.id} onPress={()=>patchCleaning({type:item.id})} style={[styles.trade,(project.cleaning?.type||'residential')===item.id&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.type||'residential')===item.id&&{color:PALETTE.white}]}>{item.en}</Text></Pressable>)}
+     </View>
+     <Text style={styles.label}>Frequency / Frecuencia</Text>
+     <View style={styles.tradeGrid}>
+      {([{id:'once',en:'One time'},{id:'weekly',en:'Weekly'},{id:'biweekly',en:'Every 2 weeks'},{id:'twice_monthly',en:'Twice a month'},{id:'monthly',en:'Monthly'}] as {id:CleaningFrequency;en:string}[]).map(item=><Pressable key={item.id} onPress={()=>patchCleaning({frequency:item.id})} style={[styles.trade,(project.cleaning?.frequency||'weekly')===item.id&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.frequency||'weekly')===item.id&&{color:PALETTE.white}]}>{item.en}</Text></Pressable>)}
+     </View>
+     <View style={styles.row}>
+      <View style={{flex:1}}><Input label="Bedrooms" number value={String(project.cleaning?.bedrooms??3)} onChangeText={x=>patchCleaning({bedrooms:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="Bathrooms" number value={String(project.cleaning?.bathrooms??2)} onChangeText={x=>patchCleaning({bathrooms:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="Living rooms" number value={String(project.cleaning?.livingRooms??1)} onChangeText={x=>patchCleaning({livingRooms:cleaningInput(x)})}/></View>
+     </View>
+     <Input label="Square feet (optional) / Pies²" number value={String(project.cleaning?.areaSqFt??0)} onChangeText={x=>patchCleaning({areaSqFt:cleaningInput(x)})}/>
+     <View style={styles.row}>
+      <View style={{flex:1}}><Input label="Workers / Personas" number value={String(project.cleaning?.workers??2)} onChangeText={x=>patchCleaning({workers:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="First deep clean hours EACH" number value={String(project.cleaning?.firstHoursPerWorker??5)} onChangeText={x=>patchCleaning({firstHoursPerWorker:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="Repeat visit hours EACH" number value={String(project.cleaning?.repeatHoursPerWorker??3)} onChangeText={x=>patchCleaning({repeatHoursPerWorker:cleaningInput(x)})}/></View>
+     </View>
+     <Input label="Worker-hour labor COST ($), not customer price" number value={String(project.cleaning?.laborCostPerHour??businessProfile.cleaningLaborCostPerHour)} onChangeText={x=>patchCleaning({laborCostPerHour:cleaningInput(x)})}/>
+     <View style={styles.row}>
+      <View style={{flex:1}}><Input label="First supplies $" number value={String(project.cleaning?.firstSupplies??25)} onChangeText={x=>patchCleaning({firstSupplies:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="Repeat supplies $" number value={String(project.cleaning?.repeatSupplies??15)} onChangeText={x=>patchCleaning({repeatSupplies:cleaningInput(x)})}/></View>
+      <View style={{flex:1}}><Input label="Travel per visit $" number value={String(project.cleaning?.travelPerVisit??15)} onChangeText={x=>patchCleaning({travelPerVisit:cleaningInput(x)})}/></View>
+     </View>
+     <Text style={styles.hint}>Enter your real crew hours and costs. Starting values are examples, not market prices. First-time and repeat-visit prices are calculated separately.</Text>
+    </View>}
     <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title="Take photo" secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title="Choose photos" secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
@@ -227,8 +316,8 @@ export default function App(){
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>2 · Prepare the scope / Preparar trabajo</Text>
-    <Text style={styles.hint}>Your dictated notes become editable work items. No backend address, developer code, or AI account is needed for this offline estimate.</Text>
-    <Action title="Build work items from dictation / Crear partidas" onPress={createLocalDraft}/>
+    <Text style={styles.hint}>{project.trade==='cleaning'?'We will price an initial deep clean and a separate price for recurring visits using your crew-hours and cost settings.':'Your dictated notes become editable work items. No backend address, developer code, or AI account is needed for this offline estimate.'}</Text>
+    <Action title={project.trade==='cleaning'?'Calculate cleaning prices / Calcular limpieza':'Build work items from dictation / Crear partidas'} onPress={createLocalDraft}/>
     <Action title="Start with blank items / Agregar manualmente" secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
@@ -264,7 +353,8 @@ export default function App(){
      </View>}
     <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label="Overhead %" number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label="Profit %" number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
-    <Text style={styles.total}>Estimated total: {money(total.total)}</Text>
+    <Text style={styles.total}>{project.trade==='cleaning'?'First deep cleaning / Primera limpieza':'Estimated total'}: {money(total.total)}</Text>
+    {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>Recurring price PER VISIT / Por visita: {money(recurringCleaningPrice(project))} · {project.cleaning?.frequency.replace('_',' ')}</Text>}
     <Action title="Next · Customer estimate" onPress={()=>setStage(3)}/>
    </View>}
    {stage===3&&<View style={styles.card}>

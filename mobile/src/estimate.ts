@@ -1,5 +1,8 @@
-export type Trade='electrical'|'plumbing'|'painting'|'concrete'|'handyman'|'remodel';
+export type Trade='electrical'|'plumbing'|'painting'|'concrete'|'handyman'|'remodel'|'cleaning';
 export type Language='en'|'es';
+export type CleaningType='residential'|'office'|'post_construction'|'specialty';
+export type CleaningFrequency='once'|'weekly'|'biweekly'|'twice_monthly'|'monthly';
+export type CleaningDetails={type:CleaningType;frequency:CleaningFrequency;bedrooms:number;bathrooms:number;livingRooms:number;areaSqFt:number;workers:number;firstHoursPerWorker:number;repeatHoursPerWorker:number;laborCostPerHour:number;firstSupplies:number;repeatSupplies:number;travelPerVisit:number;repeatPricePerVisit?:number};
 export type JobStatus='draft'|'sent'|'accepted'|'declined'|'in_progress'|'completed';
 export const JOB_STATUSES:Record<JobStatus,{en:string;es:string}>={draft:{en:'Draft',es:'Borrador'},sent:{en:'Proposal sent',es:'Propuesta enviada'},accepted:{en:'Accepted',es:'Aceptada'},declined:{en:'Declined',es:'Rechazada'},in_progress:{en:'Work in progress',es:'Trabajo en proceso'},completed:{en:'Completed',es:'Terminado'}};
 export type EstimateLine={
@@ -16,6 +19,7 @@ export type Project={
  lines:EstimateLine[];exclusions:string[];futureWork:string[];unknowns:string[];
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
  status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
+ address?:string;cleaning?:CleaningDetails;
 };
 export const TRADES:Record<Trade,{en:string;es:string}>={
  electrical:{en:'Electrical',es:'Electricidad'},
@@ -24,8 +28,15 @@ export const TRADES:Record<Trade,{en:string;es:string}>={
  concrete:{en:'Concrete',es:'Concreto'},
  handyman:{en:'Handyman',es:'Mantenimiento'},
  remodel:{en:'Remodeling',es:'Remodelación'},
+ cleaning:{en:'Cleaning Services',es:'Servicios de limpieza'},
 };
 export const money=(n:number)=>'$'+(Number.isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+export function recurringCleaningPrice(p:Pick<Project,'cleaning'|'overheadPct'|'profitPct'>):number{
+ const c=p.cleaning;
+ if(!c||c.frequency==='once'||c.workers<=0||c.repeatHoursPerWorker<=0)return 0;
+ const base=c.workers*c.repeatHoursPerWorker*c.laborCostPerHour+c.repeatSupplies+c.travelPerVisit;
+ return Math.round(base*(1+Math.max(0,p.overheadPct)/100)*(1+Math.max(0,p.profitPct)/100)*100)/100;
+}
 export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
  const subtotal=p.lines.reduce((sum,x)=>sum+Math.max(0,x.quantity||0)*Math.max(0,x.rate||0),0);
  const overhead=subtotal*Math.max(0,p.overheadPct||0)/100;
@@ -76,6 +87,7 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
   notice:'This estimate summarizes the proposed work and pricing. Confirm details before starting.'
  };
  const sum=totals(p);
+ const recurring=p.trade==='cleaning'&&p.cleaning&&p.cleaning.frequency!=='once'?p.cleaning:undefined;
  const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||p.unknowns.length>0;
  const list=(title:string,items:string[])=>items.length?'<h3>'+esc(title)+'</h3><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
  const rows=p.lines.map(x=>'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
@@ -84,9 +96,10 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
  '</style></head><body><h1>'+tr.title+'</h1>'+
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
- '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+tr.location+':</b> '+esc(p.city||'—')+'</p>'+
+ '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+tr.location+':</b> '+esc(p.address||p.city||'—')+'</p>'+
  '<h3>'+tr.work+' — '+esc(TRADES[p.trade][p.language])+'</h3>'+
  '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th><th>'+tr.rate+'</th><th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+ (recurring?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'SERVICIO RECURRENTE':'RECURRING SERVICE')+'</h3><p>'+(es?'Frecuencia: ':'Frequency: ')+esc(recurring.frequency.replace('_',' '))+'<br>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</p><p class="notice">'+(es?'Precio separado de la primera limpieza. Sujeto a confirmación de frecuencia, acceso y alcance.':'Separate from initial deep-clean price. Confirm frequency, access and scope before acceptance.')+'</p></section>':'')+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
  '<section class="summary">'+line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
