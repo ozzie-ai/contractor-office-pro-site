@@ -596,7 +596,7 @@ export default function App(){
        </View>
        <Input label={tr('Labor burden factor','Factor de carga laboral')} number value={String(line.costLaborBurdenMultiplier??1.35)} onChangeText={x=>setLine(i,{costLaborBurdenMultiplier:Number(x)||0})}/>
        <Action title={tr('Calculate direct unit cost','Calcular costo directo unitario')} secondary onPress={()=>applyReferencePrice(i)}/>
-      </View>
+      </View>}
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
