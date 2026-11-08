@@ -318,8 +318,8 @@ export default function App(){
        <View style={{flex:1}}><Input label={tr("Default profit %","Utilidad predeterminada %")} number value={String(businessProfile.profitPct)} onChangeText={x=>patchProfile({profitPct:cleaningInput(x)})}/></View>
       </View>
       {businessProfile.enabledTrades.includes('cleaning')&&<Input label={tr("Labor cost per worker-hour ($)","Costo por hora-persona ($)")} number value={String(businessProfile.cleaningLaborCostPerHour)} onChangeText={x=>patchProfile({cleaningLaborCostPerHour:cleaningInput(x)})}/>}
-      <Action title="Save business settings / Guardar preferencias" onPress={commitProfile}/>
-      <Text style={styles.hint}>These defaults apply to NEW jobs; existing saved estimates keep their rates and scope.</Text>
+      <Action title={tr("Save settings","Guardar ajustes")} onPress={commitProfile}/>
+      <Text style={styles.hint}>{tr("Defaults apply to new jobs. Saved estimates keep their prices.","Los valores predeterminados se aplican a trabajos nuevos. Los estimados guardados conservan sus precios.")}</Text>
     </View>
    </View>}
    {showJobs&&<View style={styles.card}>
@@ -327,8 +327,8 @@ export default function App(){
     <Text style={styles.hint}>{tr('Tap a saved job to continue. Jobs are stored on this phone.','Toca un trabajo guardado para continuar. Los trabajos están en este teléfono.')}</Text>
     <Text style={styles.hint}>{saveStatus}</Text>
     <View style={styles.row}>
-     <View style={{flex:1}}><Action title="Save now / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
-     <View style={{flex:1}}><Action title="+ New job / Nuevo" onPress={startNewJob}/></View>
+     <View style={{flex:1}}><Action title={tr("Save","Guardar")} secondary onPress={()=>saveCurrent(true)}/></View>
+     <View style={{flex:1}}><Action title={tr("New Job","Nuevo trabajo")} onPress={startNewJob}/></View>
     </View>
     {savedJobs.length===0?<Text style={styles.hint}>{tr('No saved jobs yet.','Aún no hay trabajos guardados.')}</Text>:
     savedJobs.slice(0,10).map(j=><Pressable key={j.id} accessibilityRole="button" onPress={()=>openSaved(j)} style={[styles.savedJob,j.id===activeJobId&&{borderColor:PALETTE.accent}]}>
@@ -341,8 +341,8 @@ export default function App(){
    <Text style={styles.h2}>{stage===0?tr('New Job','Nuevo trabajo'):tr('Job workspace','Área de trabajo')}{project.customer?' · '+project.customer:''}</Text>
    <View style={styles.steps}>{(businessProfile.language==='es'?['Trabajo','Alcance','Precio','Enviar','Seguimiento']:['Job','Scope','Price','Send','Follow up']).map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
-    <Text style={styles.h2}>1 · Start a job</Text>
-    <Text style={styles.hint}>Choose the trade, describe the work in Spanish or English, and add site photos.</Text>
+    <Text style={styles.h2}>{tr("1 · New Job","1 · Nuevo trabajo")}</Text>
+    <Text style={styles.hint}>{tr("Choose a service, describe the job, and add photos.","Elige un servicio, describe el trabajo y agrega fotos.")}</Text>
     <View style={styles.tradeGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} onPress={()=>patch({trade:t,cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):project.cleaning})} style={[styles.trade,project.trade===t&&styles.selectedTrade]}><Text style={[styles.tradeText,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text></Pressable>)}</View>
     <Input label={tr("Business","Negocio")} value={project.contractor} onChangeText={x=>patch({contractor:x})} placeholder="Business name (pre-filled from profile)"/>
     <Input label={tr("Customer","Cliente")} value={project.customer} onChangeText={x=>patch({customer:x})} placeholder="Customer name"/>
@@ -352,7 +352,7 @@ export default function App(){
     {!!propertyMessage&&<Text style={styles.hint}>{propertyMessage}</Text>}
     {project.propertyArea&&areaMatchesAddress(project.propertyArea,project.address||'')&&<Text style={styles.notice}>Public property record: {project.propertyArea.squareFootage.toLocaleString('en-US')} sq ft · {project.propertyArea.source}. Matched: {project.propertyArea.matchedAddress}. Verify work area; building size is not automatically the area of new flooring or a partial remodel.</Text>}
     {project.trade==='cleaning'&&<View style={styles.lineCard}>
-     <Text style={styles.h2}>Cleaning details / Detalles de limpieza</Text>
+     <Text style={styles.h2}>{tr("Cleaning details","Detalles de limpieza")}</Text>
      <Text style={styles.label}>{tr("Cleaning type","Tipo de limpieza")}</Text>
      <View style={styles.tradeGrid}>
       {([{id:'residential',en:'House / Casa'},{id:'office',en:'Office / Oficina'},{id:'post_construction',en:'Post-construction'},{id:'specialty',en:'Specialty / Especial'}] as {id:CleaningType;en:string}[]).map(item=><Pressable key={item.id} onPress={()=>patchCleaning({type:item.id})} style={[styles.trade,(project.cleaning?.type||'residential')===item.id&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.type||'residential')===item.id&&{color:PALETTE.white}]}>{businessProfile.language==='es'?({residential:'Casa',office:'Oficina',post_construction:'Después de obra',specialty:'Especializada'} as Record<CleaningType,string>)[item.id]:item.en.split(' / ')[0]}</Text></Pressable>)}
@@ -379,12 +379,12 @@ export default function App(){
       <View style={{flex:1}}><Input label={tr("Travel per visit $","Traslado por visita $")} number value={String(project.cleaning?.travelPerVisit??15)} onChangeText={x=>patchCleaning({travelPerVisit:cleaningInput(x)})}/></View>
      </View>
      {project.cleaning?.type==='post_construction'&&<View style={styles.lineCard}>
-      <Text style={styles.h2}>Construction dust / Polvo de construcción</Text>
-      <Text style={styles.hint}>One choice affects the working hours and the customer estimate.</Text>
+      <Text style={styles.h2}>{tr("Construction dust","Polvo de construcción")}</Text>
+      <Text style={styles.hint}>{tr("Choose the dust level to calculate work hours.","Elige el nivel de polvo para calcular las horas de trabajo.")}</Text>
       <View style={styles.tradeGrid}>
        {(['light','moderate','heavy'] as const).map(level=><Pressable key={level} onPress={()=>patchCleaning({dustLevel:level})} style={[styles.trade,(project.cleaning?.dustLevel||'moderate')===level&&styles.selectedTrade]}><Text style={[styles.tradeText,(project.cleaning?.dustLevel||'moderate')===level&&{color:PALETTE.white}]}>{level==='light'?tr('Light','Ligero'):level==='heavy'?tr('Heavy','Abundante'):tr('Moderate','Moderado')}</Text></Pressable>)}
       </View>
-      <Text style={styles.h2}>What work is included? / ¿Qué incluye?</Text>
+      <Text style={styles.h2}>{tr("Included services","Servicios incluidos")}</Text>
       {POST_CONSTRUCTION_TASKS.map(task=><Pressable key={task.id} onPress={()=>{
        const selected=project.cleaning?.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS;
        patchCleaning({postConstructionTasks:selected.includes(task.id)?selected.filter(x=>x!==task.id):[...selected,task.id]});
@@ -394,118 +394,118 @@ export default function App(){
       </Pressable>)}
       <Text style={styles.notice}>Area/dust-based planning hours: {recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour))} total worker-hours. Entered: {(project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5)}. Price automatically uses the larger number unless you explicitly confirm your own site-assessed hours.</Text>
       <Text style={styles.hint}>Currently priced worker-hours: {(project.cleaning?.laborHoursConfirmed&&project.cleaning?.laborHoursVerificationVersion===2)?(project.cleaning.workers*project.cleaning.firstHoursPerWorker):Math.max((project.cleaning?.workers||2)*(project.cleaning?.firstHoursPerWorker||5),recommendedPostConstructionWorkerHours(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)))}. This is a planning estimate, not a guaranteed production rate.</Text>
-      <Action title="Use my measured hours / Confirmar mis horas" secondary onPress={()=>{
+      <Action title={tr("Use measured hours","Usar horas medidas")} secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        Alert.alert('Confirm site-assessed labor / Confirmar horas','Use '+(c.workers*c.firstHoursPerWorker)+' actual worker-hours for this job instead of the area-based guideline only if you assessed the condition and scope.',[
         {text:'Cancel'},
         {text:'Confirm measured hours',onPress:()=>patchCleaning({laborHoursConfirmed:true,laborHoursVerificationVersion:2})}
        ]);
       }}/>
-      <Action title="Use suggested hours / Usar horas sugeridas" secondary onPress={()=>{
+      <Action title={tr("Use suggested hours","Usar horas sugeridas")} secondary onPress={()=>{
        const c=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
        if(!c.areaSqFt){Alert.alert('Enter square feet','Measure or estimate the cleanable square footage first.');return;}
        patchCleaning({firstHoursPerWorker:Math.ceil(recommendedPostConstructionWorkerHours(c)/Math.max(1,c.workers))});
       }}/>
      </View>}
-    <Text style={styles.hint}>Enter your real crew hours and costs. Starting values are examples, not market prices. First-time and repeat-visit prices are calculated separately.</Text>
+    <Text style={styles.hint}>{tr("Labor and supply amounts are editable planning costs.","Las horas y costos son estimados editables.")}</Text>
     </View>}
     <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
-    <View style={styles.row}><View style={{flex:1}}><Action title="Take photo" secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title="Choose photos" secondary onPress={()=>addPhoto()}/></View></View>
+    <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} local photos selected. Photos stay on your device and are not uploaded in this pilot.</Text>
-    <Action title="Next · Understand the job" onPress={()=>setStage(1)}/>
+    <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
    </View>}
    {stage===1&&<View style={styles.card}>
-    <Text style={styles.h2}>2 · Prepare the scope / Preparar trabajo</Text>
+    <Text style={styles.h2}>{tr("2 · Prepare scope","2 · Preparar alcance")}</Text>
     <Text style={styles.hint}>{project.trade==='cleaning'?'We will price an initial deep clean and a separate price for recurring visits using your crew-hours and cost settings.':'Your dictated notes become editable work items. No backend address, developer code, or AI account is needed for this offline estimate.'}</Text>
     <Action title={project.trade==='cleaning'?'Calculate cleaning prices / Calcular limpieza':'Build work items from dictation / Crear partidas'} onPress={createLocalDraft}/>
-    <Action title="Start with blank items / Agregar manualmente" secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
+    <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
-    <Text style={styles.h2}>3 · Review quantities and prices</Text>
+    <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
     <Text style={styles.hint}>{aiConnected?'AI interpretation received. ':'Draft estimate from dictated work or manual entry. '}Offline planning rates are illustrative, not verified supplier quotes. Review quantities and every rate.</Text>
     {pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
      {project.trade==='cleaning'&&line.id==='clean-initial'?<View>
-      <Text style={styles.label}>Cleaning service price / Precio del servicio</Text>
+      <Text style={styles.label}>{tr("Cleaning price","Precio de limpieza")}</Text>
       <Text style={styles.total}>{money(total.total)}</Text>
-      <Text style={styles.hint}>Updated automatically from your live cleaning area, dust level, crew, labor costs and business margins. Edit those values in Step 1; customer documents show one service price.</Text>
-      <Action title="Review job and labor hours / Revisar horas" secondary onPress={()=>setStage(0)}/>
+      <Text style={styles.hint}>{tr("Price updates automatically as job details change.","El precio se actualiza automáticamente cuando cambia el trabajo.")}</Text>
+      <Action title={tr("Review labor hours","Revisar horas de trabajo")} secondary onPress={()=>setStage(0)}/>
      </View>:<>
      <Text style={styles.lineNumber}>WORK ITEM {i+1}</Text>
      <Input label={tr("Description in English","Descripción en inglés")} value={line.description_en} onChangeText={x=>setLine(i,{description_en:x})}/>
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>Line amount: {money(line.quantity*line.rate)}</Text>
-     <Action title="Remove item" secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
+     <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
     {project.trade==='electrical'&&<View style={styles.lineCard}>
-      <Text style={styles.h2}>Electrical quick add / Agregar luces</Text>
-      <Text style={styles.hint}>Add missing recessed lights without replacing your existing dimmer or other priced work.</Text>
+      <Text style={styles.h2}>{tr("Recessed lights","Luces empotradas")}</Text>
+      <Text style={styles.hint}>{tr("Add lights without removing other electrical items.","Agrega luces sin borrar otras partidas eléctricas.")}</Text>
       <View style={styles.row}>
        <View style={{flex:1}}><Input label={tr("Number of lights","Cantidad de luces")} number value={lightCount} onChangeText={setLightCount}/></View>
        <View style={{flex:1}}><Input label={tr("Ceiling height (ft)","Altura de techo (pies)")} number value={electricalCeilingHeight} onChangeText={setElectricalCeilingHeight}/></View>
       </View>
-      <Action title="+ Add recessed lights / Agregar luces" onPress={addElectricalLights}/>
+      <Action title={tr("Add recessed lights","Agregar luces empotradas")} onPress={addElectricalLights}/>
      </View>}
-    <Action title="+ Add work item" secondary onPress={addLine}/>
+    <Action title={tr("Add work item","Agregar partida")} secondary onPress={addLine}/>
     <Input label={tr("Exclusions (one per line)","Exclusiones (una por línea)")} multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label={tr("Future work (excluded)","Trabajo futuro (no incluido)")} multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     {project.unknowns.length>0&&<Text style={styles.notice}>Planning estimate — confirm before pricing: {project.unknowns.join('; ')}</Text>}
     {project.lines.some(item=>item.id==='local-wall-tile'&&item.quantity===0)&&<View style={styles.lineCard}>
-      <Text style={styles.h2}>Missing measurement / Falta medida</Text>
-      <Text style={styles.hint}>How high are the shower walls? Enter measured feet to calculate tile area. No default height is assumed.</Text>
+      <Text style={styles.h2}>{tr("Missing measurement","Falta una medida")}</Text>
+      <Text style={styles.hint}>{tr("Enter the measured shower wall height in feet.","Ingresa la altura medida de las paredes de la regadera, en pies.")}</Text>
       <Input label={tr("Shower wall height (ft)","Altura de paredes (pies)")} value={wallHeight} onChangeText={setWallHeight} number placeholder="e.g. 8"/>
-      <Action title="Apply height & update estimate" onPress={applyWallHeight}/>
+      <Action title={tr("Apply height","Aplicar altura")} onPress={applyWallHeight}/>
      </View>}
-    <Action title="Regenerate work items from dictated description" secondary onPress={createLocalDraft}/>
+    <Action title={tr("Rebuild from description","Recalcular desde descripción")} secondary onPress={createLocalDraft}/>
     <View style={styles.row}><View style={{flex:1}}><Input label={tr("Overhead %","Gastos generales %")} number value={String(project.overheadPct)} onChangeText={x=>patch({overheadPct:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Profit %","Utilidad %")} number value={String(project.profitPct)} onChangeText={x=>patch({profitPct:Number(x)||0})}/></View></View>
     {project.trade==='cleaning'&&project.cleaning&&<View style={styles.lineCard}>
-      <Text style={styles.h2}>Labor calculation / Cálculo de horas</Text>
+      <Text style={styles.h2}>{tr("Estimated labor hours","Horas de trabajo estimadas")}</Text>
       <Text style={styles.total}>{project.cleaning.type==='post_construction'&&!(project.cleaning.laborHoursConfirmed&&project.cleaning.laborHoursVerificationVersion===2)?Math.max(project.cleaning.workers*project.cleaning.firstHoursPerWorker,recommendedPostConstructionWorkerHours(project.cleaning)):project.cleaning.workers*project.cleaning.firstHoursPerWorker} total worker-hours</Text>
       <Text style={styles.hint}>{project.cleaning.workers} workers · {project.cleaning.areaSqFt||'Area not entered'} sq ft · {project.cleaning.type==='post_construction'?(project.cleaning.dustLevel||'moderate')+' dust':'Standard deep cleaning'}. Automatically recalculated from your job details. Adjust the plan in Step 1 if needed.</Text>
     </View>}
     <Text style={styles.total}>{project.trade==='cleaning'?'First deep cleaning / Primera limpieza':'Estimated total'}: {money(total.total)}</Text>
     {project.trade==='cleaning'&&project.cleaning?.frequency!=='once'&&<Text style={styles.hint}>Recurring price PER VISIT / Por visita: {money(recurringCleaningPrice(project))} · {project.cleaning?.frequency.replace('_',' ')}</Text>}
-    <Action title="Next · Customer estimate" onPress={()=>setStage(3)}/>
+    <Action title={tr("Next: Proposal","Siguiente: Propuesta")} onPress={()=>setStage(3)}/>
    </View>}
    {stage===3&&<View style={styles.card}>
-    <Text style={styles.h2}>4 · Send a professional estimate</Text>
-    <Text style={styles.hint}>Private job notes and selected photos are not included in the customer PDF.</Text>
+    <Text style={styles.h2}>{tr("4 · Customer proposal","4 · Propuesta al cliente")}</Text>
+    <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
     <View style={styles.row}><View style={{flex:1}}><Action title="English" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
     <Text style={styles.total}>{project.language==='en'?'Estimated price':'Precio estimado'}: {money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} work items · {project.exclusions.length} exclusions · {photos.length} private site photos</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
     {!readiness.ready&&<View style={styles.lineCard}>
-      <Text style={styles.h2}>Estimate incomplete / Estimado incompleto</Text>
-      <Text style={styles.hint}>Resolve the following items before sharing a customer PDF. In particular, 0 sq ft of shower tile is not a complete price.</Text>
+      <Text style={styles.h2}>{tr("Estimate incomplete","Estimado incompleto")}</Text>
+      <Text style={styles.hint}>{tr("Complete missing quantities and rates before sharing.","Completa las cantidades y tarifas pendientes antes de compartir.")}</Text>
       {readiness.issues.slice(0,6).map((item,i)=><Text key={i} style={styles.hint}>• {item}</Text>)}
       {readiness.issues.length>6&&<Text style={styles.hint}>…and {readiness.issues.length-6} more items.</Text>}
-      <Action title="Review missing quantities / Revisar cantidades" secondary onPress={()=>setStage(2)}/>
+      <Action title={tr("Review missing quantities","Revisar cantidades pendientes")} secondary onPress={()=>setStage(2)}/>
      </View>}
-    {project.trade==='cleaning'&&<Text style={styles.hint}>Cleaning prices update automatically when scope or work hours change.</Text>}
+    {project.trade==='cleaning'&&<Text style={styles.hint}>{tr("Cleaning prices update automatically.","Los precios de limpieza se actualizan automáticamente.")}</Text>}
     <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('estimate')}/>
-    <Action title="Continue · Track proposal / Seguimiento" secondary onPress={()=>setStage(4)}/>
+    <Action title={tr("Track proposal","Dar seguimiento")} secondary onPress={()=>setStage(4)}/>
     {shareDone&&<View style={styles.lineCard}>
-     <Text style={styles.h2}>PDF prepared / PDF preparado</Text>
-     <Text style={styles.hint}>The sharing window closed. The job is saved on this phone. Please confirm delivery in the destination you selected.</Text>
-     <Action title="Back to My Jobs / Mis trabajos" onPress={goToMyJobs}/>
-     <Action title="+ Start another job / Nuevo trabajo" secondary onPress={startNewJob}/>
-     <Action title="Share PDF again / Compartir otra vez" secondary onPress={()=>sharePdf('estimate')}/>
-     <Action title="Next · Track this job / Dar seguimiento" onPress={()=>setStage(4)}/>
+     <Text style={styles.h2}>{tr("PDF ready","PDF preparado")}</Text>
+     <Text style={styles.hint}>{tr("Your job is saved. Check the sharing app to confirm delivery.","Tu trabajo está guardado. Confirma el envío en la aplicación que elegiste.")}</Text>
+     <Action title={tr("My Jobs","Mis trabajos")} onPress={goToMyJobs}/>
+     <Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/>
+     <Action title={tr("Share PDF again","Compartir PDF de nuevo")} secondary onPress={()=>sharePdf('estimate')}/>
+     <Action title={tr("Track this job","Dar seguimiento")} onPress={()=>setStage(4)}/>
     </View>}
     {!shareDone&&<View style={styles.row}>
-     <View style={{flex:1}}><Action title="Save job / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
-     <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
+     <View style={{flex:1}}><Action title={tr("Save job","Guardar trabajo")} secondary onPress={()=>saveCurrent(true)}/></View>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
     </View>}
-    <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
+    <Action title={tr("Back to prices","Volver a precios")} secondary onPress={()=>setStage(2)}/>
    </View>}
    {stage===4&&<View style={styles.card}>
-    <Text style={styles.h2}>5 · Project follow-up / Seguimiento</Text>
-    <Text style={styles.hint}>After preparing an estimate, record the customer's decision, plan the next action, and keep this project moving.</Text>
+    <Text style={styles.h2}>{tr("5 · Follow-up","5 · Seguimiento")}</Text>
+    <Text style={styles.hint}>{tr("Track customer decisions and next steps.","Registra la decisión del cliente y los próximos pasos.")}</Text>
     <Text style={styles.total}>{project.customer||'Customer'} · {money(total.total)}</Text>
-    <Text style={styles.label}>Current status / Estado actual</Text>
+    <Text style={styles.label}>{tr("Status","Estado")}</Text>
     <Text style={styles.notice}>{JOB_STATUSES[project.status||'draft'][businessProfile.language]}</Text>
     <View style={styles.statusGrid}>
      {(Object.keys(JOB_STATUSES) as JobStatus[]).map(status=><Pressable key={status} accessibilityRole="button" accessibilityState={{selected:(project.status||'draft')===status}} onPress={()=>setStatus(status)} style={[styles.statusChoice,(project.status||'draft')===status&&styles.selectedTrade]}>
@@ -515,18 +515,18 @@ export default function App(){
     </View>
     <Input label={tr("Follow-up date (YYYY-MM-DD)","Fecha de seguimiento (AAAA-MM-DD)")} value={project.followUpDate||''} onChangeText={x=>patch({followUpDate:x})} placeholder="2026-11-15"/>
     <Input label={tr("Private follow-up notes","Notas privadas de seguimiento")} multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder="Called customer; waiting for approval..."/>
-    <Text style={styles.hint}>These notes remain private. Dates are saved locally; automated reminders are not included yet.</Text>
-    <Action title="Save follow-up / Guardar seguimiento" onPress={()=>saveCurrent(true)}/>
+    <Text style={styles.hint}>{tr("Notes stay private. Reminders are not automatic yet.","Las notas son privadas. Los recordatorios todavía no son automáticos.")}</Text>
+    <Action title={tr("Save follow-up","Guardar seguimiento")} onPress={()=>saveCurrent(true)}/>
     <Action title={busy?'Creating PDF...':'Prepare & share formal proposal / Propuesta formal'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('proposal')}/>
-    {!readiness.ready&&<Text style={styles.notice}>Complete quantities and prices before preparing the customer proposal.</Text>}
+    {!readiness.ready&&<Text style={styles.notice}>{tr("Complete quantities and prices before sharing.","Completa cantidades y precios antes de compartir.")}</Text>}
     <View style={styles.row}>
-     <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
-     <View style={{flex:1}}><Action title="+ New job / Nuevo" secondary onPress={startNewJob}/></View>
+     <View style={{flex:1}}><Action title={tr("My Jobs","Mis trabajos")} secondary onPress={goToMyJobs}/></View>
+     <View style={{flex:1}}><Action title={tr("New Job","Nuevo trabajo")} secondary onPress={startNewJob}/></View>
     </View>
-    <Action title="Back to estimate / Volver al estimado" secondary onPress={()=>setStage(3)}/>
+    <Action title={tr("Back to estimate","Volver al estimado")} secondary onPress={()=>setStage(3)}/>
    </View>}
    </>}
-   <Text style={styles.footer}>Drafts are stored on this phone only. Uninstalling removes local drafts. Keyboard dictation works offline. Planning rates are editable and not verified supplier bids.</Text>
+   <Text style={styles.footer}>{tr("Jobs are saved on this phone, not the cloud. Prices are editable estimates.","Los trabajos se guardan en este teléfono, no en la nube. Los precios son estimados editables.")}</Text>
   </ScrollView>
  </KeyboardAvoidingView>;
 }
