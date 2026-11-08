@@ -8,7 +8,6 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
-import {lookupLocalPrice,LOCAL_TASK_CODES,LocalReference} from './src/localPricingClient';
 import {calculateUnitRate,explainLine,LA_ELECTRICIAN_MEAN_WAGE_Q1_2026,LA_WAGE_SOURCE} from './src/pricingReference';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
@@ -66,8 +65,6 @@ export default function App(){
  const [showProfile,setShowProfile]=useState(false);
  const [showJobs,setShowJobs]=useState(false);
  const [profileSaved,setProfileSaved]=useState('');
- const [lookupBusy,setLookupBusy]=useState<string|null>(null);
- const [lookupPreview,setLookupPreview]=useState<{id:string;reference:LocalReference}|null>(null);
 
  const [activeJobId,setActiveJobId]=useState(newJobId);
  const [savedJobs,setSavedJobs]=useState<SavedJob[]>([]);
@@ -183,31 +180,6 @@ export default function App(){
  };
 
  const patch=(updates:Partial<Project>)=>setProject(prev=>({...prev,...updates}));
- const inspectLocalPrice=async(line:EstimateLine)=>{
-  if(lookupBusy)return;
-  const url=businessProfile.localPriceServerUrl||'';
-  const token=businessProfile.localPriceServerToken||'';
-  const region=businessProfile.localPriceRegion||'US-CA-LA';
-  if(!url||!token){Alert.alert('Mac pricing not connected','Enter the Mac server URL, region, and access token in Business Settings.');return;}
-  setLookupBusy(line.id);setLookupPreview(null);
-  try{
-   const reference=await lookupLocalPrice(url,token,region,line);
-   setLookupPreview({id:line.id,reference});
-   if(!reference.found)Alert.alert('No verified reference',reference.message||'No verified reference price in this region.');
-  }catch(e){Alert.alert('Local pricing unavailable',e instanceof Error?e.message:'Could not reach the Mac. Your current estimate is unchanged.');}
-  finally{setLookupBusy(null);}
- };
- const approveLocalPrice=(line:EstimateLine,reference:LocalReference)=>{
-  if(!reference.found||!reference.cost_complete||typeof reference.direct_cost!=='number'||reference.direct_cost<=0){
-   Alert.alert('No complete direct cost','This reference is incomplete or only a bid benchmark. Keep your current rate.');return;
-  }
-  const index=project.lines.findIndex(x=>x.id===line.id);
-  if(index<0)return;
-  setLine(index,{rate:reference.direct_cost,rateSource:(reference.source_name||'Mac local price')+' — '+(reference.observed_on||'date unavailable')+' — '+reference.region});
-  setLookupPreview(null);
-  setInfo('Applied independently verified direct cost; overhead and profit are calculated on top. Review before sending.');
- };
-
  const tr=(en:string,es:string)=>businessProfile.language==='es'?es:en;
  const chooseLanguage=(language:Language)=>{
   const updated={...businessProfile,language};
@@ -433,11 +405,6 @@ export default function App(){
       </View>
       {businessProfile.enabledTrades.includes('cleaning')&&<Input label={tr("Labor cost per worker-hour ($)","Costo por hora-persona ($)")} number value={String(businessProfile.cleaningLaborCostPerHour)} onChangeText={x=>patchProfile({cleaningLaborCostPerHour:cleaningInput(x)})}/>}
 
-      <Text style={styles.h2}>{tr('Local Mac price database — optional','Base de precios en Mac — opcional')}</Text>
-      <Text style={styles.hint}>{tr('No paid cloud needed. Keep Mac and iPhone on the same trusted Wi-Fi. Prices are only applied after you approve them.','No se necesita nube de pago. Mantén el Mac y el iPhone en la misma red Wi-Fi privada. Los precios se aplican solo con tu aprobación.')}</Text>
-      <Input label={tr('Mac server URL','Dirección del servidor Mac')} value={businessProfile.localPriceServerUrl||''} onChangeText={x=>patchProfile({localPriceServerUrl:x})} placeholder="http://192.168.1.10:8765"/>
-      <Input label={tr('Private access token','Clave privada de acceso')} secure value={businessProfile.localPriceServerToken||''} onChangeText={x=>patchProfile({localPriceServerToken:x})}/>
-      <Input label={tr('Pricing region code','Código de región de precios')} value={businessProfile.localPriceRegion||'US-CA-LA'} onChangeText={x=>patchProfile({localPriceRegion:x.toUpperCase()})} placeholder="US-CA-LA"/>
       <Action title={tr("Save settings","Guardar ajustes")} onPress={commitProfile}/>
       <Text style={styles.hint}>{tr("Defaults apply to new jobs. Saved estimates keep their prices.","Los valores predeterminados se aplican a trabajos nuevos. Los estimados guardados conservan sus precios.")}</Text>
     </View>
@@ -569,20 +536,6 @@ export default function App(){
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
-     {project.trade==='electrical'&&Boolean(LOCAL_TASK_CODES[line.id])&&<View style={{marginTop:8}}>
-      <Action secondary disabled={lookupBusy!==null} title={lookupBusy===line.id?tr('Checking Mac…','Buscando en Mac…'):tr('Check my Mac pricing database','Consultar precios en mi Mac')} onPress={()=>inspectLocalPrice(line)}/>
-      {lookupPreview?.id===line.id&&<View style={styles.lineCard}>
-       <Text style={styles.label}>{tr('Local reference review','Revisar referencia local')}</Text>
-       <Text style={styles.hint}>{lookupPreview.reference.found
-        ?(lookupPreview.reference.source_name||'Source')+' · '+(lookupPreview.reference.observed_on||'Date pending')+' · '+lookupPreview.reference.region+' · '+(lookupPreview.reference.license||'License pending')
-        :lookupPreview.reference.message||'No verified local price'}</Text>
-       {lookupPreview.reference.found&&<Text style={styles.rate}>{tr('Direct cost per','Costo directo por')} {line.unit}: {typeof lookupPreview.reference.direct_cost==='number'?money(lookupPreview.reference.direct_cost):tr('Incomplete; no calculated cost','Incompleto; sin costo calculado')} {lookupPreview.reference.benchmark_bid!=null?(' · '+tr('Bid benchmark','Referencia de licitación')+': '+money(lookupPreview.reference.benchmark_bid)):''}</Text>}
-       <Text style={styles.hint}>{tr('This is a reference, not an approved selling price. The app keeps current rates unless you choose Apply.','Esto es una referencia, no un precio de venta aprobado. La aplicación conserva el precio actual hasta que elijas Aplicar.')}</Text>
-       <Action secondary title={tr('Dismiss','Cerrar')} onPress={()=>setLookupPreview(null)}/>
-       {lookupPreview.reference.cost_complete&&typeof lookupPreview.reference.direct_cost==='number'&&lookupPreview.reference.direct_cost>0&&<Action title={tr('Apply direct unit cost','Aplicar costo directo por unidad')} onPress={()=>approveLocalPrice(line,lookupPreview.reference)}/>}
-      </View>}
-     </View>}
-
      {project.trade==='electrical'&&line.id!=='local-permit'&&<View style={styles.lineCard}>
       <Text style={styles.label}>{tr('Unit-cost worksheet (optional)','Hoja de costos por unidad (opcional)')}</Text>
       <Text style={styles.hint}>{explainLine(line)} {tr('Employee wage reference:','Sueldo de referencia:')} $40.57/hr — {LA_WAGE_SOURCE}. {tr('Burden 1.35 is an editable example, NOT a verified employer burden.','El factor 1.35 es un ejemplo editable, NO una carga laboral verificada.')}</Text>
