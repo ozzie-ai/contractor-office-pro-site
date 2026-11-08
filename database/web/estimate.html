@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/><meta name="theme-color" content="#12244b"/>
+<title>Contractor Office Pro — Local Test</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#172640;background:#f3f6fb;font-size:15px}
+*{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.5}
+main{max-width:760px;margin:auto;padding:16px 14px 90px}
+header{background:linear-gradient(120deg,#152955,#21478a);color:white;padding:24px 16px 18px;border-radius:0 0 22px 22px}
+header>div{max-width:740px;margin:auto}.eyebrow{font-size:11px;letter-spacing:2px;color:#afc8f8;font-weight:700}
+h1{font-size:23px;line-height:1.15;margin:8px 0}h2{font-size:20px;margin:0 0 10px}h3{font-size:15px;margin:0 0 8px}
+p{line-height:1.5}.sub{font-size:13px;color:#62718b}.head-sub{color:#cbd9fc;font-size:13px}
+.card{border:1px solid #dde5f1;box-shadow:0 5px 18px rgba(16,34,69,.035);background:#fff;padding:17px;margin:16px 0;border-radius:18px}
+label{display:block;font-size:13px;font-weight:700;margin:13px 0 6px}
+input,select,textarea{width:100%;border:1px solid #c9d4e6;border-radius:10px;padding:12px;background:#fbfcff;color:#13284a}
+textarea{min-height:120px;resize:vertical}
+button{background:#193d83;border:0;color:white;padding:13px 14px;border-radius:12px;font-weight:750;min-height:45px}
+button.secondary{background:#eaf0fa;color:#193d83;border:1px solid #dae2f0}
+button.tertiary{background:transparent;border:1px solid #c8d6ea;color:#15356f}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+.actions button{flex:1;min-width:130px}
+.row{display:flex;gap:10px}.row>*{flex:1;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.trade{padding:11px;text-align:center;background:#f5f8fd;color:#274166;border:1px solid #d2dcec}
+.trade.selected{background:#193d83;color:white;border-color:#193d83}
+.pill{display:inline-block;background:#e7f8f1;color:#0f694c;border-radius:50px;padding:5px 10px;font-size:11px;font-weight:750}
+.line{background:#f8faff;border:1px solid #d7e0ef;border-radius:14px;padding:12px;margin:13px 0}
+.linehead{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:800}
+.notice{background:#fff7e5;color:#795623;border:1px solid #f0dfbd;padding:12px;border-radius:12px;font-size:13px;line-height:1.5}
+.good{background:#eaf8f0;color:#17643c;padding:11px;border-radius:10px;font-size:13px}
+.total-row{display:flex;justify-content:space-between;padding:6px 0}.grand{font-size:22px;font-weight:900;color:#102b65;border-top:2px solid #ccd8ea;margin-top:10px;padding-top:13px}
+.mini{font-size:12px;color:#5b6a81}.hidden{display:none}
+details{border:1px solid #dce5f1;border-radius:14px;padding:12px;background:#fff;margin:12px 0}
+summary{font-weight:800;cursor:pointer}
+.footer{text-align:center;color:#6b7890;font-size:11px;margin-top:25px}
+#report{display:none}
+@media(min-width:600px){header{border-radius:0 0 26px 26px}main{padding-top:20px}}
+@media print{header,main,.no-print{display:none!important}#report{display:block!important;color:black;font-family:Arial,sans-serif;margin:18px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccc;text-align:left;padding:8px;font-size:12px}h1{font-size:25px;color:black}.print-total{font-size:20px;text-align:right;font-weight:bold}}
+</style></head>
+<body>
+<header><div><div class="eyebrow">CONTRACTOR OFFICE PRO</div><h1 id="title">Your construction office, simplified.</h1><div class="head-sub">Mac-connected beta · Free local test · Bilingual</div></div></header>
+<main>
+<div class="card">
+ <div style="display:flex;justify-content:space-between;align-items:center;gap:9px">
+  <h2 id="heading">New estimate</h2><span class="pill">MAC LOCAL</span>
+ </div>
+ <div class="row"><div><label for="language">Language / Idioma</label><select id="language"><option value="en">English</option><option value="es">Español</option></select></div><div><label for="region">Pricing region</label><input id="region" value="US-CA-LA" autocomplete="off"/></div></div>
+ <label id="chooseLabel">Choose a trade</label><div class="grid" id="trades"></div>
+ <div class="row"><div><label for="customer">Customer</label><input id="customer" autocomplete="off"/></div><div><label for="location">Job city</label><input id="location" placeholder="Santa Clarita, CA"/></div></div>
+ <label for="scope" id="scopeLabel">Describe the job (private)</label>
+ <textarea id="scope" placeholder="Upgrade existing 100A panel to 200A. Transfer 20 existing circuits. Install one 100A breaker only for future wiring. Permit $500."></textarea>
+ <div class="actions"><button id="draft">Create work items</button><button id="load" class="secondary">Load saved draft</button></div>
+ <div id="message" class="notice hidden" role="status"></div>
+</div>
+<section id="results" class="hidden">
+ <div class="card"><h2 id="itemsTitle">Work items & costs</h2><p class="sub">Prices are editable. No invented prices; the permit uses your stated amount.</p>
+ <div id="lines"></div>
+ <button class="secondary" id="add" style="width:100%">+ Add work item</button>
+ <div class="row"><div><label for="overhead">Overhead %</label><input id="overhead" type="number" min="0" step=".1" value="10"/></div><div><label for="profit">Profit %</label><input id="profit" type="number" min="0" step=".1" value="20"/></div></div>
+ <div id="totals" style="margin-top:14px"></div>
+ <div id="ready" class="notice"></div>
+ <div class="actions"><button id="save" class="secondary">Save draft on iPhone</button><button id="print">Print / Save PDF</button></div>
+ </div>
+</section>
+<details><summary id="macTitle">Mac database — optional price lookup</summary>
+ <p class="sub">This uses your Mac on the same private Wi-Fi. Enter the access token from the Mac's terminal. The token stays in memory and is not saved in the estimate or customer PDF.</p>
+ <label for="token">Private Mac token</label><input id="token" type="password" autocomplete="off"/>
+ <button class="secondary" id="check" style="width:100%;margin-top:12px">Check authenticated server</button>
+ <div id="mac-status" class="mini" role="status" style="margin-top:10px"></div>
+ <p class="mini">Verified task references may be looked up per work item. Currently the database starts with task definitions, not market prices.</p>
+</details>
+<p class="footer">Local browser pilot; not a native App Store installation. Customer printout excludes the dictated notes and database token. Project drafts stay in this browser.</p>
+</main>
+<article id="report"></article>
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money=n=>"$"+(Number.isFinite(n)?n:0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+const tradeNames={electrical:["Electrical","Electricidad"],plumbing:["Plumbing","Plomería"],painting:["Painting","Pintura"],concrete:["Concrete","Concreto"],handyman:["Handyman","Trabajos varios"],remodel:["Remodeling","Remodelación"],cleaning:["Cleaning","Limpieza"]};
+const texts={en:{heading:"New estimate",select:"Choose a trade",scope:"Describe the work (private notes)",make:"Create work items",items:"Work items & costs",save:"Save draft on this iPhone",pdf:"Print / Save PDF",read:"All items must have a positive quantity, rate and description before printing.",manual:"Work scope — review and price",future:"Future feeder wiring and final connections are excluded."},es:{heading:"Nuevo estimado",select:"Selecciona un trabajo",scope:"Describe el trabajo (notas privadas)",make:"Crear partidas",items:"Partidas y costos",save:"Guardar borrador en este iPhone",pdf:"Imprimir / Guardar PDF",read:"Todas las partidas necesitan cantidad, precio y descripción antes de imprimir.",manual:"Trabajo por revisar y cotizar",future:"El cableado y conexiones futuras están excluidos."}};
+let currentTrade="electrical",lines=[],futureWiring=false;
+const text=()=>texts[$("language").value]||texts.en;
+const countWords={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10,veinte:20,twenty:20};
+const tidy=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+const qty=v=>countWords[v]||Number(v)||0;
+const row=(id,en,es,q=1,unit="job",rate=0)=>({id,en,es,q,unit,rate});
+function showMessage(s){$("message").textContent=s;$("message").classList.remove("hidden")}
+function parser(desc,trade){
+ const s=tidy(desc);let r=[];futureWiring=false;
+ if(trade==="electrical"){
+  const amps=[...s.matchAll(/\b(\d{2,3})\s*(?:a|amps?|amperios?)\b/g)].map(m=>+m[1]);
+  const panel=/\b(panel|tablero|centro de carga|load center|service upgrade)\b/.test(s);
+  if(panel&&/\b(upgrad\w*|reemplaz\w*|cambi\w*|actualiz\w*|ampli\w*|aument\w*)\b/.test(s)){
+    const label=amps.length>=2?amps[0]+"A to "+amps[1]+"A":"size to confirm";
+    r.push(row("ELEC.PANEL.UPGRADE","Upgrade electrical panel / service "+label,"Actualizar panel eléctrico "+(amps.length>=2?"de "+amps[0]+"A a "+amps[1]+"A":"(confirmar amperaje)")));
+  }
+  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\b[^.!?\n]{0,38}?\b(circuits?|circuitos?)\b/);
+  if(circuits)r.push(row("ELEC.CIRCUIT.TRANSFER","Transfer/reconnect "+qty(circuits[1])+" existing circuits (confirm scope)","Transferir/reconectar "+qty(circuits[1])+" circuitos existentes (confirmar alcance)",qty(circuits[1]),"each"));
+  const breaker=/\bbreaker\b[^.!?\n]{0,30}\b(\d{2,3})\s*(?:a|amps?)\b/.exec(s)||/\b(\d{2,3})\s*(?:a|amps?)\b[^.!?\n]{0,30}\bbreaker\b/.exec(s);
+  if(/\b(breaker|disyuntor)\b/.test(s)&&/\b(solo|solamente|nomas|posterior\w*|future|later|only)\b/.test(s)){
+    futureWiring=true;
+    const amp=breaker?+breaker[1]:amps.at(-1)||null;
+    r.push(row("ELEC.BREAKER.ONLY","Supply and install "+(amp?amp+"A ":"")+"breaker only; no feeder wiring","Instalar solamente breaker "+(amp?amp+"A":"(confirmar amperaje)")+"; sin cableado nuevo",1,"each"));
+  }
+  if(/\b(permiso|permit)\b/.test(s)){
+    const part=s.match(/\b(?:permiso|permit)\b[^.!?\n]{0,90}/)?.[0]||"";
+    const amount=part.match(/\$\s*(\d{2,5})/)?.[1]||part.match(/(?:costara|costs?|aproximadamente|about|around)\s*(?:de\s*)?\$?\s*(\d{2,5})/)?.[1];
+    r.push(row("ELEC.PERMIT","Electrical permit allowance","Permiso eléctrico",1,"job",amount?+amount:0));
+  }
+  const lights=s.match(/\b(\d+|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six)\s+(?:recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|downlights?)\b/);
+  if(/\b(recessed|empotrad\w*|downlights?)\b/.test(s))r.push(row("ELEC.RECESSED.LIGHT","Install recessed light(s)","Instalar luz(ces) empotrada(s)",lights?qty(lights[1]):0,"each"));
+  if(/\b(gfci|gfi)\b/.test(s))r.push(row("ELEC.GFCI","Install GFCI receptacle","Instalar tomacorriente GFCI",1,"each"));
+ } 
+ if(!r.length)r.push(row("OTHER","Review described "+trade+" work — "+desc.trim(),"Revisar trabajo de "+(tradeNames[trade]?.[1]||trade)+" — "+desc.trim(),1,"job",0));
+ return r;
+}
+function renderTrade(){
+ $("trades").innerHTML=Object.entries(tradeNames).map(([k,v])=>'<button class="trade '+(currentTrade===k?'selected':'')+'" data-trade="'+k+'">'+esc(v[$("language").value==="es"?1:0])+"</button>").join("");
+ for(const b of $("trades").querySelectorAll("button"))b.onclick=()=>{if(currentTrade!==b.dataset.trade){currentTrade=b.dataset.trade;lines=[];$("results").classList.add("hidden");}renderTrade()};
+}
+function totals(){
+ let base=0;const issues=[];
+ lines.forEach((x,i)=>{
+  if(!x.en.trim()||!x.es.trim()||!Number.isFinite(+x.q)||+x.q<=0||!Number.isFinite(+x.rate)||+x.rate<=0)issues.push(i+1);
+  base+=Math.max(0,+x.q||0)*Math.max(0,+x.rate||0);
+ });
+ const over=Math.max(0,+$("overhead").value||0)/100,profit=Math.max(0,+$("profit").value||0)/100;
+ return {base,overhead:base*over,profit:(base+base*over)*profit,total:base*(1+over)*(1+profit),issues};
+}
+function renderTotals(){
+ const x=totals();
+ $("totals").innerHTML='<div class="total-row"><span>Direct subtotal</span><b>'+money(x.base)+'</b></div><div class="total-row"><span>Overhead</span><b>'+money(x.overhead)+'</b></div><div class="total-row"><span>Profit</span><b>'+money(x.profit)+'</b></div><div class="total-row grand"><span>Estimated total</span><b>'+money(x.total)+'</b></div>';
+ $("ready").textContent=x.issues.length?text().read+" Items: "+x.issues.join(", "):"Estimate has priced items. Verify job conditions before sending.";
+ $("ready").className=x.issues.length?"notice":"good";
+ $("print").disabled=!!x.issues.length;
+}
+function renderLines(){
+ const lang=$("language").value;
+ $("lines").innerHTML=lines.map((x,i)=>'<div class="line"><div class="linehead"><span>ITEM '+(i+1)+'</span><button data-remove="'+i+'" class="tertiary" style="min-height:30px;padding:4px 7px">Remove</button></div>'+
+ '<label>English description</label><input data-i="'+i+'" data-field="en" value="'+esc(x.en)+'"/>'+
+ '<label>Descripción en español</label><input data-i="'+i+'" data-field="es" value="'+esc(x.es)+'"/>'+
+ '<div class="row"><div><label>Qty</label><input type="number" data-i="'+i+'" data-field="q" value="'+esc(x.q)+'" step=".01" min="0"/></div>'+
+ '<div><label>Unit</label><input data-i="'+i+'" data-field="unit" value="'+esc(x.unit)+'"/></div>'+
+ '<div><label>Rate $</label><input type="number" data-i="'+i+'" data-field="rate" value="'+esc(x.rate||"")+'" step=".01" min="0"/></div></div>'+
+ '<div class="actions"><button class="secondary" data-lookup="'+i+'">Check Mac unit price</button></div><div class="mini" id="lookup-'+i+'"></div></div>').join("");
+ $("lines").querySelectorAll("input").forEach(el=>el.oninput=()=>{const i=+el.dataset.i,k=el.dataset.field;lines[i][k]=k==="q"||k==="rate"?Number(el.value):el.value;renderTotals()});
+ $("lines").querySelectorAll("[data-remove]").forEach(el=>el.onclick=()=>{lines.splice(+el.dataset.remove,1);renderLines()});
+ $("lines").querySelectorAll("[data-lookup]").forEach(el=>el.onclick=()=>lookup(+el.dataset.lookup));
+ renderTotals();
+}
+async function lookup(i){
+ const x=lines[i],node=$("lookup-"+i),token=$("token").value.trim();
+ if(x.id==="OTHER"){node.textContent="No mapped reference task yet.";return}
+ if(!token){node.textContent="Enter your private token in Mac database settings below.";return}
+ node.textContent="Checking local reference…";
+ try{
+  const u="/reference?task="+encodeURIComponent(x.id)+"&region="+encodeURIComponent($("region").value.trim().toUpperCase());
+  const response=await fetch(u,{headers:{"Authorization":"Bearer "+token}});
+  if(!response.ok)throw Error(response.status===401?"Access denied — check token":"Mac API error "+response.status);
+  const data=await response.json();
+  if(!data.found){node.textContent=data.message||"No verified regional price yet.";return}
+  node.textContent=(data.source_name||"Reference")+" · "+(data.observed_on||"Date pending")+(data.direct_cost!=null?" · Direct cost: "+money(data.direct_cost):" · Direct cost incomplete");
+  if(data.cost_complete&&typeof data.direct_cost==="number"&&data.direct_cost>0){
+   const approve=document.createElement("button");
+   approve.textContent="Apply verified direct cost "+money(data.direct_cost);approve.className="secondary";approve.style.marginTop="8px";
+   approve.onclick=()=>{lines[i].rate=data.direct_cost;renderLines();showMessage("Reference applied. Review unit, job scope, overhead and profit.")};
+   node.appendChild(document.createElement("br"));node.appendChild(approve);
+  }
+ }catch(e){node.textContent=String(e.message||e)}
+}
+function updateLanguage(){
+ $("heading").textContent=text().heading;$("chooseLabel").textContent=text().select;$("scopeLabel").textContent=text().scope;
+ $("draft").textContent=text().make;$("itemsTitle").textContent=text().items;$("save").textContent=text().save;$("print").textContent=text().pdf;
+ renderTrade();if(lines.length)renderLines();
+}
+$("draft").onclick=()=>{
+ const d=$("scope").value.trim();
+ if(d.length<8){showMessage("Describe the job before creating items. / Describe el trabajo primero.");return}
+ lines=parser(d,currentTrade);$("results").classList.remove("hidden");
+ $("message").classList.add("hidden");renderLines();$("results").scrollIntoView({behavior:"smooth"});
+};
+$("language").onchange=updateLanguage;
+$("add").onclick=()=>{lines.push(row("OTHER","","",1,"job",0));renderLines()};
+for(const id of ["overhead","profit"])$(id).oninput=renderTotals;
+$("save").onclick=()=>{
+ const draft={v:1,trade:currentTrade,language:$("language").value,region:$("region").value,customer:$("customer").value,location:$("location").value,scope:$("scope").value,lines,overhead:$("overhead").value,profit:$("profit").value,futureWiring};
+ try{localStorage.setItem("contractorOfficeProLocalPilot",JSON.stringify(draft));showMessage("Saved on this iPhone browser. Not shared to the cloud.");}
+ catch(e){showMessage("Unable to save in this browser.")}
+};
+$("load").onclick=()=>{
+ try{
+ const d=JSON.parse(localStorage.getItem("contractorOfficeProLocalPilot")||"null");
+ if(!d||!Array.isArray(d.lines)){showMessage("No saved draft found in this browser.");return}
+ currentTrade=d.trade||"electrical";$("language").value=d.language||"en";$("region").value=d.region||"US-CA-LA";$("customer").value=d.customer||"";$("location").value=d.location||"";$("scope").value=d.scope||"";
+ $("overhead").value=d.overhead??10;$("profit").value=d.profit??20;lines=d.lines;futureWiring=!!d.futureWiring;
+ $("results").classList.remove("hidden");updateLanguage();showMessage("Saved browser draft loaded.");
+ }catch(e){showMessage("Draft could not be read.")}
+};
+$("check").onclick=async()=>{
+ const token=$("token").value.trim(),out=$("mac-status");out.textContent="Checking…";
+ if(!token){out.textContent="Enter the private Mac access token.";return}
+ try{const r=await fetch("/health",{headers:{"Authorization":"Bearer "+token}});
+ const d=await r.json();out.textContent=r.ok&&d.ok?"Connected to local Mac SQLite server.":d.error||"Not connected."}
+ catch(e){out.textContent=String(e.message||e)}
+};
+$("print").onclick=()=>{
+ const s=totals();if(s.issues.length){showMessage(text().read);return}
+ const es=$("language").value==="es";
+ const rows=lines.map(x=>"<tr><td>"+esc(es?x.es:x.en)+"</td><td>"+esc(x.q)+"</td><td>"+esc(x.unit)+"</td><td>"+money(+x.rate)+"</td><td>"+money(+x.q*+x.rate)+"</td></tr>").join("");
+ $("report").innerHTML="<h1>"+(es?"ESTIMADO DE TRABAJO":"WORK ESTIMATE")+"</h1><p><b>"+(es?"Cliente":"Customer")+":</b> "+esc($("customer").value)+"<br><b>"+(es?"Ciudad":"Location")+":</b> "+esc($("location").value)+"<br><b>"+(es?"Servicio":"Trade")+":</b> "+esc(tradeNames[currentTrade]?.[es?1:0])+"</p><table><thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th>Rate</th><th>Amount</th></tr></thead><tbody>"+rows+"</tbody></table><p>Subtotal: "+money(s.base)+"<br>Overhead: "+money(s.overhead)+"<br>Profit: "+money(s.profit)+"</p><div class='print-total'>"+(es?"TOTAL ESTIMADO":"ESTIMATED TOTAL")+": "+money(s.total)+"</div>"+(futureWiring?"<p>"+esc(text().future)+"</p>":"")+"<p style='font-size:11px'>"+(es?"Cotización preliminar; confirmar medidas y precios.":"Preliminary estimate; verify quantities and prices.")+"</p>";
+ window.print();
+};
+updateLanguage();
+})();
+</script></body></html>
