@@ -68,3 +68,26 @@ test('latest voice dictation includes both GFCI and recessed light, and leaves u
  assert.match(find(r,'paint-ceiling').description_en,/white/);
  assert.match(find(r,'paint-walls').description_en,/white/);
 });
+
+test('Electrical: five recessed lights at 8 ft and dimmer replacing existing switch',()=>{
+ const t='Quiero cinco recessed lights en un apartamento, en un ceiling de ocho pies de altura, y necesito un dimmer instead del apagador.';
+ const r=localEstimate(t,'electrical');
+ assert.equal(find(r,'recessed-light').quantity,5);
+ assert.equal(find(r,'recessed-light').unit,'each');
+ assert.match(find(r,'recessed-light').description_en,/8 ft ceiling/);
+ assert.equal(find(r,'dimmer').quantity,1);
+ assert.match(find(r,'dimmer').description_en,/Replace existing wall switch/);
+ assert.equal(find(r,'unclassified'),undefined);
+ assert.equal(r.lines.length,2);
+});
+test('Electrical: numeric counts and no invented bathroom items',()=>{
+ const r=localEstimate('Install 5 recessed lights in 8 feet ceiling and replace old switch with a dimmer.','electrical');
+ assert.equal(find(r,'recessed-light').quantity,5);
+ assert.ok(find(r,'dimmer'));
+ assert.equal(find(r,'shower'),undefined);
+ assert.equal(find(r,'floor'),undefined);
+});
+test('Electrical: one light is not mistaken for an 8-foot ceiling quantity',()=>{
+ const r=localEstimate('Instalar un recessed light en techo de 8 pies.','electrical');
+ assert.equal(find(r,'recessed-light').quantity,1);
+});

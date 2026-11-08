@@ -52,7 +52,17 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const oldToilet=hasRemovalVerb&&has(demoSection,/\b(toilet|inodoro|sanitario|retrete)\b/);
  const oldVanity=hasRemovalVerb&&has(demoSection,/\b(vanity|vanitorio)\b/);
  const oldMirror=hasRemovalVerb&&has(demoSection,/\b(espejo|mirror)\b/);
- const lightRecessed=has(s,/\b(recessed\s*(?:light|lighting|luz)?|luz\s*empotrada|foco\s*empotrado|can light|downlight)\b/);
+ const lightRecessed=has(s,/\b(recessed\s*(?:lights?|lighting|luz|luces)?|luces?\s*empotradas?|focos?\s*empotrados?|can lights?|downlights?)\b/);
+ const dimmer=has(s,/\b(dimmer|dimer|dimmers|regulador(?: de intensidad)?|atenuador)\b/);
+ const dimmerReplacement=dimmer&&has(s,/\b(reemplaz\w*|cambi\w*|sustitu\w*|replace|instead(?: of| del?| la)?|en lugar de(?:l| la)?)\b/);
+ const ceilingHeightMatch=s.match(/\b(?:ceiling|techo|cielo raso|altura del techo)\b[^.!?]{0,35}?\b(\d{1,2}(?:[.,]\d+)?|ocho|eight|nueve|nine|diez|ten)\s*(?:pies?|feet|ft)\b/)
+  ||s.match(/\b(\d{1,2}(?:[.,]\d+)?|ocho|eight|nueve|nine|diez|ten)\s*(?:pies?|feet|ft)\s*(?:de altura)?\s*(?:del?\s*)?(?:ceiling|techo)\b/);
+ const ceilingHeight=ceilingHeightMatch?((({ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10} as Record<string,number>)[ceilingHeightMatch[1]])||number(ceilingHeightMatch[1])):undefined;
+ const countWords:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10};
+ const countMatch=s.match(/\b(\d{1,2}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten)\s+(?:nuev[oa]s?\s+)?(?:recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|focos?\s*empotrados?|downlights?|can lights?)\b/)
+  ||s.match(/\b(?:recessed\s*(?:lights?|lighting)?|luces?\s*empotradas?|focos?\s*empotrados?)\b[^.!?]{0,30}?\b(\d{1,2})\s*(?:luces?|lights?|focos?|unidades?)\b/);
+ const recessedCount=countMatch?(countWords[countMatch[1]]||number(countMatch[1])):1;
+ const validRecessedCount=Number.isInteger(recessedCount)&&recessedCount>0&&recessedCount<=30?recessedCount:0;
  const gfci=has(s,/\b(gfci|gfi|ground.fault)\b/);
  const gfciReplacement=gfci&&has(s,/\b(reemplaz\w*|cambiar|reponer|sustituir|replace|instead of|en lugar de(?:l| la)?)\b/);
  const whitePaint=has(s,/\b(blanco|blanca|white)\b/);
@@ -98,8 +108,16 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   lines.push(line('mirror',(light?'Supply and install illuminated mirror':'Supply and install mirror')+mirrorSize,
    (light?'Suministrar e instalar espejo iluminado':'Suministrar e instalar espejo')+mirrorSize,1,'job',375));
  }
- if(lightRecessed)lines.push(line('recessed-light','Supply and install new recessed ceiling light (verify existing circuit and wiring)',
-  'Suministrar e instalar lámpara empotrada nueva en techo (verificar circuito y cableado)',1,'job',325));
+ if(lightRecessed){
+  const heightDetail=ceilingHeight?' ('+ceilingHeight+' ft ceiling)':' (ceiling height to confirm)';
+  lines.push(line('recessed-light','Supply and install recessed LED ceiling lights'+heightDetail+'; verify circuit, switching and wiring',
+   'Suministrar e instalar luces LED empotradas en techo'+heightDetail+'; verificar circuito, interruptor y cableado',
+   validRecessedCount,'each',325));
+  if(!ceilingHeight)unknowns.push('Confirm ceiling height and access for recessed fixtures.');
+  unknowns.push('Confirm fixture type, dimmer compatibility, switch location, existing wiring and ceiling access before pricing.');
+ }
+ if(dimmer)lines.push(line('dimmer',dimmerReplacement?'Replace existing wall switch with LED-compatible dimmer':'Install LED-compatible dimmer switch (confirm existing vs new)',
+   dimmerReplacement?'Reemplazar interruptor existente por dimmer compatible con LED':'Instalar dimmer compatible con LED (confirmar si sustituye interruptor)',1,'each',175));
  if(gfci)lines.push(line('gfci',
   gfciReplacement?'Replace existing bathroom receptacle with GFCI outlet':'Install GFCI bathroom receptacle (verify existing wiring)',
   gfciReplacement?'Reemplazar tomacorriente existente por uno GFCI':'Instalar tomacorriente GFCI (verificar cableado existente)',
@@ -117,7 +135,7 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   if(!paintWalls&&!paintCeiling)lines.push(line('paint','Prepare and paint bathroom (scope to confirm)','Preparar y pintar baño (confirmar alcance)',1,'job',475));
  }
  if(plumbing&&!shower)lines.push(line('plumbing','Bathroom plumbing work (confirm scope)','Trabajo de plomería de baño (confirmar alcance)',1,'job',700));
- if(electrical&&!lightRecessed&&!gfci&&!mirror)lines.push(line('electrical','Electrical/lighting work (confirm scope)','Electricidad o iluminación (confirmar alcance)',1,'job',550));
+ if(electrical&&!lightRecessed&&!dimmer&&!gfci&&!mirror)lines.push(line('electrical','Electrical/lighting work (confirm scope)','Electricidad o iluminación (confirmar alcance)',1,'job',550));
  if(roomArea)unknowns.push('Bathroom floor '+roomArea+' sq ft based on '+size(roomDim!)+'; verify dimensions and units.');
  if(tileToCeiling&&!height)unknowns.push('Shower tile reaches ceiling; confirm measured wall height before pricing.');
  if(gfci)unknowns.push('Verify GFCI location, circuit protection and wiring before final pricing.');
