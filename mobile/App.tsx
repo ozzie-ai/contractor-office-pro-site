@@ -409,7 +409,7 @@ export default function App(){
      </View>}
     <Text style={styles.hint}>{tr("Labor and supply amounts are editable planning costs.","Las horas y costos son estimados editables.")}</Text>
     </View>}
-    <SpeechInput description={project.description} onChange={x=>patch({description:x})}/>
+    <SpeechInput language={businessProfile.language} description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>Remove</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
@@ -473,7 +473,8 @@ export default function App(){
    {stage===3&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("4 · Customer proposal","4 · Propuesta al cliente")}</Text>
     <Text style={styles.hint}>{tr("Internal notes and photos stay out of the customer PDF.","Las notas privadas y fotos no aparecen en el PDF del cliente.")}</Text>
-    <View style={styles.row}><View style={{flex:1}}><Action title="English" secondary={project.language!=='en'} onPress={()=>patch({language:'en'})}/></View><View style={{flex:1}}><Action title="Español" secondary={project.language!=='es'} onPress={()=>patch({language:'es'})}/></View></View>
+    <Text style={styles.hint}>{tr('Proposal language','Idioma de la propuesta')}: {project.language==='es'?'Español':'English'}</Text>
+    <Action title={tr('Change proposal language','Cambiar idioma de propuesta')} secondary onPress={()=>patch({language:project.language==='en'?'es':'en'})}/>
     <Text style={styles.total}>{project.language==='en'?'Estimated price':'Precio estimado'}: {money(total.total)}</Text>
     <Text style={styles.hint}>{project.lines.length} {tr('items','partidas')} · {project.exclusions.length} {tr('exclusions','exclusiones')} · {photos.length} {tr('private photos','fotos privadas')}</Text>
     <Input label={project.language==='en'?'Extra customer notes (optional)':'Notas adicionales para el cliente (opcional)'} multiline value={project.customerNotes} onChangeText={x=>patch({customerNotes:x})}/>
