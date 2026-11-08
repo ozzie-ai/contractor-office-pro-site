@@ -93,9 +93,11 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||p.unknowns.length>0;
  const list=(title:string,items:string[])=>items.length?'<h3>'+esc(title)+'</h3><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
  const isCleaning=p.trade==='cleaning';
- const rows=p.lines.map(x=>isCleaning
-  ?'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(totals(p).total))+'</td></tr>'
-  :'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
+ // Cleaning is quoted as one bundled service, even when the owner adds extra tasks.
+ // Never repeat the grand total on each line, and never disclose internal cost categories.
+ const rows=isCleaning
+  ?'<tr><td>'+p.lines.map(x=>esc(es?x.description_es:x.description_en)).join('<p style="margin:7px 0 0">')+'</td><td>1</td><td>'+(es?'servicio':'service')+'</td><td>'+esc(money(sum.total))+'</td></tr>'
+  :p.lines.map(x=>'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
  'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
