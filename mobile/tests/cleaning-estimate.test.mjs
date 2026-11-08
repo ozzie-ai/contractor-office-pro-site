@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
 const load=(name)=>{const filename=path.resolve('src/'+name+'.ts');const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;const module={exports:{}};vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url)});return module.exports;};
-const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours,isCleaningQuoteCurrent,currentCleaningProject}=load('cleaningEstimate');
+const {priceCleaning,cleaningToProject,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,isCleaningQuoteCurrent,currentCleaningProject}=load('cleaningEstimate');
 const {proposalHtml,totals,TRADES,recurringCleaningPrice}=load('estimate');
 const c={type:'residential',frequency:'twice_monthly',bedrooms:3,bathrooms:2,livingRooms:2,areaSqFt:1800,workers:2,firstHoursPerWorker:5,repeatHoursPerWorker:3,laborCostPerHour:25,firstSupplies:25,repeatSupplies:15,travelPerVisit:15};
 test('cleaning calculates first deep clean and repeat visit separately',()=>{
@@ -184,4 +184,16 @@ test('app interface language does not automatically change customer PDF language
  assert.ok(pdf.includes('CLEANING SERVICE PLAN'));
  assert.ok(!pdf.includes('ESTIMADO DE TRABAJO'));
  assert.ok(!pdf.includes('PRIVATE DICTATION IN SPANISH'));
+});
+
+test('clear room counts and area from dictated notes can seed missing cleaning inputs',()=>{
+ const parsed=explicitCleaningNumbers('Limpieza después de obra 4,034 pies cuadrados, 4 dormitorios, 3 baños y 2 salas');
+ assert.equal(parsed.areaSqFt,4034);
+ assert.equal(parsed.bedrooms,4);
+ assert.equal(parsed.bathrooms,3);
+ assert.equal(parsed.livingRooms,2);
+ assert.equal(plannedCleaningWorkerHours({...c,areaSqFt:4034}),17);
+});
+test('notes with no explicit room counts or area do not invent measurements',()=>{
+ assert.equal(Object.keys(explicitCleaningNumbers('Clean all surfaces and remove dust.')).length,0);
 });
