@@ -316,7 +316,6 @@ export default function App(){
    exclusions:futureBreaker?['Future 100A branch-circuit feeder wiring, terminations and connections are not included in this job.']:[],
    futureWork:futureBreaker?['Future circuit wiring and final connections under a separate scope and price.']:[]});
   setAiConnected(false);
-  setLookupPreview(null);
   setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
   setStage(2);
  };
