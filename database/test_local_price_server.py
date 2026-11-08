@@ -71,6 +71,28 @@ class LocalPricingTests(unittest.TestCase):
             thread.join(timeout=3)
             server.server_close()
 
+    def test_iphone_safari_preview_without_database_token(self):
+        from local_price_server import handler
+        from http.server import ThreadingHTTPServer
+        from threading import Thread
+        from urllib.request import urlopen
+        server=ThreadingHTTPServer(("127.0.0.1",0),handler("local-test-token-at-least-24-characters"))
+        worker=Thread(target=server.serve_forever,daemon=True)
+        worker.start()
+        try:
+            with urlopen("http://127.0.0.1:"+str(server.server_port)+"/app",timeout=3) as response:
+                html=response.read().decode("utf-8")
+                self.assertEqual(response.status,200)
+                self.assertIn("Contractor Office Pro",html)
+                self.assertIn("Create work items",html)
+                self.assertIn("Print / Save PDF",html)
+                self.assertIn("Check Mac unit price",html)
+                self.assertIn("Local browser pilot; not a native App Store",html)
+        finally:
+            server.shutdown()
+            worker.join(timeout=3)
+            server.server_close()
+
     def test_sqlite_backup_and_integrity(self):
         from backup_local_database import backup
         backupdir=Path(self.folder.name)/"backups"
