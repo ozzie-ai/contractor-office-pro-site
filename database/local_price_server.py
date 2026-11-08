@@ -168,10 +168,26 @@ def handler(token=None):
             self.end_headers()
             self.wfile.write(body)
         def do_GET(self):
+            u=urlparse(self.path)
+            if u.path in ("/app","/app/"):
+                page=Path(__file__).resolve().parent/"web"/"estimate.html"
+                try:
+                    body=page.read_bytes()
+                except OSError:
+                    return self.respond(404,{"error":"Local app page is not installed"})
+                self.send_response(200)
+                self.send_header("Content-Type","text/html; charset=utf-8")
+                self.send_header("Content-Length",str(len(body)))
+                self.send_header("Cache-Control","no-store")
+                self.send_header("X-Content-Type-Options","nosniff")
+                self.send_header("Referrer-Policy","no-referrer")
+                self.send_header("Content-Security-Policy","default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; form-action 'none'; base-uri 'none'; frame-ancestors 'none'")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             supplied=self.headers.get("Authorization","")
             if token and not hmac.compare_digest(supplied,"Bearer "+token):
                 return self.respond(401,{"error":"Authorization required"})
-            u=urlparse(self.path)
             if u.path == "/health":
                 return self.respond(200,{"ok":True,"storage":str(db_path()),"mode":"local"})
             if u.path == "/tasks":
