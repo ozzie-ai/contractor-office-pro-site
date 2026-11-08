@@ -15,6 +15,18 @@ export function recommendedPostConstructionWorkerHours(c:CleaningDetails):number
  const sqftPerWorkerHour=c.dustLevel==='heavy'?100:c.dustLevel==='moderate'?160:240;
  return Math.ceil(c.areaSqFt/sqftPerWorkerHour);
 }
+/** Input fingerprint for the most recently calculated cleaning price.
+ * An old saved draft without this marker must be recalculated before sharing.
+ */
+export function cleaningQuoteFingerprint(c:CleaningDetails,overheadPct:number,profitPct:number):string{
+ const {repeatPricePerVisit,...inputs}=c;
+ return JSON.stringify({inputs,overheadPct,profitPct});
+}
+export function isCleaningQuoteCurrent(p:Pick<Project,'trade'|'cleaning'|'cleaningQuoteSignature'|'overheadPct'|'profitPct'>):boolean{
+ if(p.trade!=='cleaning')return true;
+ if(!p.cleaning||!p.cleaningQuoteSignature)return false;
+ return p.cleaningQuoteSignature===cleaningQuoteFingerprint(p.cleaning,p.overheadPct,p.profitPct);
+}
 export type CleaningQuote={initialPrice:number;recurringPrice:number;initialBase:number;recurringBase:number;lines:EstimateLine[];unknowns:string[]};
 const round=(n:number)=>Math.round(n*100)/100;
 const line=(en:string,es:string,rate:number):EstimateLine=>({id:'clean-initial',description_en:en,description_es:es,quantity:1,unit:'visit',rate,status:'allowance_to_confirm'});
@@ -45,7 +57,7 @@ export function priceCleaning(c:CleaningDetails,overheadPct:number,profitPct:num
  return {initialPrice,recurringPrice,initialBase,recurringBase,lines:[line(en,es,initialBase)],unknowns};
 }
 /** Pricing: line holds direct visit cost. The existing totals() applies profile overhead and profit once. */
-export function cleaningToProject(c:CleaningDetails,p:Pick<Project,'overheadPct'|'profitPct'>):{cleaning:CleaningDetails;lines:EstimateLine[];unknowns:string[]}{
+export function cleaningToProject(c:CleaningDetails,p:Pick<Project,'overheadPct'|'profitPct'>):{cleaning:CleaningDetails;cleaningQuoteSignature:string;lines:EstimateLine[];unknowns:string[]}{
  const q=priceCleaning(c,p.overheadPct,p.profitPct);
- return {cleaning:{...c,repeatPricePerVisit:c.frequency==='once'?undefined:q.recurringPrice},lines:q.lines,unknowns:q.unknowns};
+ return {cleaning:{...c,repeatPricePerVisit:c.frequency==='once'?undefined:q.recurringPrice},cleaningQuoteSignature:cleaningQuoteFingerprint(c,p.overheadPct,p.profitPct),lines:q.lines,unknowns:q.unknowns};
 }
