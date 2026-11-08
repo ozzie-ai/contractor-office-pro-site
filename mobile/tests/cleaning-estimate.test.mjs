@@ -42,3 +42,23 @@ test('recurring price recalculates with edited profit setting',()=>{
  assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:20}),237.6);
  assert.equal(recurringCleaningPrice({...priced,overheadPct:10,profitPct:15}),227.7);
 });
+
+test('one-time cleaning proposal explicitly says one-time and labels service address',()=>{
+ const one={...c,frequency:'once'};
+ const priced=cleaningToProject(one,{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',contractor:'Cleaner',customer:'Clarisse',city:'Santa Clarita',address:'123 Test Road',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const html=proposalHtml(p,'estimate');
+ assert.ok(html.includes('One-time service'));
+ assert.ok(html.includes('Service address:'));
+ assert.ok(html.includes('123 Test Road'));
+ assert.ok(!html.includes('Price per subsequent visit:'));
+});
+test('recurring cleaning proposal names monthly frequency and price per visit',()=>{
+ const monthly={...c,frequency:'twice_monthly'};
+ const priced=cleaningToProject(monthly,{overheadPct:10,profitPct:20});
+ const p={...priced,trade:'cleaning',contractor:'Cleaner',customer:'Clarisse',city:'Santa Clarita',description:'PRIVATE',customerNotes:'',exclusions:[],futureWork:[],language:'en',overheadPct:10,profitPct:20};
+ const html=proposalHtml(p,'proposal');
+ assert.ok(html.includes('Twice monthly'));
+ assert.ok(html.includes('Price per subsequent visit:'));
+ assert.ok(html.includes('237.60'));
+});
