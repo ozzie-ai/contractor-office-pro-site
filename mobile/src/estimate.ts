@@ -27,7 +27,7 @@ export const TRADES:Record<Trade,{en:string;es:string}>={
  plumbing:{en:'Plumbing',es:'Plomería'},
  painting:{en:'Painting',es:'Pintura'},
  concrete:{en:'Concrete',es:'Concreto'},
- handyman:{en:'Handyman',es:'Mantenimiento'},
+ handyman:{en:'Handyman',es:'Trabajos varios'},
  remodel:{en:'Remodeling',es:'Remodelación'},
  cleaning:{en:'Cleaning Services',es:'Servicios de limpieza'},
 };
