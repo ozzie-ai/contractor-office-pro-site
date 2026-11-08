@@ -44,5 +44,6 @@ export async function retainJobPhoto(uri:string){
  return target.uri;
 }
 export function hasJobContent(job:Project,photos:string[]){
- return Boolean(job.description.trim()||job.customer.trim()||job.contractor.trim()||job.city.trim()||job.lines.length||photos.length);
+ // A prefilled business profile is not itself a project; avoid creating empty drafts on startup.
+ return Boolean(job.description.trim()||job.customer.trim()||job.city.trim()||(job.address||'').trim()||job.lines.length||photos.length);
 }

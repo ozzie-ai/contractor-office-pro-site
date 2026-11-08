@@ -55,16 +55,16 @@ export default function App(){
   setBusinessProfile(profile);
   const stored=readStore();
   setSavedJobs(stored.jobs);
-  const active=stored.jobs.find(x=>x.id===stored.activeId);
-  if(active){
-   setActiveJobId(active.id);
-   setProject(active.project);
-   addressRef.current=active.project.address||'';
-   setPhotos(active.photos);
-   setStage(active.stage);
-   setSaveStatus('Previous job restored from this iPhone.');
-  }
-  if(!active&&profile.name)setProject(prev=>({...prev,contractor:profile.name,language:profile.language,overheadPct:profile.overheadPct,profitPct:profile.profitPct,trade:profile.enabledTrades[0]}));
+  // The home screen always opens a NEW job, never the last active estimate.
+  // Existing saved jobs are kept in My Jobs and opened only by tapping one.
+  const id=newJobId();
+  setActiveJobId(id);
+  setProject({...initial,contractor:profile.name,language:profile.language,overheadPct:profile.overheadPct,profitPct:profile.profitPct,trade:profile.enabledTrades[0]||'electrical'});
+  setPhotos([]);
+  setStage(0);
+  addressRef.current='';
+  makeActive(null);
+  setSaveStatus('New job — ready to start. Previous jobs are listed below.');
   setLoaded(true);
  },[]);
  useEffect(()=>{
