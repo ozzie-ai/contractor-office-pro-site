@@ -1,5 +1,7 @@
 export type Trade='electrical'|'plumbing'|'painting'|'concrete'|'handyman'|'remodel';
 export type Language='en'|'es';
+export type JobStatus='draft'|'sent'|'accepted'|'declined'|'in_progress'|'completed';
+export const JOB_STATUSES:Record<JobStatus,{en:string;es:string}>={draft:{en:'Draft',es:'Borrador'},sent:{en:'Proposal sent',es:'Propuesta enviada'},accepted:{en:'Accepted',es:'Aceptada'},declined:{en:'Declined',es:'Rechazada'},in_progress:{en:'Work in progress',es:'Trabajo en proceso'},completed:{en:'Completed',es:'Terminado'}};
 export type EstimateLine={
  id:string;description_en:string;description_es:string;
  quantity:number;unit:string;rate:number;status:'included_now'|'allowance_to_confirm';
@@ -13,6 +15,7 @@ export type Project={
  trade:Trade;contractor:string;customer:string;city:string;description:string;
  lines:EstimateLine[];exclusions:string[];futureWork:string[];unknowns:string[];
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
+ status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
 };
 export const TRADES:Record<Trade,{en:string;es:string}>={
  electrical:{en:'Electrical',es:'Electricidad'},
@@ -58,15 +61,15 @@ export function mapInterpretation(result:Interpretation):Pick<Project,'lines'|'e
  };
 }
 const esc=(s:string)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
-export function proposalHtml(p:Project){
+export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const es=p.language==='es',tr=es?{
-  title:'ESTIMADO DE TRABAJO',contractor:'Contratista',customer:'Cliente',location:'Ciudad',work:'Trabajo incluido',
+  title:mode==='proposal'?'PROPUESTA DE TRABAJO':'ESTIMADO DE TRABAJO',contractor:'Contratista',customer:'Cliente',location:'Ciudad',work:'Trabajo incluido',
   qty:'Cantidad',unit:'Unidad',rate:'Tarifa',amount:'Importe',excluded:'No incluido',future:'Trabajo futuro — no incluido',
   subtotal:'Subtotal',overhead:'Gastos generales',profit:'Utilidad',total:'Precio estimado',signature:'Firma del cliente',
   date:'Fecha',draft:'BORRADOR — El contratista debe confirmar precios y cantidades.',
   notice:'Este estimado resume el trabajo y precio propuesto. Confirmar los detalles antes de comenzar.'
  }:{
-  title:'WORK ESTIMATE',contractor:'Contractor',customer:'Customer',location:'City',work:'Included work',
+  title:mode==='proposal'?'WORK PROPOSAL':'WORK ESTIMATE',contractor:'Contractor',customer:'Customer',location:'City',work:'Included work',
   qty:'Qty',unit:'Unit',rate:'Rate',amount:'Amount',excluded:'Not included',future:'Future work — excluded',
   subtotal:'Subtotal',overhead:'Overhead',profit:'Profit',total:'Estimated price',signature:'Customer signature',
   date:'Date',draft:'DRAFT — Contractor must confirm pricing and quantities.',
@@ -78,7 +81,7 @@ export function proposalHtml(p:Project){
  const rows=p.lines.map(x=>'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
- 'body{font-family:Arial,sans-serif;color:#173b42;padding:28px;line-height:1.42}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:45px}tr{break-inside:avoid;page-break-inside:avoid}'+
+ 'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
  '</style></head><body><h1>'+tr.title+'</h1>'+
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+tr.location+':</b> '+esc(p.city||'—')+'</p>'+
@@ -87,5 +90,5 @@ export function proposalHtml(p:Project){
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
  '<section class="summary">'+line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
- '<p class="notice">'+tr.notice+'</p><div class="sign">'+tr.signature+': ______________________________ &nbsp; '+tr.date+': ______________</div></body></html>';
+ '<div style="break-inside:avoid;page-break-inside:avoid"><p class="notice">'+tr.notice+'</p><div class="sign">'+tr.signature+': ______________________________ &nbsp; '+tr.date+': ______________</div></div></body></html>';
 }

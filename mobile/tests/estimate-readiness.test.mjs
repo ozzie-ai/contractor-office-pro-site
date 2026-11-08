@@ -9,7 +9,7 @@ const filename=path.resolve('src/estimate.ts');
 const js=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const mod={exports:{}};
 vm.runInNewContext(js,{module:mod,exports:mod.exports,require:createRequire(import.meta.url)});
-const {estimateReadiness,proposalHtml,totals}=mod.exports;
+const {estimateReadiness,proposalHtml,totals,JOB_STATUSES}=mod.exports;
 const sample={trade:'remodel',contractor:'Builder',customer:'Customer',city:'Los Angeles',description:'PRIVATE JOB NOTES: DO NOT DISPLAY',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20};
 const item=(quantity,rate=18)=>({id:'wall',description_en:'Tile shower walls',description_es:'Loseta en paredes',quantity,unit:'sq ft',rate,status:'allowance_to_confirm'});
 test('zero shower wall quantity prevents export readiness',()=>{
@@ -27,4 +27,16 @@ test('customer PDF excludes internal dictated transcript',()=>{
  const html=proposalHtml(p);
  assert.ok(html.includes('Tile shower walls'));
  assert.equal(html.includes('PRIVATE JOB NOTES'),false);
+});
+
+test('formal proposal contains proposal title but not private follow-up notes or transcript',()=>{
+ const p={...sample,status:'sent',followUpNotes:'PRIVATE: ask client to call on Monday',followUpDate:'2026-11-15',lines:[item(88)]};
+ const html=proposalHtml(p,'proposal');
+ assert.ok(html.includes('WORK PROPOSAL'));
+ assert.equal(html.includes('PRIVATE JOB NOTES'),false);
+ assert.equal(html.includes('PRIVATE: ask client'),false);
+ assert.ok(html.includes('Tile shower walls'));
+});
+test('follow-up pipeline provides six status choices',()=>{
+ assert.deepEqual(Object.keys(JOB_STATUSES).sort(),['accepted','completed','declined','draft','in_progress','sent'].sort());
 });

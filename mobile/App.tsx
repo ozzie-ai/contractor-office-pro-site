@@ -8,11 +8,11 @@ import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
-import {Language,Project,Trade,TRADES,EstimateLine,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,JobStatus,JOB_STATUSES,totals,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PALETTE={ink:'#163942',accent:'#116b60',background:'#f3f7f5',line:'#cedfda',muted:'#526e70',white:'#fff'};
-const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20};
-type Stage=0|1|2|3;
+const initial:Project={trade:'electrical',contractor:'',customer:'',city:'',description:'',lines:[],exclusions:[],futureWork:[],unknowns:[],customerNotes:'',language:'en',overheadPct:10,profitPct:20,status:'draft',followUpDate:'',followUpNotes:''};
+type Stage=0|1|2|3|4;
 
 function Action({title,onPress,secondary=false,disabled=false}:{title:string;onPress:()=>void;secondary?:boolean;disabled?:boolean}){
  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button,secondary&&styles.buttonSecondary,disabled&&{opacity:.5}]}><Text style={[styles.buttonText,secondary&&{color:PALETTE.ink}]}>{title}</Text></Pressable>;
@@ -166,7 +166,7 @@ export default function App(){
   setInfo('Local draft created. Illustrative rates only; review every line and adjust before sharing.');
   setStage(2);
  };
- const sharePdf=async()=>{
+ const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const readiness=estimateReadiness(project);
   if(!readiness.ready){
    Alert.alert('Estimate is incomplete','Finish the missing quantities and prices before exporting. '+readiness.issues.slice(0,2).join(' '),[{text:'Review work items',onPress:()=>setStage(2)}]);
@@ -175,14 +175,19 @@ export default function App(){
   if(!saveCurrent())return;
   setBusy(true);
   try{
-   const pdf=await Print.printToFileAsync({html:proposalHtml(project)});
+   const pdf=await Print.printToFileAsync({html:proposalHtml(project,mode)});
    if(await Sharing.isAvailableAsync()){
     await Sharing.shareAsync(pdf.uri,{mimeType:'application/pdf',UTI:'com.adobe.pdf',dialogTitle:'Share Contractor Office Pro Estimate'});
     setShareDone(true);
     setSaveStatus('✓ Job saved · Share sheet closed');
+    if(mode==='proposal')patch({lastProposalPreparedAt:new Date().toISOString()});
    }else Alert.alert('Sharing unavailable','PDF was generated but sharing is not available on this device.');
   }catch(e){Alert.alert('PDF export','Could not create or share the estimate.')}
   finally{setBusy(false)}
+ };
+ const setStatus=(status:JobStatus)=>{
+  patch({status});
+  setSaveStatus('Status updated — saving on this iPhone');
  };
  const total=totals(project);
  const readiness=estimateReadiness(project);
@@ -202,11 +207,11 @@ export default function App(){
     {savedJobs.length===0?<Text style={styles.hint}>No saved jobs yet. Dictate your first job below.</Text>:
     savedJobs.slice(0,10).map(j=><Pressable key={j.id} accessibilityRole="button" onPress={()=>openSaved(j)} style={[styles.savedJob,j.id===activeJobId&&{borderColor:PALETTE.accent}]}>
      <Text style={{fontWeight:'800',color:PALETTE.ink}}>{j.project.customer||j.project.city||j.project.description.slice(0,42)||'Untitled job'}{j.id===activeJobId?' · Current':''}</Text>
-     <Text style={styles.hint}>{TRADES[j.project.trade].en} · {j.project.lines.length} items · {new Date(j.updatedAt).toLocaleString()}</Text>
+     <Text style={styles.hint}>{TRADES[j.project.trade].en} · {JOB_STATUSES[j.project.status||'draft'].en} · {j.project.lines.length} items · {new Date(j.updatedAt).toLocaleString()}</Text>
      <Text style={{color:PALETTE.accent,fontWeight:'700'}}>Open / Continuar</Text>
     </Pressable>)}
    </View>
-   <View style={styles.steps}>{['Job','Scope','Price','Send'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
+   <View style={styles.steps}>{['Job','Scope','Price','Send','Follow up'].map((name,i)=><Pressable key={name} onPress={()=>setStage(i as Stage)} style={[styles.step,stage===i&&styles.stepActive]}><Text style={[styles.stepText,stage===i&&{color:PALETTE.white}]}>{i+1}. {name}</Text></Pressable>)}</View>
    {stage===0&&<View style={styles.card}>
     <Text style={styles.h2}>1 · Start a job</Text>
     <Text style={styles.hint}>Choose the trade, describe the work in Spanish or English, and add site photos.</Text>
@@ -276,19 +281,45 @@ export default function App(){
       {readiness.issues.length>6&&<Text style={styles.hint}>…and {readiness.issues.length-6} more items.</Text>}
       <Action title="Review missing quantities / Revisar cantidades" secondary onPress={()=>setStage(2)}/>
      </View>}
-    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={sharePdf}/>
+    <Action title={busy?'Creating PDF...':readiness.ready?'Create & share customer PDF':'Complete estimate before PDF'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('estimate')}/>
+    <Action title="Continue · Track proposal / Seguimiento" secondary onPress={()=>setStage(4)}/>
     {shareDone&&<View style={styles.lineCard}>
      <Text style={styles.h2}>PDF prepared / PDF preparado</Text>
      <Text style={styles.hint}>The sharing window closed. The job is saved on this phone. Please confirm delivery in the destination you selected.</Text>
      <Action title="Back to My Jobs / Mis trabajos" onPress={goToMyJobs}/>
      <Action title="+ Start another job / Nuevo trabajo" secondary onPress={startNewJob}/>
-     <Action title="Share PDF again / Compartir otra vez" secondary onPress={sharePdf}/>
+     <Action title="Share PDF again / Compartir otra vez" secondary onPress={()=>sharePdf('estimate')}/>
+     <Action title="Next · Track this job / Dar seguimiento" onPress={()=>setStage(4)}/>
     </View>}
     {!shareDone&&<View style={styles.row}>
      <View style={{flex:1}}><Action title="Save job / Guardar" secondary onPress={()=>saveCurrent(true)}/></View>
      <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
     </View>}
     <Action title="Back to prices" secondary onPress={()=>setStage(2)}/>
+   </View>}
+   {stage===4&&<View style={styles.card}>
+    <Text style={styles.h2}>5 · Project follow-up / Seguimiento</Text>
+    <Text style={styles.hint}>After preparing an estimate, record the customer's decision, plan the next action, and keep this project moving.</Text>
+    <Text style={styles.total}>{project.customer||'Customer'} · {money(total.total)}</Text>
+    <Text style={styles.label}>Current status / Estado actual</Text>
+    <Text style={styles.notice}>{JOB_STATUSES[project.status||'draft'].en} / {JOB_STATUSES[project.status||'draft'].es}</Text>
+    <View style={styles.statusGrid}>
+     {(Object.keys(JOB_STATUSES) as JobStatus[]).map(status=><Pressable key={status} accessibilityRole="button" accessibilityState={{selected:(project.status||'draft')===status}} onPress={()=>setStatus(status)} style={[styles.statusChoice,(project.status||'draft')===status&&styles.selectedTrade]}>
+      <Text style={[styles.tradeText,(project.status||'draft')===status&&{color:PALETTE.white}]}>{JOB_STATUSES[status].en}</Text>
+      <Text style={[styles.tradeSub,(project.status||'draft')===status&&{color:'#e2fbf3'}]}>{JOB_STATUSES[status].es}</Text>
+     </Pressable>)}
+    </View>
+    <Input label="Follow-up date / Próximo seguimiento (YYYY-MM-DD)" value={project.followUpDate||''} onChangeText={x=>patch({followUpDate:x})} placeholder="2026-11-15"/>
+    <Input label="Internal follow-up notes / Notas internas" multiline value={project.followUpNotes||''} onChangeText={x=>patch({followUpNotes:x})} placeholder="Called customer; waiting for approval..."/>
+    <Text style={styles.hint}>These notes remain private. Dates are saved locally; automated reminders are not included yet.</Text>
+    <Action title="Save follow-up / Guardar seguimiento" onPress={()=>saveCurrent(true)}/>
+    <Action title={busy?'Creating PDF...':'Prepare & share formal proposal / Propuesta formal'} disabled={busy||!readiness.ready} onPress={()=>sharePdf('proposal')}/>
+    {!readiness.ready&&<Text style={styles.notice}>Complete quantities and prices before preparing the customer proposal.</Text>}
+    <View style={styles.row}>
+     <View style={{flex:1}}><Action title="My Jobs / Mis trabajos" secondary onPress={goToMyJobs}/></View>
+     <View style={{flex:1}}><Action title="+ New job / Nuevo" secondary onPress={startNewJob}/></View>
+    </View>
+    <Action title="Back to estimate / Volver al estimado" secondary onPress={()=>setStage(3)}/>
    </View>}
    <Text style={styles.footer}>Drafts are stored on this phone only. Uninstalling removes local drafts. Keyboard dictation works offline. Planning rates are editable and not verified supplier bids.</Text>
   </ScrollView>
@@ -307,5 +338,7 @@ const styles=StyleSheet.create({
  row:{flexDirection:'row',gap:9},photoRow:{flexDirection:'row',flexWrap:'wrap',gap:9,marginTop:12},photo:{width:82,height:82,borderRadius:8},remove:{fontSize:10,color:'#9a4545',textAlign:'center'},
  notice:{fontSize:13,color:'#775d21',backgroundColor:'#fdf6e1',padding:12,borderRadius:9,marginTop:12},
  savedJob:{borderWidth:1,borderColor:PALETTE.line,borderRadius:9,padding:10,marginTop:9,backgroundColor:'#f6fbf9'},
+ statusGrid:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:10,marginBottom:12},
+ statusChoice:{width:'48%',backgroundColor:'#f6fbf9',borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:10},
  lineCard:{borderWidth:1,borderColor:PALETTE.line,borderRadius:10,padding:12,marginTop:12},lineNumber:{color:PALETTE.accent,fontWeight:'800',fontSize:11},rate:{fontSize:14,fontWeight:'700',color:PALETTE.ink,marginTop:10},total:{fontWeight:'900',fontSize:22,color:PALETTE.accent,marginVertical:17},footer:{fontSize:12,lineHeight:18,color:PALETTE.muted,margin:8}
 });

@@ -1,7 +1,7 @@
 import {File,Paths} from 'expo-file-system';
 import type {Project} from './estimate';
 
-export type SavedJob={id:string;updatedAt:string;project:Project;photos:string[];stage:0|1|2|3};
+export type SavedJob={id:string;updatedAt:string;project:Project;photos:string[];stage:0|1|2|3|4};
 type JobStore={version:1;activeId:string|null;jobs:SavedJob[]};
 const filename='contractor-office-pro-drafts-v1.json';
 const file=()=>new File(Paths.document,filename);
