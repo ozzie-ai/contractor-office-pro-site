@@ -11,7 +11,7 @@ import {localEstimate} from './src/localEstimate';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
-import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,currentCleaningProject} from './src/cleaningEstimate';
+import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness} from './src/estimate';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
@@ -233,7 +233,10 @@ export default function App(){
  };
  const createLocalDraft=()=>{
   if(project.trade==='cleaning'){
-   const details=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+   const base=project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour);
+   const recognized=explicitCleaningNumbers(project.description);
+   // Only fill unknown quantities; never overwrite what the contractor entered.
+   const details={...base,areaSqFt:base.areaSqFt||recognized.areaSqFt||0,bedrooms:base.bedrooms||recognized.bedrooms||0,bathrooms:base.bathrooms||recognized.bathrooms||0,livingRooms:base.livingRooms||recognized.livingRooms||0};
    if(details.areaSqFt<=0){
     Alert.alert(tr('Missing cleaning area','Falta el área de limpieza'),tr('Enter approximate or measured square footage. The estimate cannot use a generic 10-hour price.','Ingresa los pies cuadrados estimados o medidos. No se puede calcular con un precio genérico de 10 horas.'));
     setStage(0);return;
@@ -253,7 +256,7 @@ export default function App(){
    try{
     const drafted=cleaningToProject(details,project);
     patch({...drafted,exclusions:[],futureWork:[]});
-    setInfo('Initial deep cleaning and recurring-visit price prepared separately. Review labor costs, hours and client scope.');
+    setInfo(tr('Room counts and floor area found in your notes were filled in when missing. Confirm them and review scope and labor hours.','Las habitaciones y el área detectadas en tus notas se usaron si faltaban. Confírmalas y revisa el trabajo y las horas.'));
     setStage(2);
    }catch(e){Alert.alert('Check cleaning details',e instanceof Error?e.message:'Check service details.');setStage(0);}
    return;
