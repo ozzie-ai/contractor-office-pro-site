@@ -161,3 +161,18 @@ test('post-construction PDF shows dust level in English and Spanish without inte
  assert.ok(!english.includes('Overhead'));
  assert.ok(!english.includes('Profit'));
 });
+
+test('an unselected new cleaning service cannot silently produce the old $382.80 quote',()=>{
+ const draft={...c,cleaningTypeConfirmed:false,frequency:'once',bedrooms:0,bathrooms:0,livingRooms:0,areaSqFt:0,firstHoursPerWorker:0,repeatHoursPerWorker:0};
+ const p={trade:'cleaning',cleaning:draft,lines:[],overheadPct:10,profitPct:20};
+ const pending=currentCleaningProject(p);
+ assert.equal(pending.lines.length,0);
+ assert.equal(totals(pending).total,0);
+});
+test('post-construction square footage calculates hours even before manually entering labor hours',()=>{
+ const c2={...c,type:'post_construction',cleaningTypeConfirmed:true,frequency:'once',areaSqFt:4034,dustLevel:'moderate',firstHoursPerWorker:0,bedrooms:0,bathrooms:0,livingRooms:0};
+ const p={trade:'cleaning',cleaning:c2,lines:[],overheadPct:10,profitPct:20};
+ const priced=currentCleaningProject(p);
+ assert.equal(totals(priced).total,910.8);
+ assert.equal(priced.cleaning.repeatPricePerVisit,undefined);
+});
