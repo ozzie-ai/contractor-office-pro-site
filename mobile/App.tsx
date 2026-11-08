@@ -84,7 +84,7 @@ export default function App(){
   try{
    saveJob({id:activeJobId,updatedAt:new Date().toISOString(),project:currentCleaningProject(project),photos,stage});
    const disk=readStore();
-   const confirmed=disk.jobs.some(j=>j.id===activeJobId&&j.project.description===project.description&&j.project.lines.length===project.lines.length);
+   const confirmed=disk.jobs.some(j=>j.id===activeJobId&&j.project.description===project.description&&j.project.lines.length===currentCleaningProject(project).lines.length);
    if(!confirmed)throw new Error('Could not verify saved data.');
    setSavedJobs(disk.jobs);
    setSaveStatus('✓ Saved locally · '+new Date().toLocaleTimeString());
@@ -192,17 +192,6 @@ export default function App(){
    if(details.type==='post_construction'&&!(details.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length){
     Alert.alert('Select scope / Seleccionar alcance','Select at least one cleaning task before preparing a quote.');
     setStage(0);return;
-   }
-   if(details.type==='post_construction'){
-    const recommended=recommendedPostConstructionWorkerHours(details);
-    const actual=details.workers*details.firstHoursPerWorker;
-    if(recommended>0&&actual<recommended&&!details.laborHoursConfirmed){
-     Alert.alert('Review crew hours / Revisar horas','For this '+details.areaSqFt+' sq ft '+(details.dustLevel||'moderate')+' dust job, the app suggests '+recommended+' total worker-hours. You entered '+actual+'. Verify the work before estimating.',[
-      {text:'Review hours / Revisar',onPress:()=>setStage(0)},
-      {text:'Keep verified hours / Confirmar',onPress:()=>patchCleaning({laborHoursConfirmed:true})}
-     ]);
-     setStage(0);return;
-    }
    }
    try{
     const drafted=cleaningToProject(details,project);
