@@ -26,8 +26,10 @@ export function localEstimate(description:string,_trade:Trade):LocalDraft{
   const words:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10,veinte:20,twenty:20};
   const parseCount=(v:string)=>words[v]||Number(v)||0;
   const panel=/\b(panel|tablero|centro de carga|load center|service upgrade|servicio electrico)\b/.test(s);
-  const upgrade=panel&&/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*|convert\w*)\b/.test(s);
   const amps=Array.from(s.matchAll(/\b(\d{2,3})\s*(?:a\b|amp(?:s)?\b|amperios?\b|amperes?\b)/g)).map(m=>Number(m[1]));
+  // Two explicitly stated service sizes alongside a panel reference indicate an
+  // upgrade even if voice transcription drops the word "upgrade".
+  const upgrade=panel&&(/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*|convert\w*)\b/.test(s)||(amps.includes(100)&&amps.includes(200)));
   const dedicatedBreaker=/(?:\b(breaker|interruptor termomagnetico|disyuntor)\b)/.test(s)&&/\b(posterior\w*|despues|future|later|otro trabajo|only|solo|solamente|nomas|unicamente)\b/.test(s);
   const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/)
    ||s.match(/\b(\d{1,3}|veinte|twenty)\b[^.!?\n]{0,38}?\b(?:circuits?|circuitos?)\b/);
