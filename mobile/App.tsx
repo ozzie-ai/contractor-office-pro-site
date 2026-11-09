@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
+import UniversalReviewDemoScreen from './src/UniversalReviewDemoScreen';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
 import {suggestPreliminaryPrices} from './src/preliminaryPricing';
@@ -65,6 +66,7 @@ export default function App(){
  const [businessProfile,setBusinessProfile]=useState<BusinessProfile>(defaultProfile);
  const [showProfile,setShowProfile]=useState(false);
  const [showJobs,setShowJobs]=useState(false);
+ const [showAiReviewDemo,setShowAiReviewDemo]=useState(false);
  const [profileSaved,setProfileSaved]=useState('');
 
  const [activeJobId,setActiveJobId]=useState(newJobId);
@@ -369,6 +371,7 @@ export default function App(){
  const panelMentioned=project.trade==='electrical'&&/\b(panel|tablero|load center|200\s*(?:a|amp)|circuitos?|circuits?)\b/i.test(project.description);
  const missingElectricalScope=panelMentioned&&project.lines.some(x=>x.id==='local-permit')&&!project.lines.some(x=>x.id==='local-panel-upgrade'||x.id==='local-existing-circuits');
  const pdfReady=readiness.ready&&cleaningInputsReady&&!missingElectricalScope;
+ if(__DEV__&&showAiReviewDemo)return <UniversalReviewDemoScreen language={businessProfile.language} onClose={()=>setShowAiReviewDemo(false)}/>;
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
   <ScrollView ref={scrollRef} contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
@@ -535,6 +538,7 @@ export default function App(){
     <Text style={styles.hint}>{project.trade==='cleaning'?tr('First cleaning and recurring visits are priced separately.','La primera limpieza y las visitas periódicas se calculan por separado.'):tr('Turn your job notes into an editable estimate.','Convierte tus notas en un estimado editable.')}</Text>
     <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
+    {__DEV__&&<Action title={tr('Preview AI review (demo only)','Ver revisión IA (solo demo)')} secondary onPress={()=>setShowAiReviewDemo(true)}/>}
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
