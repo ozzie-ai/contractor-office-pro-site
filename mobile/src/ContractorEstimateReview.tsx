@@ -38,7 +38,7 @@ export default function ContractorEstimateReview({interpretation,pricing,languag
  const accepted=initial.accepted;
  const priceMap=new Map(priced?.lines.map(line=>[line.scope_item_id,line])||[]);
  const displayed=(scope?.scope_items||[]).filter(x=>x.included_now);
- const missing=displayed.filter(x=>!priceMap.get(x.id)||priceMap.get(x.id)?.unit_rate===null||x.quantity===null);
+ const missing=displayed.filter(x=>{const p=priceMap.get(x.id);const proposed=edits[x.id]!==undefined?Number(edits[x.id]):p?.unit_rate;return !p||x.quantity===null||!Number.isFinite(proposed)||proposed===null||proposed===undefined||proposed<=0;});
  const amount=(n:number)=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
  const totals=useMemo(()=>{
   let partial=0;
