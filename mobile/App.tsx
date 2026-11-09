@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
 import {readStore,saveJob,newJobId,makeActive,retainJobPhoto,hasJobContent,SavedJob} from './src/jobDrafts';
 import {localEstimate} from './src/localEstimate';
+import {suggestPreliminaryPrices} from './src/preliminaryPricing';
 import {calculateUnitRate,explainLine,LA_ELECTRICIAN_MEAN_WAGE_Q1_2026,LA_WAGE_SOURCE} from './src/pricingReference';
 import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
@@ -321,11 +322,12 @@ export default function App(){
     costLaborBurdenMultiplier:saved.costLaborBurdenMultiplier}:item;
   });
   const manual=project.lines.filter(item=>item.id.startsWith('manual-')&&!lines.some(x=>x.id===item.id));
-  patch({lines:[...lines,...manual],unknowns:draft.unknowns,
+  const suggested=suggestPreliminaryPrices(project.trade,lines);
+  patch({lines:[...suggested.lines,...manual],unknowns:[...draft.unknowns,...suggested.notes],
    exclusions:futureBreaker?['Future feeder wiring, terminations and final connections are excluded from this job.']:project.exclusions,
    futureWork:futureBreaker?['Future feeder wiring and final connections are separate work.']:project.futureWork});
   setAiConnected(false);
-  setInfo(tr('Work items extracted. Existing prices preserved. Complete missing rates to finish your quote.','Partidas identificadas. Precios anteriores conservados. Completa las tarifas para terminar la cotización.'));
+  setInfo(suggested.suggested?tr('Preliminary LA prices added automatically for '+suggested.suggested+' work items. These are planning assumptions, not confirmed quotes. Review before sending.','Se agregaron precios preliminares de LA automáticamente para '+suggested.suggested+' partidas. Son supuestos de planificación, no cotizaciones confirmadas. Revísalos antes de enviar.'):tr('The notes do not identify enough recognized priced tasks. Add or dictate the missing work scope for a complete estimate.','Las notas no identifican suficientes partidas con precio. Describe el trabajo que falta para un estimado completo.'));
   setStage(2);
  };
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
@@ -531,7 +533,8 @@ export default function App(){
    </View>}
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
-    <Text style={styles.hint}>{tr('Review quantities and prices before sharing.','Revisa cantidades y precios antes de compartir.')}</Text>
+    <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
+    {project.lines.some(x=>(x.rateSource||'').includes('Illustrative Los Angeles'))&&<Text style={styles.notice}>{tr('Preliminary 2026 LA market-based model, NOT live supplier prices or a confirmed bid. Verify panel materials, service entrance, utility coordination and breaker type.','Modelo preliminar LA 2026, NO son precios de proveedores en vivo ni oferta confirmada. Verifica materiales, acometida, compañía eléctrica y tipo de breaker.')}</Text>}
     {pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
      {project.trade==='cleaning'&&line.id==='clean-initial'?<View>
       <Text style={styles.label}>{tr("Cleaning price","Precio de limpieza")}</Text>
@@ -544,6 +547,7 @@ export default function App(){
      <Input label={tr("Description in Spanish","Descripción en español")} value={line.description_es} onChangeText={x=>setLine(i,{description_es:x})}/>
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0})}/></View></View>
      <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
+     {!!line.rateSource&&<Text style={styles.hint}>{tr('Price basis','Base del precio')}: {line.rateSource}</Text>}
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
