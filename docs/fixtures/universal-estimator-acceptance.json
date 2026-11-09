@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0",
+  "description": "Backend acceptance cases: expected scope and guardrails, not fake expected market prices. Tests must work through one universal API.",
+  "cases": [
+    {
+      "id": "electrical-panel",
+      "trade": "electrical",
+      "language": "es",
+      "region": "US-CA-LA",
+      "description": "Voy a actualizar el panel de 100 A a 200 A, reconectar 20 circuitos existentes. Un breaker de 100 A solamente; el cableado y conexiones serán otro trabajo. El permiso cuesta $500.",
+      "required_items": [
+        {
+          "id_hint": "panel-upgrade",
+          "quantity": 1,
+          "unit": "job"
+        },
+        {
+          "id_hint": "circuit-transfer",
+          "quantity": 20,
+          "unit": "each"
+        },
+        {
+          "id_hint": "breaker-only",
+          "quantity": 1,
+          "unit": "each"
+        },
+        {
+          "id_hint": "permit",
+          "quantity": 1,
+          "unit": "job",
+          "stated_cost": 500
+        }
+      ],
+      "required_exclusions": [
+        "future 100A wiring and final connections"
+      ],
+      "forbidden_items": [
+        "new 20 branch-circuit home runs",
+        "shower",
+        "painting"
+      ],
+      "must_not_show_final_if_missing_price": true
+    },
+    {
+      "id": "bathroom-remodel",
+      "trade": "remodel",
+      "language": "es",
+      "region": "US-CA-LA",
+      "description": "Baño 5 por 7 pies, quitar la tina e instalar regadera de 3 por 5 con puerta de vidrio. Losa en piso y tres paredes de regadera de 8 pies de alto. Nuevo inodoro en la posición anterior, vanity de 36 pulgadas, espejo con luz y una luz empotrada. Pintar techo y paredes libres.",
+      "required_items": [
+        {
+          "id_hint": "shower",
+          "quantity": 1
+        },
+        {
+          "id_hint": "shower-glass",
+          "quantity": 1
+        },
+        {
+          "id_hint": "floor-tile",
+          "quantity": 35,
+          "unit": "sq_ft"
+        },
+        {
+          "id_hint": "shower-wall-tile",
+          "quantity": 88,
+          "unit": "sq_ft"
+        },
+        {
+          "id_hint": "toilet",
+          "quantity": 1
+        },
+        {
+          "id_hint": "vanity",
+          "quantity": 1
+        },
+        {
+          "id_hint": "lighted-mirror",
+          "quantity": 1
+        },
+        {
+          "id_hint": "recessed-light",
+          "quantity": 1
+        }
+      ],
+      "forbidden_items": [
+        "second shower",
+        "new wall height guessed"
+      ],
+      "must_not_show_final_if_missing_price": true
+    },
+    {
+      "id": "cleaning-postconstruction",
+      "trade": "cleaning",
+      "language": "en",
+      "region": "US-CA-LA",
+      "description": "Post-construction cleaning for a 1500 square-foot house, heavy dust, three bedrooms, two bathrooms, one living room. One-time service. Include floors, fixtures, cabinets, and windows inside.",
+      "required_facts": {
+        "area_sq_ft": 1500,
+        "bedrooms": 3,
+        "bathrooms": 2,
+        "living_rooms": 1,
+        "dust_level": "heavy",
+        "frequency": "once"
+      },
+      "forbidden_items": [
+        "weekly recurring service",
+        "assume dust is light"
+      ],
+      "must_not_show_final_if_missing_price": true
+    },
+    {
+      "id": "concrete-driveway",
+      "trade": "concrete",
+      "language": "en",
+      "region": "US-CA-LA",
+      "description": "Remove and replace 600 square feet of driveway concrete. Thickness and reinforcement not yet confirmed.",
+      "required_facts": {
+        "area_sq_ft": 600
+      },
+      "required_questions": [
+        "thickness",
+        "reinforcement"
+      ],
+      "forbidden_items": [
+        "assumed 4 inch thickness as confirmed",
+        "bathroom shower"
+      ],
+      "must_not_show_final_if_missing_price": true
+    },
+    {
+      "id": "plumbing-waterheater",
+      "trade": "plumbing",
+      "language": "en",
+      "region": "US-CA-LA",
+      "description": "Replace existing water heater and reconnect supply pipes. Heater fuel, capacity and permit requirements not provided.",
+      "required_items": [
+        {
+          "id_hint": "water-heater-replacement",
+          "quantity": 1
+        }
+      ],
+      "required_questions": [
+        "fuel/type",
+        "capacity",
+        "permit requirements"
+      ],
+      "forbidden_items": [
+        "assume gas",
+        "bathroom floor"
+      ],
+      "must_not_show_final_if_missing_price": true
+    },
+    {
+      "id": "permit-only-incomplete",
+      "trade": "electrical",
+      "language": "es",
+      "region": "US-CA-LA",
+      "description": "El permiso del panel de 200A cuesta $500, todavía no he detallado el equipo ni trabajo.",
+      "required_items": [
+        {
+          "id_hint": "permit",
+          "quantity": 1,
+          "stated_cost": 500
+        }
+      ],
+      "required_questions": [
+        "panel equipment and labor scope"
+      ],
+      "forbidden_items": [
+        "assert complete panel price",
+        "pretend 500 USD permit is full project"
+      ],
+      "must_not_show_final_if_missing_price": true
+    }
+  ]
+}
