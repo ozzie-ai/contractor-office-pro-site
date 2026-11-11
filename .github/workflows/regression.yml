@@ -31,5 +31,7 @@ jobs:
         run: node tests/assemblies.test.mjs
       - name: Check the scoped workspace and legacy integration
         run: node tests/workspace-static.test.mjs
+      - name: Browser test of trade scope, pricing and customer proposal
+        run: node tests/workspace-browser.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
