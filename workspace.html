@@ -100,15 +100,17 @@ function paintProfile(){
  const stored=profile;
  $('primaryTrade').value=stored?.primaryTrade||'';
  $('businessName').value=stored?.name||'';
- function drawAdditional(){
+ function drawAdditional(restoreSavedSelections=false){
   const main=$('primaryTrade').value;const area=$('additionalTrades');area.replaceChildren();
   for(const trade of TRADES.filter(x=>x.id!==main)){
     const id=trade.id;
-    area.append(checkBox(nameOf(trade),stored?.enabledTrades?.includes(id)||false,()=>{}));
+    const checked=restoreSavedSelections&&Boolean(stored?.enabledTrades?.includes(id));
+    area.append(checkBox(nameOf(trade),checked,()=>{}));
     area.lastElementChild.dataset.trade=id;
   }
  }
- $('primaryTrade').onchange=drawAdditional;drawAdditional();
+ // Changing the primary business specialty never silently carries the old one.
+ $('primaryTrade').onchange=()=>drawAdditional(false);drawAdditional(true);
  $('capabilities').replaceChildren();
  for(const cap of CAPABILITIES){
   const item=checkBox(nameOf(cap),stored?.capabilities?.includes(cap.id)||false,()=>{});
