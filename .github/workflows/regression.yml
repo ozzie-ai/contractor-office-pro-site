@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'index.html'
+      - 'workspace.html'
       - 'core/**'
       - 'api/**'
       - 'level2.html'
@@ -11,6 +12,7 @@ on:
   pull_request:
     paths:
       - 'index.html'
+      - 'workspace.html'
       - 'core/**'
       - 'tests/**'
 jobs:
@@ -27,5 +29,7 @@ jobs:
         run: node tests/estimate-engine.test.mjs
       - name: Test trade-scoped assemblies and contractor profiles
         run: node tests/assemblies.test.mjs
+      - name: Check the scoped workspace and legacy integration
+        run: node tests/workspace-static.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
