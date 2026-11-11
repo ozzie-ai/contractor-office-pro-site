@@ -25,5 +25,7 @@ jobs:
         run: node tests/run-tests.mjs
       - name: Run shared estimating engine regressions
         run: node tests/estimate-engine.test.mjs
+      - name: Test trade-scoped assemblies and contractor profiles
+        run: node tests/assemblies.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
