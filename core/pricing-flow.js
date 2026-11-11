@@ -86,6 +86,10 @@ function renderOutletForm(parsed){
    field(text('One-time trip + purchasing ($)','Viaje y compra, una sola vez ($)'),input('cop_trip',text('0 if none','0 si no aplica'))),
    field(text('Plates, connectors and incidentals ($)','Tapas, conectores y consumibles ($)'),input('cop_misc',text('0 if none','0 si no aplica')))
  ));
+ const ack=tag('label',{className:'checkrow'}),ackBox=tag('input',{id:'cop_verified',type:'checkbox'});
+ ackBox.style.cssText='width:20px;height:20px';
+ ack.append(ackBox,tag('span',{},text('I checked the exact material types and entered current retailer or invoice prices above.','Verifiqué el tipo de material y escribí los precios actuales de tienda o factura.')));
+ content.append(ack);
  const apply=tag('button',{type:'button',className:'btn wide'},text('Calculate from verified costs','Calcular usando costos verificados'));
  const status=tag('p',{id:'cop_status',className:'status'},text('No final estimate until material prices, labor and the shared trip cost are confirmed.','No se genera precio final hasta confirmar materiales, mano de obra y viaje.'));
  content.append(apply,status);reflectMaterial();
@@ -94,6 +98,7 @@ function renderOutletForm(parsed){
    const gfciCount=gfi.value===''?NaN:Number(gfi.value);
    const scope=cost.finalOutletScope(parsed,{gfciCount,contractorSupplies:supplier.value==='contractor'});
    if(supplier.value==='')throw Error(text('Confirm the supplier.','Confirma quién compra.'));
+   if(scope.contractorSupplies&&!ackBox.checked)throw Error(text('Verify the selected material prices first.','Primero confirma que verificaste los precios del material.'));
    const parsedNum=id=>$(id).value===''?null:Number($(id).value);
    const materials=[],entries=[];
    if(scope.contractorSupplies){
