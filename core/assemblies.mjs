@@ -161,7 +161,11 @@ function measure(key,values) {
   if(key==='slabAreaSf')return n('lengthFt')&&n('widthFt')?Number((n('lengthFt')*n('widthFt')).toFixed(3)):null;
   if(key==='slabPerimeterFt')return n('lengthFt')&&n('widthFt')?2*(n('lengthFt')+n('widthFt')):null;
   if(key==='slabVolumeYd3')return n('lengthFt')&&n('widthFt')&&n('depthIn')?Number((n('lengthFt')*n('widthFt')*n('depthIn')/324).toFixed(3)):null;
-  if(key==='tileOrderSf')return n('floorAreaSf')?Number((n('floorAreaSf')*(1+(Number(values.wastePct)||0)/100)).toFixed(2)):null;
+  if(key==='tileOrderSf'){
+    const waste=values.wastePct;
+    return n('floorAreaSf') && waste!==undefined && waste!==null && String(waste)!=='' && Number.isFinite(Number(waste)) && Number(waste)>=0
+      ?Number((n('floorAreaSf')*(1+Number(waste)/100)).toFixed(2)):null;
+  }
   if(key==='paintGallons')return n('wallAreaSf')&&n('coats')&&n('coverageSfPerGal')?Math.ceil(n('wallAreaSf')*n('coats')/n('coverageSfPerGal')):null;
   return n(key);
 }
@@ -180,7 +184,7 @@ const FIELD_LABELS={
  patioAreaSf:'Outdoor cleaning area (sq ft)',baseboardLf:'Baseboard length (ft)',
  repairAreaSf:'Roof repair area (sq ft)',existingCircuits:'Existing circuits',
  newServiceAmps:'New service rating (A)',devices:'Number of electrical devices',
- excavationYd3:'Excavation to haul (yd3)',coats:'Coats of paint',coverageSfPerGal:'Coverage (sq ft/gallon)'
+ excavationYd3:'Excavation to haul (yd3)',wastePct:'Waste allowance (%)',coats:'Coats of paint',coverageSfPerGal:'Coverage (sq ft/gallon)'
 };
 export const INPUT_LABELS=Object.freeze(FIELD_LABELS);
 export function expandAssembly({profile,assemblyId,values={},choices={}}) {
@@ -192,7 +196,7 @@ export function expandAssembly({profile,assemblyId,values={},choices={}}) {
     slabAreaSf:['lengthFt','widthFt'],slabPerimeterFt:['lengthFt','widthFt'],
     slabVolumeYd3:['lengthFt','widthFt','depthIn'],
     paintGallons:['wallAreaSf','coats','coverageSfPerGal'],
-    tileOrderSf:['floorAreaSf']
+    tileOrderSf:['floorAreaSf','wastePct']
   };
   for(const item of assembly.tasks) {
     const isOptional=item.mode==='opt_in';
@@ -206,7 +210,7 @@ export function expandAssembly({profile,assemblyId,values={},choices={}}) {
     const quantity=measure(item.measure,values);
     if(quantity===null) {
       for(const field of requiredInputs[item.measure]||[item.measure]) {
-        if(positive(Number(values[field])))continue;
+        if(field==='wastePct' ? (values[field]!==undefined && values[field]!==null && String(values[field])!=='' && Number.isFinite(Number(values[field])) && Number(values[field])>=0) : positive(Number(values[field])))continue;
         missingFields.add(field);
         questions.push({id:field,taskId:item.id,question:'Confirm '+(FIELD_LABELS[field]||field),reason:'missing_measurement'});
       }
@@ -218,9 +222,6 @@ export function expandAssembly({profile,assemblyId,values={},choices={}}) {
   }
   const uniqueQuestions=unique(questions.map(x=>x.id)).map(id=>questions.find(x=>x.id===id));
   if(assembly.id==='panel_upgrade' && !positive(Number(values.newServiceAmps)))uniqueQuestions.push({id:'newServiceAmps',question:'Confirm new service rating (A)',reason:'missing_specification'});
-  if(assembly.id==='room_painting'&&(!positive(Number(values.coats))||!positive(Number(values.coverageSfPerGal)))){
-    for(const id of ['coats','coverageSfPerGal'])if(!positive(Number(values[id])))uniqueQuestions.push({id,question:'Confirm '+FIELD_LABELS[id],reason:'missing_specification'});
-  }
   if(assembly.id==='concrete_slab')futureWork.push('Confirm reinforcement, mix, access and soil/base specification before final quote.');
   if(assembly.id==='panel_upgrade')futureWork.push('Verify load calculation, compatibility, service coordination, permits and code compliance before quoting.');
   if(assembly.id==='roof_patch')futureWork.push('Confirm roof material, access and concealed damage limits before quoting.');
