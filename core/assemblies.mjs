@@ -91,10 +91,10 @@ export const ASSEMBLIES=Object.freeze([
   {id:'floor_tile',trade:'flooring',en:'Install floor tile',es:'Instalar piso de loseta',keywords:/floor|piso|tile|loseta|porcelanato/i,
    facts:['floorAreaSf'],tasks:[
     t('tile_surface_prep','flooring','Preparation','Assess and prepare substrate','Revisar y preparar superficie','sf','labor','floorAreaSf'),
+    t('remove_old_floor','flooring','Optional','Remove existing flooring','Retirar piso existente','sf','labor','floorAreaSf',{condition:'removeExisting',mode:'opt_in'}),
     t('tile_material','flooring','Materials','Tile including planned waste','Loseta con desperdicio previsto','sf','material','tileOrderSf'),
     t('tile_setting_material','flooring','Materials','Thinset, grout and setting accessories','Adhesivo, boquilla y accesorios','sf','material','floorAreaSf'),
     t('tile_install','flooring','Installation','Set, grout and clean tile','Instalar, emboquillar y limpiar loseta','sf','labor','floorAreaSf'),
-    t('remove_old_floor','flooring','Optional','Remove existing flooring','Retirar piso existente','sf','labor','floorAreaSf',{condition:'removeExisting',mode:'opt_in'}),
     t('install_baseboard','flooring','Optional','Install baseboard','Instalar zócalo','lf','labor','baseboardLf',{condition:'baseboard',mode:'opt_in'})
   ]},
   {id:'roof_patch',trade:'roofing',en:'Localized roof repair',es:'Reparación localizada de techo',keywords:/roof|techo|gotera|leak|shingle|teja/i,
@@ -188,6 +188,12 @@ export function expandAssembly({profile,assemblyId,values={},choices={}}) {
   if(!assembly)throw new Error('Unknown assembly');
   if(!availableAssemblies(profile).some(x=>x.id===assemblyId))throw new Error('Assembly not available to this trade profile');
   const tasks=[],exclusions=[],questions=[],futureWork=[],missingFields=new Set();
+  const requiredInputs={
+    slabAreaSf:['lengthFt','widthFt'],slabPerimeterFt:['lengthFt','widthFt'],
+    slabVolumeYd3:['lengthFt','widthFt','depthIn'],
+    paintGallons:['wallAreaSf','coats','coverageSfPerGal'],
+    tileOrderSf:['floorAreaSf']
+  };
   for(const item of assembly.tasks) {
     const isOptional=item.mode==='opt_in';
     const selected=isOptional?choices[item.condition]===true:true;
@@ -199,8 +205,11 @@ export function expandAssembly({profile,assemblyId,values={},choices={}}) {
     }
     const quantity=measure(item.measure,values);
     if(quantity===null) {
-      missingFields.add(item.measure);
-      questions.push({id:item.measure,taskId:item.id,question:'Confirm '+(FIELD_LABELS[item.measure]||item.measure),reason:'missing_measurement'});
+      for(const field of requiredInputs[item.measure]||[item.measure]) {
+        if(positive(Number(values[field])))continue;
+        missingFields.add(field);
+        questions.push({id:field,taskId:item.id,question:'Confirm '+(FIELD_LABELS[field]||field),reason:'missing_measurement'});
+      }
     }
     const included={code:item.id,trade:item.trade,phase:item.phase,description_en:item.en,description_es:item.es,
       quantity,unit:item.unit,costType:item.costType,status:quantity===null?'allowance_to_confirm':'included_now',
