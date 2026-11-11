@@ -34,8 +34,8 @@ function parseOutletRequest(raw){
  const subset=text.match(new RegExp('\\b'+numRE+'\\s+(?:de\\s+ellos?|of\\s+them|ser[aá]n|van\\s+a\\s+ser)[\\s\\S]{0,45}?(?:gfci|gfi|g\\s*f\\s*c\\s*i|10\\s+si\\s+hay)','i'))
   ||text.match(new RegExp('\\b'+numRE+'\\s*(?:gfci|gfi|g\\s*f\\s*c\\s*i)','i'));
  const specialtyCount=subset?numberToken(subset[1]):null;
- const contractorSupplies=/(?:yo\\s+(?:voy\\s+a\\s+)?(?:poner|comprar|suministrar)[\\s\\S]{0,25}?(?:material|materials?)|contratista[\\s\\S]{0,30}?(?:material|suministra)|(?:i|we)\\s+(?:will\\s+)?(?:supply|provide|buy)\\s+(?:the\\s+)?materials?|contractor\\s+suppl)/i.test(text);
- const ownerSupplies=/(?:cliente|due[nñ]o|owner|homeowner)[\\s\\S]{0,30}?(?:pone|compra|suministra|provides?|suppl)/i.test(text);
+ const contractorSupplies=/(?:yo\s+(?:voy\s+a\s+)?(?:poner|comprar|suministrar)[\s\S]{0,30}?(?:material|materials?)|contratista[\s\S]{0,30}?(?:material|suministra)|(?:i|we)\s+(?:will\s+)?(?:supply|provide|buy)\s+(?:the\s+)?materials?|contractor\s+suppl)/i.test(text);
+ const ownerSupplies=/(?:cliente|due[nñ]o|owner|homeowner)[\s\S]{0,30}?(?:pone|compra|suministra|provides?|suppl)/i.test(text);
  const questions=[];
  if(replace&&!(total>0))questions.push('total_outlets');
  if(hasGfci&&specialtyCount===null)questions.push('gfci_count');
