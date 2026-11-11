@@ -232,7 +232,7 @@ function updatePricing(){
  if(!plan)return;
  const overhead=$('overhead').value,profit=$('profit').value;
  if(overhead!=='')write(overheadKey,overhead);if(profit!=='')write(profitKey,profit);
- const validMarkup=overhead!==''&&profit!==''&&Number(overhead)>=0&&Number(profit)>=0;
+ const validMarkup=overhead!==''&&profit!==''&&Number.isFinite(Number(overhead))&&Number.isFinite(Number(profit))&&Number(overhead)>=0&&Number(profit)>=0&&Number(overhead)<=100&&Number(profit)<=100;
  const current=priceEstimate(toEstimatingJob(plan),rates,{overheadRate:validMarkup?Number(overhead)/100:0,profitRate:validMarkup?Number(profit)/100:0});
  prices=current;
  const parts=['material','labor','equipment','fee','subcontract'].map(k=>k+': '+(current.totals[k]===null?'pending':money(current.totals[k])));
