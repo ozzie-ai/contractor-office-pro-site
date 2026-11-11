@@ -150,7 +150,7 @@ function renderGenericResearch(){
   check.onclick=()=>{
    if(!source.value){message.textContent=text('Choose the store or invoice source.','Selecciona tienda o fuente de factura.');return}
    if(!(Number(item.rate)>0)){message.textContent=text('Enter the verified unit price in the estimate table first.','Primero escribe el costo unitario verificado en la tabla.');return}
-   pricingEvidence.set(index,{retailer:source.value,checkedOn:actualCheckDate(),unitCost:Number(item.rate)});
+   pricingEvidence.set(index,{retailer:source.value,checkedOn:actualCheckDate(),unitCost:Number(item.rate),description:item.description});
    message.textContent=text('Verified source recorded.','Fuente verificada guardada.');
   };
   wrap.append(r);
@@ -201,7 +201,15 @@ suggestedItems=function(){
 const previousNext=$('next4').onclick;
 $('next4').onclick=function(){
  if(activeOutlet&&!confirmedOutlet){alert(text('Confirm one-visit costs before preparing a proposal.','Confirma los costos de la visita antes de preparar la propuesta.'));detail.open=true;return}
- // The original app remains available, but sample prices may not be described as store-verified.
+ if(!activeOutlet){
+  const missing=estimateItems.map((item,index)=>({item,index})).filter(({item})=>isMaterial(item)&&Number(item.quantity)>0)
+    .filter(({item,index})=>{const e=pricingEvidence.get(index);return !e||e.description!==item.description||e.unitCost!==Number(item.rate)});
+  if(missing.length){
+   general.hidden=false;general.open=true;
+   alert(text('Confirm the material unit prices for '+missing.length+' item(s) using a retailer or actual invoice before preparing a proposal.','Confirma los precios unitarios de '+missing.length+' materiales con tienda o factura real antes de preparar la propuesta.'));
+   return;
+  }
+ }
  return previousNext.call(this);
 };
 const previousRender=render;
