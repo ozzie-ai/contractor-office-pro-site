@@ -275,7 +275,7 @@ function inferTradeQty(row){
  const d=notes.toLowerCase(),name=row[1];
  const keyword=/GFCI/i.test(name)?'(?:gfci|gfi)':/outlet|receptacle/i.test(name)?'(?:enchufes?|outlets?|tomacorrientes?)':/Light switch/i.test(name)?'(?:apagadores?|dimmers?|interruptores?|switches?)':/Ceiling fan/i.test(name)?'(?:ventiladores?|fans?)':/damaged breaker/i.test(name)?'(?:breakers?|interruptores?)':/Light fixture/i.test(name)?'(?:luminarias?|l[aá]mparas?|fixtures?)':/Dedicated appliance/i.test(name)?'(?:circuitos?|circuits?)':null;
  if(keyword){
-  const match=d.match(new RegExp('\\b(\\d+|un|uno|una|dos|tres|cuatro|cinco|two|three|four|five|one)\\s+'+keyword,'i'));
+  const match=d.match(new RegExp('\\b(\\d+|un|uno|una|dos|tres|cuatro|cinco|two|three|four|five|one)\\s+(?:(?:damaged|old|new|existing|da[nñ]ad[oa]s?|viejos?|nuevos?|existentes?)\\s+){0,2}'+keyword,'i'));
   if(match){const n={un:1,uno:1,una:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5}[match[1]]||Number(match[1]);if(n>0)return n}
  }
  const run=d.match(/(\d+(?:[.,]\d+)?)\s*(?:pies|ft|feet)\s*(?:de\s+)?(?:cable|alambre|conduit|tuber[ií]a|wiring|wire)/i);
