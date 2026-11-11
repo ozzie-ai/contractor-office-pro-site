@@ -170,7 +170,7 @@ function inferFacts(id,notes){
  }
  return result;
 }
-const optionRequested=(condition,notes)=>{
+const optionRequested=(condition,notes,{ignoreNegation=false}={})=>{
  const match={
  patchWall:/\b(?:patch|repair|fix)\s+(?:the\s+)?(?:drywall|wall)|resanar\s+(?:la\s+)?pared|reparar\s+(?:la\s+)?pared/i,
  patchStucco:/\b(?:patch|repair)\s+stucco|resanar\s+(?:el\s+)?estuco/i,
@@ -185,6 +185,7 @@ const optionRequested=(condition,notes)=>{
  contractorSupplies:/\b(?:contractor\s+supplies|materials?\s+included|materiales?\s+incluidos)\b/i
  }[condition];
  if(!match||!match.test(notes))return false;
+ if(ignoreNegation)return true;
  const negate=/\b(?:don't|do not|no(?:\s+voy\s+a|\s+vamos\s+a)?|sin|without|exclude|excluye|not)\s+(?:[a-záéíóúñ]+\s+){0,4}(?:patch|repair|paint|pintar|reparar|resanar|insulation|aislamiento|pet\s+waste|dog\s+poop|pop[oó])\b/i;
  return !negate.test(notes);
 };
@@ -217,7 +218,7 @@ function renderScope(){
  const capabilitySet=new Set(profile.capabilities);
  for(const task of selected.tasks.filter(t=>t.mode==='opt_in')){
    if(task.capability&&!capabilitySet.has(task.capability)&&!profile.enabledTrades.includes(task.trade)){
-     if(optionRequested(task.condition,notes))choices[task.condition]=true; // visible exclusion, never charged
+     if(optionRequested(task.condition,notes,{ignoreNegation:true}))choices[task.condition]=true; // explicitly mentioned but outside scope -> excluded, never charged
      continue;
    }
    const wanted=optionRequested(task.condition,notes);choices[task.condition]=wanted;
