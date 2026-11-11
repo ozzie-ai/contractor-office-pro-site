@@ -1410,4 +1410,7 @@ const originalReset=resetProject;
 resetProject=function(){originalReset();visitFiles.splice(0);addVisitFiles([]);$('visitMode').value='contractor';$('customerConsent').checked=false;$('permissionPanel').classList.add('hidden')};
 try{const preferred=new URLSearchParams(location.search).get('lang')||sessionStorage.getItem('cop-language');if(preferred==='es'||preferred==='en'){lang=preferred;$('voiceLocale').value=lang==='es'?'es-MX':'en-US'}}catch(e){}
 render();
-</script></body></html>
+</script>
+<script src="./core/job-pricing.js"></script>
+<script src="./core/pricing-flow.js"></script>
+</body></html>
