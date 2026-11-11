@@ -127,6 +127,7 @@ function renderAssemblies(){
  $('assembly').replaceChildren(selectOption('',lang==='es'?'Selecciona trabajo':'Choose a job'));
  for(const a of choices)$('assembly').add(selectOption(a.id,nameOf(a)));
  selectedAssembly=null;
+ $('jobStatus').textContent=choices.length?'':(lang==='es'?'Para remodelación, selecciona los oficios que ofreces en tu perfil. Aún no existe un ensamblaje general.':'For remodeling, select the specific trades you provide in your profile. No general assembly is available yet.');
 }
 $('saveProfile').onclick=()=>{
  try{
@@ -182,7 +183,7 @@ const optionRequested=(condition,notes)=>{
  contractorSupplies:/\b(?:contractor\s+supplies|materials?\s+included|materiales?\s+incluidos)\b/i
  }[condition];
  if(!match||!match.test(notes))return false;
- const negate=/\b(?:no|sin|without|exclude|excluye|not)\s+(?:[a-záéíóúñ]+\s+){0,3}(?:patch|repair|paint|pintar|reparar|resanar|insulation|aislamiento|pet\s+waste|pop[oó])\b/i;
+ const negate=/\b(?:don't|do not|no(?:\s+voy\s+a|\s+vamos\s+a)?|sin|without|exclude|excluye|not)\s+(?:[a-záéíóúñ]+\s+){0,4}(?:patch|repair|paint|pintar|reparar|resanar|insulation|aislamiento|pet\s+waste|dog\s+poop|pop[oó])\b/i;
  return !negate.test(notes);
 };
 const extra={
