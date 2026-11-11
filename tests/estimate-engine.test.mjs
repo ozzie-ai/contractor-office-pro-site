@@ -83,3 +83,11 @@ test('MIXED: original 20 circuits retained when spoken after breakers', () => {
   assert.equal(p.attributes.futureAmps,null);
 });
 console.log('PASS all new backend core regression cases');
+
+test('UNKNOWN QUANTITY: priced allowance with no quantity is incomplete', () => {
+  const j=createJob({trade:'painting',tasks:[{code:'paint',description_en:'Paint',quantity:null,unit:'gal',costType:'material',status:'allowance_to_confirm'}]});
+  const r=priceEstimate(j,{paint:40});
+  assert.deepEqual(r.missingQuantities,['paint']);
+  assert.equal(r.totals.total,null);
+  assert.equal(r.proposal.status,'draft_review_required');
+});
