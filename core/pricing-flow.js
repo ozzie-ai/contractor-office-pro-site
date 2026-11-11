@@ -140,7 +140,7 @@ function renderGenericResearch(){
  general.hidden=false;
  wrap.append(tag('p',{className:'help'},text('Open Home Depot or Lowe’s for each material, choose the exact product and enter its verified unit price in your existing estimate table. No real-time product feed is connected yet.','Consulta Home Depot o Lowe’s para cada material, elige el producto correcto y escribe el costo unitario verificado en la tabla del estimado. Todavía no hay conexión automática de precios.')));
  const matches=estimateItems.map((item,index)=>({item,index})).filter(({item})=>isMaterial(item));
- if(!matches.length){wrap.append(tag('p',{className:'help'},text('No separately identified materials. Confirm whether supplies are included in any combined work items.','No se encontraron materiales separados. Confirma si hay materiales incluidos en partidas combinadas.')));return}
+ if(!matches.length)wrap.append(tag('p',{className:'help'},text('No separately identified materials. Confirm whether supplies are included in any combined work items.','No se encontraron materiales separados. Confirma si hay materiales incluidos en partidas combinadas.')));
  for(const {item,index} of matches){
   const r=tag('div',{className:'field'});r.style.cssText='padding-bottom:10px;border-bottom:1px solid #ddd';
   r.append(tag('strong',{},item.description+' · '+item.quantity+' '+(item.unit||'ea')),searchLinks(item.description));
@@ -154,6 +154,33 @@ function renderGenericResearch(){
    message.textContent=text('Verified source recorded.','Fuente verificada guardada.');
   };
   wrap.append(r);
+ }
+ const laborRows=estimateItems.filter(x=>/(?:labor|mano de obra)/i.test(x.description||'')&&!/(?:material|supplies)/i.test(x.description||''));
+ if(laborRows.length){
+  const box=tag('details',{className:'panel'});box.style.boxShadow='none';
+  const summary=tag('summary',{},text('Optional: price labor as ONE job visit','Opcional: calcular mano de obra como UNA visita'));
+  summary.style.cursor='pointer';summary.style.fontWeight='700';box.append(summary);
+  box.append(tag('p',{className:'help'},text('For one-trade visits, replace the explicitly labeled labor lines with total job hours and one trip cost. Review combined task rates separately.','Para trabajos de un oficio, reemplaza partidas de mano de obra por horas totales y un solo viaje. Revisa aparte cualquier partida combinada.')));
+  const hours=input('cop_job_hours',text('Total hours','Horas totales'));
+  const rate=input('cop_job_rate',text('Actual hourly labor cost','Costo real por hora'));
+  const trip=input('cop_job_trip',text('One trip/purchasing cost','Costo de un viaje y compra'));
+  const form=row(field(text('Total labor hours','Horas totales de mano de obra'),hours),
+    field(text('Loaded labor cost per hour ($)','Costo completo por hora ($)'),rate),
+    field(text('Travel/purchasing ONCE ($)','Viaje y compra UNA vez ($)'),trip));
+  const apply=tag('button',{type:'button',className:'btn secondary'},text('Use one-visit labor cost','Usar costo de una visita'));
+  const status=tag('p',{className:'status'},'');
+  box.append(form,apply,status);
+  apply.onclick=()=>{
+   const nums=[hours.value,rate.value,trip.value].map(v=>v===''?NaN:Number(v));
+   if(nums.some(v=>!Number.isFinite(v)||v<0)){status.textContent=text('Enter confirmed hours, hourly cost and one trip allowance (zero allowed).','Confirma horas, costo por hora y un viaje (puede ser cero).');return}
+   const [h,r,t]=nums;
+   estimateItems=estimateItems.filter(x=>!laborRows.includes(x)&&x.copSharedLabor!==true);
+   estimateItems.push({description:text('Total job labor — one visit','Mano de obra total — una visita'),quantity:1,unit:'job',rate:Math.round(h*r*100)/100,copSharedLabor:true});
+   estimateItems.push({description:text('Travel and purchasing — once','Viaje y compra — una vez'),quantity:1,unit:'job',rate:t,copSharedLabor:true});
+   renderItems();buildCustomerScope();calculateTakeoff();
+   status.textContent=text('Replaced '+laborRows.length+' labor rows with a single visit calculation. Review the estimate for any combined labor/material rows.','Se reemplazaron '+laborRows.length+' partidas de mano de obra por una visita. Revisa que no quede duplicada mano de obra en otras partidas.');
+  };
+  wrap.append(box);
  }
 }
 const previousSuggestedItems=suggestedItems;
