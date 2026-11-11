@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'index.html'
+      - 'core/**'
       - 'api/**'
       - 'level2.html'
       - 'tests/**'
@@ -10,6 +11,7 @@ on:
   pull_request:
     paths:
       - 'index.html'
+      - 'core/**'
       - 'tests/**'
 jobs:
   test:
@@ -21,5 +23,7 @@ jobs:
           node-version: '22'
       - name: Run electrical regression cases
         run: node tests/run-tests.mjs
+      - name: Run shared estimating engine regressions
+        run: node tests/estimate-engine.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
