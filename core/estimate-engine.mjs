@@ -103,27 +103,29 @@ export function priceEstimate(job, priceCatalog = {}, { overheadRate = 0, profit
     const catalogValue = priceCatalog[t.code];
     const unitCost = t.fixedPrice !== undefined ? t.fixedPrice : (numeric(catalogValue) ? catalogValue : null);
     const mustPrice = t.priceRequired !== false && t.costType !== 'scope';
+    const missingQuantity = !numeric(t.quantity) || t.quantity <= 0;
     if (unitCost !== null && (!numeric(unitCost) || unitCost < 0)) throw new Error('invalid_price_'+t.code);
-    const extendedCost = unitCost === null ? null : money(t.quantity * unitCost);
-    return { ...t, unitCost, extendedCost, missingPrice: mustPrice && unitCost === null };
+    const extendedCost = unitCost === null || missingQuantity ? null : money(t.quantity * unitCost);
+    return { ...t, unitCost, extendedCost, missingPrice: mustPrice && unitCost === null, missingQuantity };
   });
   const missingPrices = items.filter(t => t.missingPrice).map(t => t.code);
+  const missingQuantities = items.filter(t => t.missingQuantity).map(t => t.code);
   const categoryTotals = Object.fromEntries(['material','labor','equipment','fee','subcontract'].map(k => [k, null]));
   for (const category of Object.keys(categoryTotals)) {
     const group = items.filter(x => x.costType === category && x.priceRequired !== false);
     categoryTotals[category] = group.some(x => x.extendedCost === null) ? null : money(group.reduce((a, x) => a + x.extendedCost, 0));
   }
-  const complete = missingPrices.length === 0;
+  const complete = missingPrices.length === 0 && missingQuantities.length === 0;
   const baseCost = complete ? money(items.reduce((sum, t) => sum + (t.extendedCost ?? 0), 0)) : null;
   const overhead = complete ? money(baseCost * overheadRate) : null;
   const profit = complete ? money((baseCost + overhead) * profitRate) : null;
   const total = complete ? money(baseCost + overhead + profit) : null;
-  const blockers = [...missingPrices.map(code => 'Price missing: '+code), ...job.unknownDetails];
+  const blockers = [...missingPrices.map(code => 'Price missing: '+code), ...missingQuantities.map(code => 'Quantity missing: '+code), ...job.unknownDetails];
   const takeoff = items.filter(t => t.costType === 'material').map(t => ({code: t.code, description_en: t.description_en, quantity: t.quantity, unit: t.unit}));
   const proposal = { trade: job.trade, kind: job.kind,
     scope: items.map(({description_en, quantity, unit, status}) => ({description_en, quantity, unit, status})),
     excludedWork: [...job.excludedWork], futureWork: [...job.futureWork],
     total: blockers.length ? null : total, status: blockers.length ? 'draft_review_required' : 'priced_draft' };
   return { items, takeoff, totals: { ...categoryTotals, baseCost, overhead, profit, total },
-    missingPrices, blockers, readyForReview: blockers.length === 0, proposal };
+    missingPrices, missingQuantities, blockers, readyForReview: blockers.length === 0, proposal };
 }
