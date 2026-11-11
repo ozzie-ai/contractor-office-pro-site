@@ -16,7 +16,7 @@ const server=http.createServer((req,res)=>{
   const file=resolve(root,'.'+p);
   if(!file.startsWith(root)){res.writeHead(403);res.end();return}
   let bytes=readFileSync(file);
-  if(p==='/index.html')bytes=Buffer.from(html.replace('</body>',injected+'</body>'));
+  if(p==='/index.html')bytes=Buffer.from(html.replace(/<\/body>\s*<\/html>\s*$/,injected+'</body></html>'));
   res.writeHead(200,{'Content-Type':extname(file)==='.js'?'text/javascript; charset=utf-8':'text/html; charset=utf-8'});
   res.end(bytes);
  }catch{res.writeHead(404);res.end()}
