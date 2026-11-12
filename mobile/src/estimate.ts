@@ -51,6 +51,19 @@ export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
  * This prevents a $0 shower-wall-tile line from silently understating the total.
  * Preliminary rates still require contractor review.
  */
+export type CostEvidenceKind='cached_retail_reference'|'planning_allowance'|'contractor_entered';
+export function itemCostEvidence(line:EstimateLine):{kind:CostEvidenceKind;merchant?:string;observedOn?:string;detail?:string}{
+ if(line.priceEvidence)return line.priceEvidence;
+ if(/contractor.entered|ingresada por contratista/i.test(line.rateSource||''))
+  return {kind:'contractor_entered',detail:line.rateSource};
+ return {kind:'planning_allowance',detail:line.rateSource||'No supplier reference recorded'};
+}
+export function priceEvidenceSummary(lines:EstimateLine[]){
+ return lines.filter(x=>x.quantity>0&&x.rate>0).reduce((counts,line)=>{
+  counts[itemCostEvidence(line).kind]++;
+  return counts;
+ },{cached_retail_reference:0,planning_allowance:0,contractor_entered:0});
+}
 export function estimationScopeIssues(p:Pick<Project,'unknowns'>):string[]{
  return [...new Set((p.unknowns||[]).filter(message=>
   /(?:not measured|no dimensions|dimensions not recognized|missing (?:quantity|area|dimensions|measurement)|falta(?:n)? (?:medidas|cantidad|area)|sin medidas|not included in priced quantities)/i.test(message)))];
