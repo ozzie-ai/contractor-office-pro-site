@@ -178,6 +178,12 @@ function parseBathroomFaucets(text,lines,questions,opts,now){
  if(!/(?:faucet|grifo|griferia|llave\s+de\s+lavamanos)/.test(text))return;
  if(/(?:kitchen|cocina|fregadero|shower|ducha|tina|bathtub)/.test(text))return;
  if(!/(?:bathroom|lavamanos|bano|bath|4\s*(?:in|inch|pulgadas?)|centerset)/.test(text))return;
+ if(/\b(?:8\s*(?:in|inch|pulgadas?)|widespread|ocho\s+pulgadas)\b/.test(text)){
+  questions.push({code:'faucet_mount',message:'8-inch/widespread faucet is not priced by the 4-inch centerset reference'});return;
+ }
+ if(/(?:customer|owner|homeowner|cliente|dueno)[\s\S]{0,30}?(?:supplies?|provides?|pone|compra|suministra)[\s\S]{0,18}?(?:faucets?|fixtures?|grifos?|griferia|materials?|materiales?)/.test(text)){
+  questions.push({code:'customer_supplied_fixture',message:'Customer supplies the faucet; do not include a material charge'});return;
+ }
  const n=numUnit(text,'(?:bathroom\\s+)?(?:faucets?|grifos?|llaves?)');
  const options={...opts};
  if(!options['bathroom-faucet-4in']&&/(?:2\\s*handle|two\\s*handle|dos\\s*manijas|doble\\s*manija)/.test(text))
