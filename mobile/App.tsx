@@ -14,7 +14,7 @@ import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
-import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary} from './src/estimate';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -374,6 +374,7 @@ export default function App(){
  const panelMentioned=project.trade==='electrical'&&/\b(panel|tablero|load center|200\s*(?:a|amp)|circuitos?|circuits?)\b/i.test(project.description);
  const missingElectricalScope=panelMentioned&&project.lines.some(x=>x.id==='local-permit')&&!project.lines.some(x=>x.id==='local-panel-upgrade'||x.id==='local-existing-circuits');
  const scopeIssues=estimationScopeIssues(pricedProject);
+ const sourceSummary=priceEvidenceSummary(pricedProject.lines);
  const pdfReady=readiness.ready&&cleaningInputsReady&&!missingElectricalScope&&!scopeIssues.length;
  return <KeyboardAvoidingView style={{flex:1,backgroundColor:PALETTE.background}} behavior={Platform.OS==='ios'?'padding':undefined}>
   <StatusBar style="dark"/>
@@ -547,13 +548,14 @@ export default function App(){
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}
-    {project.lines.some(x=>x.priceEvidence||x.rateSource)&&<View style={styles.lineCard}>
+    {project.lines.some(x=>x.quantity>0&&x.rate>0)&&<View style={styles.lineCard}>
       <Text style={styles.h2}>{tr('Material price references — contractor only','Referencias de precios — solo contratista')}</Text>
-      {project.lines.filter(x=>x.priceEvidence).map(item=><Text key={'source-'+item.id} style={styles.hint}>
+      <Text style={styles.hint}>{sourceSummary.cached_retail_reference} {tr('dated store references','referencias de tienda con fecha')} · {sourceSummary.contractor_entered} {tr('contractor-entered','ingresados por contratista')} · {sourceSummary.planning_allowance} {tr('unverified allowances','provisiones sin verificar')}</Text>
+      {(project.trade!=='painting'||paintingDetailsOpen)&&project.lines.filter(x=>x.quantity>0&&x.rate>0).map(item=><Text key={'source-'+item.id} style={styles.hint}>
         {(businessProfile.language==='es'?item.description_es:item.description_en)+': '+(
-          item.priceEvidence?.kind==='cached_retail_reference'
-            ?tr('Saved retailer example','Ejemplo guardado de tienda')+' · '+(item.priceEvidence.merchant||'')+' · '+(item.priceEvidence.observedOn||'')
-            :item.priceEvidence?.kind==='contractor_entered'?tr('Contractor-entered','Ingresado por contratista'):
+          itemCostEvidence(item).kind==='cached_retail_reference'
+            ?tr('Saved retailer example','Ejemplo guardado de tienda')+' · '+(itemCostEvidence(item).merchant||'')+' · '+(itemCostEvidence(item).observedOn||'')
+            :itemCostEvidence(item).kind==='contractor_entered'?tr('Contractor-entered','Ingresado por contratista'):
              tr('Unverified planning allowance','Provisión preliminar sin verificar'))}
       </Text>)}
       <Text style={styles.hint}>{tr('The app never treats an assumed allowance as a verified live store price.','La aplicación nunca presenta una provisión supuesta como precio de tienda verificado en vivo.')}</Text>
@@ -606,13 +608,25 @@ export default function App(){
       <Action title={tr('Include living room and recalculate','Agregar sala y recalcular')} disabled={!(Number(livingLength)>0&&Number(livingWidth)>0&&Number(livingLength)<=50&&Number(livingWidth)<=50)} onPress={()=>{
         const measurements={...project.paintingMeasurements,livingLengthFt:Number(livingLength),livingWidthFt:Number(livingWidth),excludeLivingRoom:false};
         const result=localEstimate(project.description,project.trade,measurements);
-        patch({paintingMeasurements:measurements,lines:result.lines,unknowns:result.unknowns});
+        const previous=new Map(project.lines.map(x=>[x.id,x]));
+        const merged=result.lines.map(x=>{
+          const saved=previous.get(x.id);
+          return saved&&itemCostEvidence(saved).kind==='contractor_entered'?
+           {...x,rate:saved.rate,rateSource:saved.rateSource,priceEvidence:saved.priceEvidence}:x;
+        });
+        patch({paintingMeasurements:measurements,lines:merged,unknowns:result.unknowns});
         setInfo(tr('Living room included. Totals recalculated.','Se incluyó la sala y se recalcularon los totales.'));
       }}/>
       <Action secondary title={tr('Exclude living room from this proposal','Excluir la sala de esta propuesta')} onPress={()=>{
         const measurements={...project.paintingMeasurements,excludeLivingRoom:true};
         const result=localEstimate(project.description,project.trade,measurements);
-        patch({paintingMeasurements:measurements,lines:result.lines,unknowns:result.unknowns,
+        const previous=new Map(project.lines.map(x=>[x.id,x]));
+        const merged=result.lines.map(x=>{
+          const saved=previous.get(x.id);
+          return saved&&itemCostEvidence(saved).kind==='contractor_entered'?
+            {...x,rate:saved.rate,rateSource:saved.rateSource,priceEvidence:saved.priceEvidence}:x;
+        });
+        patch({paintingMeasurements:measurements,lines:merged,unknowns:result.unknowns,
           exclusions:[...project.exclusions.filter(x=>!x.startsWith('Living room / Sala:')),'Living room / Sala: painting excluded (measurements not supplied).']});
       }}/>
     </View>}
