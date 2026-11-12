@@ -66,7 +66,7 @@ export function priceEvidenceSummary(lines:EstimateLine[]){
 }
 export function estimationScopeIssues(p:Pick<Project,'unknowns'>):string[]{
  return [...new Set((p.unknowns||[]).filter(message=>
-  /(?:not measured|no dimensions|dimensions not recognized|missing (?:quantity|area|dimensions|measurement)|falta(?:n)? (?:medidas|cantidad|area)|sin medidas|not included in priced quantities)/i.test(message)))];
+  /(?:not measured|no dimensions|dimensions not recognized|missing (?:quantity|area|dimensions|measurement)|falta(?:n)? (?:medidas|cantidad|area)|sin medidas|not included in priced quantities|confirm (?:shower )?dimensions|requires (?:shower|wall|room|ceiling|floor) (?:length|width|height|area)|requires shower length|count was not dictated|confirm number of)/i.test(message)))];
 }
 export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues:string[]}{
  const issues:string[]=[];
