@@ -83,10 +83,31 @@ function applyCachedMaterials(){
   'Materiales calculados con precios guardados (no precios en vivo). Completa la mano de obra y revisa las cantidades antes de cotizar.'
  )+(questions.length?' '+questions.join(' • '):'');
 }
+const paintInput=$('pPaintRate');
+if(paintInput)paintInput.addEventListener('input',()=>{paintInput.dataset.userEdited='true'});
+function prefillPainter(){
+ if(!paintingActive||!paintInput||paintInput.dataset.userEdited==='true')return null;
+ const r=book.fromTranscript($('description').value,{now:today()});
+ const material=r.lines.find(x=>x.id==='interior-paint-1gal'&&tradeAllowed(x));
+ if(!material||!(material.unitCost>0)||paintInput.value!=='45')return null;
+ paintInput.value=String(material.unitCost);
+ return material;
+}
+function registerPaintReference(reference){
+ if(!reference)return;
+ const index=estimateItems.findIndex(x=>/wall paint|pintura de muros/i.test(x.description||'')&&/material/i.test(x.description||'')&&Number(x.rate)===reference.unitCost);
+ if(index>=0){
+  recordRetail(index,reference);
+  if(typeof window.COPRefreshRetailReferences==='function')window.COPRefreshRetailReferences();
+  $('estimateHint').textContent+=' '+localText('Paint unit price prefilled from dated Home Depot reference; adjust if needed.','Precio de pintura calculado con referencia guardada de Home Depot; ajusta si hace falta.');
+ }
+}
 const previous=suggestedItems;
 suggestedItems=function(){
  currentDraft=null;
+ const paintReference=prefillPainter();
  previous.apply(this,arguments);
+ registerPaintReference(paintReference);
  if(!$('copCostPanel')?.hidden){
   fillOutletCache();
   return;
