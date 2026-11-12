@@ -1,4 +1,5 @@
 import {EstimateLine,Trade} from './estimate';
+import {mobilePaintingEstimate} from './paintingEstimate';
 type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean};
 type Dim={a:number;b:number;index:number;end:number};
 const has=(s:string,re:RegExp)=>re.test(s);
@@ -21,6 +22,11 @@ const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuart
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
 export function localEstimate(description:string,_trade:Trade):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
+ if(_trade==='painting'){
+  const painting=mobilePaintingEstimate(description);
+  if(painting)return painting;
+ }
+
  // Electrical scope has its own parser: no bathroom defaults or unrelated fixtures.
  if(_trade==='electrical'){
   const words:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10,veinte:20,twenty:20};
