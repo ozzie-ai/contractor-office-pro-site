@@ -8,7 +8,7 @@ import type {EstimateLine} from './estimate';
  */
 type Area={category:'bedroom'|'bathroom'|'kitchen'|'living';count:number;length:number;width:number};
 export type NativePaintingDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean};
-const clean=(s:string)=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,' ').replace(/\s+/g,' ');
+const clean=(s:string)=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
 const words:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10};
 const count=(s:string)=>words[s]||Number(s)||0;
 const reCount='(\\d{1,2}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten)';
