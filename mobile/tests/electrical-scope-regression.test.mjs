@@ -6,9 +6,18 @@ import vm from 'node:vm';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
 const f=path.resolve('src/localEstimate.ts');
+function resolvePaintingModule(id){
+ if(id==='./paintingEstimate'){
+  const js=ts.transpileModule(fs.readFileSync('src/paintingEstimate.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  const p={exports:{}};
+  vm.runInNewContext(js,{module:p,exports:p.exports,require:createRequire(import.meta.url)});
+  return p.exports;
+ }
+ return createRequire(import.meta.url)(id);
+}
 const js=ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 const mod={exports:{}};
-vm.runInNewContext(js,{module:mod,exports:mod.exports,require:createRequire(import.meta.url)});
+vm.runInNewContext(js,{module:mod,exports:mod.exports,require:resolvePaintingModule});
 const {localEstimate}=mod.exports;
 const src=fs.readFileSync('App.tsx','utf8');
 test('original Spanish panel dictation yields separate editable scope items, not transcript',()=>{

@@ -75,6 +75,7 @@ export default function App(){
  const [lightCount,setLightCount]=useState('');
  const [electricalCeilingHeight,setElectricalCeilingHeight]=useState('');
  const [shareDone,setShareDone]=useState(false);
+ const [paintingDetailsOpen,setPaintingDetailsOpen]=useState(false);
  const scrollRef=useRef<React.ElementRef<typeof ScrollView>>(null);
  const addressRef=useRef('');
 
@@ -528,7 +529,7 @@ export default function App(){
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
-    <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
+    <Action title={project.trade==='painting'?tr("Create painting estimate","Crear estimado de pintura"):tr("Next: Scope","Siguiente: Alcance")} onPress={()=>project.trade==='painting'?createLocalDraft():setStage(1)}/>
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("2 · Prepare scope","2 · Preparar alcance")}</Text>
@@ -542,7 +543,16 @@ export default function App(){
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}
     {project.lines.some(x=>(x.rateSource||'').includes('Illustrative Los Angeles'))&&<Text style={styles.notice}>{tr('Preliminary 2026 LA market-based model, NOT live supplier prices or a confirmed bid. Verify panel materials, service entrance, utility coordination and breaker type.','Modelo preliminar LA 2026, NO son precios de proveedores en vivo ni oferta confirmada. Verifica materiales, acometida, compañía eléctrica y tipo de breaker.')}</Text>}
-    {pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
+    {project.trade==='painting'&&project.lines.length>0&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Painting estimate — ready to review','Estimado de pintura — listo para revisar')}</Text>
+     <Text style={styles.hint}>{tr('Materials, primer, job labor and one visit calculated from your description. Tap Edit only if you want to change rates.','Materiales, primer, mano de obra y una visita calculados del dictado. Toca Editar solo si quieres cambiar tarifas.')}</Text>
+     {pricedProject.lines.map(item=><View key={'summary-'+item.id} style={{flexDirection:'row',justifyContent:'space-between',gap:8,paddingVertical:5}}>
+       <Text style={{flex:1,color:PALETTE.ink}}>{businessProfile.language==='es'?item.description_es:item.description_en} · {item.quantity} {item.unit}</Text>
+       <Text style={{fontWeight:'700',color:PALETTE.ink}}>{money(item.quantity*item.rate)}</Text>
+     </View>)}
+     <Action title={paintingDetailsOpen?tr('Hide detailed editing','Ocultar edición detallada'):tr('Edit costs (optional)','Editar costos (opcional)')} secondary onPress={()=>setPaintingDetailsOpen(x=>!x)}/>
+    </View>}
+    {(project.trade!=='painting'||paintingDetailsOpen)&&pricedProject.lines.map((line,i)=><View key={line.id} style={styles.lineCard}>
      {project.trade==='cleaning'&&line.id==='clean-initial'?<View>
       <Text style={styles.label}>{tr("Cleaning price","Precio de limpieza")}</Text>
       <Text style={styles.total}>{cleaningInputsReady?money(total.total):tr('Confirm cleaning area and rooms','Confirma área y habitaciones')}</Text>
