@@ -37,8 +37,9 @@ function parsePaintingAreas(text:string):{areas:Area[];unknowns:string[];wallHei
  const s=clean(text);
  if(!/\b(?:pintar|pintura|paint|painting)\b/.test(s)||/\b(?:exterior|fachada)\b/.test(s))return null;
  const areas:Area[]=[],unknowns:string[]=[];
- const h=s.match(/(?:altura\s+(?:en\s+)?paredes?|paredes?\s+(?:de|son|tienen)|wall\s+height|ceiling\s+height)[^\d]{0,20}(\d{1,2})\s*(?:pies?|feet|ft)?/);
- const wallHeight=h?Number(h[1]):8;
+ const h=s.match(/(?:altura\s+(?:en\s+)?paredes?|paredes?\s+(?:de|son|tienen)|wall\s+height|ceiling\s+height)[^\d]{0,24}?(\d{1,2}|ocho|eight|nueve|nine|diez|ten)\s*(?:pies?|feet|ft)?/);
+ const heightNames:Record<string,number>={ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10};
+ const wallHeight=h?(heightNames[h[1]]||Number(h[1])):8;
  if(wallHeight<6||wallHeight>16)return null;
  if(!h)unknowns.push('Assumed wall height 8 ft / Se supuso altura de 8 pies.');
  const explicitBedroom=s.match(new RegExp('\\b'+reCount+'\\s+(?:habitaciones?|recamaras?|cuartos?|bedrooms?|rooms?)\\b'));
