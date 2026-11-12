@@ -51,6 +51,10 @@ export function totals(p:Pick<Project,'lines'|'overheadPct'|'profitPct'>){
  * This prevents a $0 shower-wall-tile line from silently understating the total.
  * Preliminary rates still require contractor review.
  */
+export function estimationScopeIssues(p:Pick<Project,'unknowns'>):string[]{
+ return [...new Set((p.unknowns||[]).filter(message=>
+  /(?:not measured|no dimensions|dimensions not recognized|missing (?:quantity|area|dimensions|measurement)|falta(?:n)? (?:medidas|cantidad|area)|sin medidas|not included in priced quantities)/i.test(message)))];
+}
 export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues:string[]}{
  const issues:string[]=[];
  if(!p.lines.length)issues.push('No work items have been added.');
@@ -100,9 +104,9 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const isCleaning=p.trade==='cleaning';
  // Cleaning is quoted as one bundled service, even when the owner adds extra tasks.
  // Never repeat the grand total on each line, and never disclose internal cost categories.
- const rows=isCleaning
-  ?'<tr><td>'+p.lines.map(x=>esc(es?x.description_es:x.description_en)).join('<p style="margin:7px 0 0">')+'</td><td>1</td><td>'+(es?'servicio':'service')+'</td><td>'+esc(money(sum.total))+'</td></tr>'
-  :p.lines.map(x=>'<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+'</td><td>'+esc(x.unit)+'</td><td>'+esc(money(x.rate))+'</td><td>'+esc(money(x.quantity*x.rate))+'</td></tr>').join('');
+ const customerTasks=p.lines.filter(x=>x.quantity>0&&!/\b(?:labor|mano de obra|mobilization|movilizacion|purchasing|compras|preparation|preparacion|masking|proteccion|equipment|suministros)\b/i.test(x.description_en+' '+x.description_es));
+ const scopeList='<ul>'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+'</li>').join('')+'</ul>';
+ const rows='<tr><td>'+esc(es?'Trabajo incluido — precio por el proyecto':'Included work — total project price')+'</td><td>1</td><td>'+(es?'trabajo':'job')+'</td><td>'+esc(money(sum.total))+'</td></tr>';
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
  'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
@@ -110,10 +114,11 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+(p.trade==='cleaning'?(es?'Dirección del servicio':'Service address'):tr.location)+':</b> '+esc(p.address||p.city||'—')+'</p>'+
  '<h3>'+tr.work+' — '+esc(TRADES[p.trade][p.language])+'</h3>'+
- '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th>'+(isCleaning?'':'<th>'+tr.rate+'</th>')+'<th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+ scopeList+
+ '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th><th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
  (cleaning?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'PLAN DE LIMPIEZA':'CLEANING SERVICE PLAN')+'</h3><p>'+(es?'Tipo de servicio: ':'Service type: ')+esc(({residential:es?'Residencial':'Residential',office:es?'Oficina':'Office',post_construction:es?'Después de construcción':'Post-construction',specialty:es?'Especializada':'Specialty'} as Record<CleaningType,string>)[cleaning.type])+'<br>'+(es?'Frecuencia: ':'Frequency: ')+esc(frequencyLabel(cleaning.frequency))+(cleaning.type==='post_construction'?'<br>'+(es?'Nivel de polvo: ':'Dust level: ')+esc(dustLabel(cleaning.dustLevel||'moderate')):'')+'</p>'+(recurring?'<p><b>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</b></p><p class="notice">'+(es?'La primera limpieza profunda y cada visita posterior tienen precios separados. Confirmar alcance y calendario.':'The initial deep clean and subsequent visits are priced separately. Confirm scope and schedule.')+'</p>':'<p class="notice">'+(es?'Estimado de una sola limpieza. No incluye visitas futuras.':'One-time cleaning estimate. Future visits are not included.')+'</p>')+'</section>':'')+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
  (p.customerNotes.trim()?'<p>'+esc(p.customerNotes.trim())+'</p>':'')+
- '<section class="summary">'+(isCleaning?'':line(tr.subtotal,money(sum.subtotal))+line(tr.overhead,money(sum.overhead))+line(tr.profit,money(sum.profit)))+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
+ '<section class="summary">'+''+'<div class="grand">'+line(tr.total,money(sum.total))+'</div></section>'+
  '<div style="break-inside:avoid;page-break-inside:avoid"><p class="notice">'+tr.notice+'</p><div class="sign">'+tr.signature+': ______________________________ &nbsp; '+tr.date+': ______________</div></div></body></html>';
 }
