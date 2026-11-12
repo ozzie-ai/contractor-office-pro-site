@@ -31,5 +31,9 @@ jobs:
         run: node tests/pricing-browser.test.mjs
       - name: Browser test original app with offline pricebook
         run: node tests/reference-pricebook-browser.test.mjs
+      - name: Test house painting dimensions and draft costs
+        run: node tests/quick-paint.test.mjs
+      - name: Test one-dictation painting workflow in original browser UI
+        run: node tests/quick-paint-browser.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
