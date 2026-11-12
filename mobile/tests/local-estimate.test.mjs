@@ -20,7 +20,7 @@ const js=ts.transpileModule(fs.readFileSync(file,'utf8'),{
  compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}
 }).outputText;
 const module={exports:{}};
-vm.runInNewContext(js,{module,exports:module.exports,require:createRequire(import.meta.url),console});
+vm.runInNewContext(js,{module,exports:module.exports,require:resolvePaintingModule,console});
 const {localEstimate}=module.exports;
 const find=(r,id)=>r.lines.find(x=>x.id==='local-'+id);
 
