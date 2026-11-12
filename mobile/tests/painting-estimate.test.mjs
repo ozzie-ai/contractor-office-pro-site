@@ -20,7 +20,7 @@ test('Known room dimensions are not double-counted; kitchen and baths are one sh
  const r=mobilePaintingEstimate(spoken);
  assert.equal(find(r,'eggshell').quantity,9);
  assert.equal(find(r,'semigloss').quantity,6);
- assert.equal(find(r,'primer').quantity,3);
+ assert.equal(find(r,'primer').quantity,7);
  assert.equal(find(r,'mobilization').quantity,1);
  assert.ok(find(r,'labor').quantity>=30 && find(r,'labor').quantity<65);
 });
@@ -60,4 +60,30 @@ test('Saved retailer reference is dated, while primer and semi-gloss are clearly
  assert.equal(find(r,'eggshell').priceEvidence.observedOn,'2026-11-11');
  assert.equal(find(r,'semigloss').priceEvidence.kind,'planning_allowance');
  assert.equal(find(r,'primer').priceEvidence.kind,'planning_allowance');
+});
+
+test('Primer covers ALL included areas, while finish groups each get two coats',()=>{
+ const r=mobilePaintingEstimate(spoken);
+ assert.ok(r);
+ assert.equal(find(r,'primer').quantity,7);
+ assert.match(find(r,'primer').description_en,/ALL included rooms/);
+ assert.match(find(r,'eggshell').description_en,/Two coats of eggshell/);
+ assert.match(find(r,'semigloss').description_en,/Two coats of semigloss/);
+ const scope=r.customerScope.en.join(' ');
+ assert.match(scope,/ONE complete coat of primer to all included wall surfaces/);
+ assert.match(scope,/TWO finish coats of eggshell/);
+ assert.match(scope,/TWO finish coats of semi-gloss/);
+ assert.match(scope,/3 Bedrooms \(15 × 15 ft\)/);
+ assert.match(scope,/3 Bathrooms \(7 × 5 ft\)/);
+ assert.ok(r.customerScope.es.some(x=>x.includes('UNA mano completa de primer')));
+ assert.ok(r.customerScope.es.some(x=>x.includes('DOS manos de pintura')));
+ assert.ok(find(r,'labor').quantity>38.5,'Primer labor should cover whole house, not kitchen and baths only');
+});
+test('Measured living room joins primer and eggshell scope; deliberate exclusion never appears as included',()=>{
+ const inc=mobilePaintingEstimate(spoken,{livingLengthFt:15,livingWidthFt:20});
+ const exc=mobilePaintingEstimate(spoken,{excludeLivingRoom:true});
+ assert.ok(inc&&exc);
+ assert.ok(find(inc,'primer').quantity>find(exc,'primer').quantity);
+ assert.ok(inc.customerScope.en.some(x=>x.includes('Living / dining area (15 × 20 ft)')));
+ assert.ok(!exc.customerScope.en.some(x=>x.includes('Living / dining area (15 × 20 ft)')));
 });

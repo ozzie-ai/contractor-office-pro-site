@@ -326,7 +326,7 @@ export default function App(){
   });
   const manual=project.lines.filter(item=>item.id.startsWith('manual-')&&!lines.some(x=>x.id===item.id));
   const suggested=suggestPreliminaryPrices(project.trade,lines);
-  patch({lines:[...suggested.lines,...manual],unknowns:[...draft.unknowns.filter(note=>!(suggested.lines.every(item=>item.rate>0)&&note.startsWith('Enter verified prices'))),...suggested.notes],
+  patch({lines:[...suggested.lines,...manual],customerScope:draft.customerScope,unknowns:[...draft.unknowns.filter(note=>!(suggested.lines.every(item=>item.rate>0)&&note.startsWith('Enter verified prices'))),...suggested.notes],
    exclusions:futureBreaker?['Future feeder wiring, terminations and final connections are excluded from this job.']:project.exclusions,
    futureWork:futureBreaker?['Future feeder wiring and final connections are separate work.']:project.futureWork});
   setAiConnected(false);
@@ -461,7 +461,7 @@ export default function App(){
      </View>
     </View>
     <Text style={styles.sectionTitle}>{tr('Service / Trade','Servicio / Oficio')}</Text>
-    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>{if(t!==project.trade){patch({trade:t,lines:[],unknowns:[],exclusions:[],futureWork:[],cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):undefined});setInfo('');setAiConnected(false);}}} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
+    <View style={styles.serviceGrid}>{businessProfile.enabledTrades.map(t=><Pressable key={t} accessibilityRole="button" accessibilityState={{selected:project.trade===t}} onPress={()=>{if(t!==project.trade){patch({trade:t,lines:[],customerScope:undefined,paintingMeasurements:undefined,unknowns:[],exclusions:[],futureWork:[],cleaning:t==='cleaning'?(project.cleaning||defaultCleaning(businessProfile.cleaningLaborCostPerHour)):undefined});setInfo('');setAiConnected(false);}}} style={[styles.serviceTile,t==='cleaning'&&styles.serviceTileFull,project.trade===t&&styles.serviceTileSelected]}>
      <ServiceGlyph trade={t} selected={project.trade===t}/>
      <Text numberOfLines={2} style={[styles.serviceName,project.trade===t&&{color:PALETTE.white}]}>{TRADES[t][businessProfile.language]}</Text>
      {project.trade===t&&<Text style={styles.selectedTick}>✓</Text>}
@@ -614,7 +614,7 @@ export default function App(){
           return saved&&itemCostEvidence(saved).kind==='contractor_entered'?
            {...x,rate:saved.rate,rateSource:saved.rateSource,priceEvidence:saved.priceEvidence}:x;
         });
-        patch({paintingMeasurements:measurements,lines:merged,unknowns:result.unknowns});
+        patch({paintingMeasurements:measurements,lines:merged,customerScope:result.customerScope,unknowns:result.unknowns});
         setInfo(tr('Living room included. Totals recalculated.','Se incluyó la sala y se recalcularon los totales.'));
       }}/>
       <Action secondary title={tr('Exclude living room from this proposal','Excluir la sala de esta propuesta')} onPress={()=>{
@@ -626,7 +626,7 @@ export default function App(){
           return saved&&itemCostEvidence(saved).kind==='contractor_entered'?
             {...x,rate:saved.rate,rateSource:saved.rateSource,priceEvidence:saved.priceEvidence}:x;
         });
-        patch({paintingMeasurements:measurements,lines:merged,unknowns:result.unknowns,
+        patch({paintingMeasurements:measurements,lines:merged,customerScope:result.customerScope,unknowns:result.unknowns,
           exclusions:[...project.exclusions.filter(x=>!x.startsWith('Living room / Sala:')),'Living room / Sala: painting excluded (measurements not supplied).']});
       }}/>
     </View>}

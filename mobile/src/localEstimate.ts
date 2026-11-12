@@ -1,7 +1,7 @@
 import {EstimateLine,Trade} from './estimate';
 import {mobilePaintingEstimate} from './paintingEstimate';
 import type {PaintingMeasurements} from './paintingEstimate';
-type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean};
+type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;customerScope?:{en:string[];es:string[]}};
 type Dim={a:number;b:number;index:number;end:number};
 const has=(s:string,re:RegExp)=>re.test(s);
 const line=(id:string,en:string,es:string,quantity:number,unit:string,rate:number):EstimateLine=>({id:'local-'+id,description_en:en,description_es:es,quantity,unit,rate,status:'allowance_to_confirm'});

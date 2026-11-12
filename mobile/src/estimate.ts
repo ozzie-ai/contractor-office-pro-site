@@ -20,6 +20,7 @@ export type Project={
  trade:Trade;contractor:string;customer:string;city:string;description:string;
  lines:EstimateLine[];exclusions:string[];futureWork:string[];unknowns:string[];
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
+ customerScope?:{en:string[];es:string[]};
  paintingMeasurements?:{livingLengthFt?:number;livingWidthFt?:number;excludeLivingRoom?:boolean};
  status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
  address?:string;cleaning?:CleaningDetails;cleaningQuoteSignature?:string;
@@ -118,11 +119,15 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  // Cleaning is quoted as one bundled service, even when the owner adds extra tasks.
  // Never repeat the grand total on each line, and never disclose internal cost categories.
  const customerTasks=p.lines.filter(x=>x.quantity>0&&!/\b(?:labor|mano de obra|mobilization|movilizacion|purchasing|compras|preparation|preparacion|masking|proteccion|equipment|suministros)\b/i.test(x.description_en+' '+x.description_es));
- const scopeList=customerTasks.length?'<ul>'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+'</li>').join('')+'</ul>':'<p>'+esc(es?'Trabajo de '+TRADES[p.trade].es.toLowerCase()+' según alcance acordado.':'Work in '+TRADES[p.trade].en.toLowerCase()+' as agreed in the scope.')+'</p>';
+ const curatedScope=p.customerScope?.[p.language]?.filter(Boolean)||[];
+ const scopeList=curatedScope.length?
+  '<ol class="work-scope">'+curatedScope.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>':
+  customerTasks.length?'<ul class="work-scope">'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+(x.quantity>1?' — '+esc(String(x.quantity))+' '+esc(x.unit):'')+'</li>').join('')+'</ul>':
+  '<p>'+esc(es?'Trabajo de '+TRADES[p.trade].es.toLowerCase()+' según alcance acordado.':'Work in '+TRADES[p.trade].en.toLowerCase()+' as agreed in the scope.')+'</p>';
  const rows='<tr><td>'+esc(es?'Trabajo incluido — precio por el proyecto':'Included work — total project price')+'</td><td>1</td><td>'+(es?'trabajo':'job')+'</td><td>'+esc(money(sum.total))+'</td></tr>';
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
- 'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
+ 'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}.work-scope{padding-left:22px;line-height:1.55}.work-scope li{margin:0 0 9px 0}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
  '</style></head><body><h1>'+tr.title+'</h1>'+
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
  '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+(p.trade==='cleaning'?(es?'Dirección del servicio':'Service address'):tr.location)+':</b> '+esc(p.address||p.city||'—')+'</p>'+
