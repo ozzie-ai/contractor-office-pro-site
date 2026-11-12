@@ -8,7 +8,7 @@ import type {EstimateLine} from './estimate';
  */
 type Area={category:'bedroom'|'bathroom'|'kitchen'|'living';count:number;length:number;width:number};
 export type PaintingMeasurements={livingLengthFt?:number;livingWidthFt?:number;excludeLivingRoom?:boolean};
-export type NativePaintingDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;missingMeasurements:Array<'living'>};
+export type NativePaintingDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;missingMeasurements:Array<'living'>;customerScope:{en:string[];es:string[]}};
 const clean=(s:string)=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
 const words:Record<string,number>={un:1,una:1,uno:1,one:1,dos:2,two:2,tres:3,three:3,cuatro:4,four:4,cinco:5,five:5,seis:6,six:6,siete:7,seven:7,ocho:8,eight:8,nueve:9,nine:9,diez:10,ten:10};
 const count=(s:string)=>words[s]||Number(s)||0;
@@ -34,7 +34,7 @@ function findRoomSize(text:string,category:Area['category']){
  const near=items.map(it=>({it,distance:Math.min(...tokens.map(i=>Math.abs(i-it.start)))})).sort((a,b)=>a.distance-b.distance);
  return near[0]&&near[0].distance<70?near[0].it:null;
 }
-function parsePaintingAreas(text:string,measurements:PaintingMeasurements={}):{areas:Area[];unknowns:string[];wallHeight:number;primerKitchenBath:boolean;missingMeasurements:Array<'living'>}|null{
+function parsePaintingAreas(text:string,measurements:PaintingMeasurements={}):{areas:Area[];unknowns:string[];wallHeight:number;primerAllAreas:boolean;missingMeasurements:Array<'living'>}|null{
  const s=clean(text);
  if(!/\b(?:pintar|pintura|paint|painting)\b/.test(s)||/\b(?:exterior|fachada)\b/.test(s))return null;
  const areas:Area[]=[],unknowns:string[]=[],missingMeasurements:Array<'living'>=[];
@@ -71,13 +71,13 @@ function parsePaintingAreas(text:string,measurements:PaintingMeasurements={}):{a
   unknowns.push('Living-room area not measured; not included in priced quantities / Sala sin medidas; no incluida en cantidades cotizadas.');
  }
  if(!areas.length)return null;
- const primerKitchenBath=/(?:primer|sellador|imprimacion|base\s+coat)/.test(s);
- return {areas,unknowns,wallHeight,primerKitchenBath,missingMeasurements};
+ const primerAllAreas=/(?:primer|sellador|imprimacion|base\s+coat)/.test(s);
+ return {areas,unknowns,wallHeight,primerAllAreas,missingMeasurements};
 }
 export function mobilePaintingEstimate(description:string,measurements:PaintingMeasurements={}):NativePaintingDraft|null{
  const parsed=parsePaintingAreas(description,measurements);
  if(!parsed)return null;
- const {areas,unknowns,wallHeight,primerKitchenBath,missingMeasurements}=parsed;
+ const {areas,unknowns,wallHeight,primerAllAreas,missingMeasurements}=parsed;
  const gross=(kind:Area['category'][])=>areas.filter(a=>kind.includes(a.category)).reduce((s,a)=>s+2*(a.length+a.width)*a.count*wallHeight,0);
  const eggshellSf=money(gross(['bedroom','living'])*0.9);
  const semiSf=money(gross(['kitchen','bathroom'])*0.9);
@@ -86,22 +86,22 @@ export function mobilePaintingEstimate(description:string,measurements:PaintingM
  const coats=2,coverage=350,waste=1.1;
  const eggGallons=Math.ceil(eggshellSf*coats*waste/coverage);
  const semiGallons=Math.ceil(semiSf*coats*waste/coverage);
- const primerGallons=primerKitchenBath?Math.ceil(semiSf*waste/coverage):0;
- const hours=Math.ceil(((allSf/75)+3+(primerKitchenBath?semiSf/135:0))*2)/2;
+ const primerGallons=primerAllAreas?Math.ceil(allSf*waste/coverage):0;
+ const hours=Math.ceil(((allSf/75)+3+(primerAllAreas?allSf/135:0))*2)/2;
  const prep=money(allSf*0.1);
  const pricedAreas=areas.map(a=>a.count+' '+a.category+' '+a.length+'×'+a.width+' ft').join('; ');
  const basis='2026 preliminary materials and labor assumptions, NOT live retail pricing. '+pricedAreas+
   '; 8-ft walls unless stated; 10% openings; two coats; 350 sq ft/gal/coat; 10% waste; estimated crew-hours';
  const lines:EstimateLine[]=[];
- if(eggGallons)lines.push({...line('eggshell','Interior eggshell paint — bedrooms / measured living areas',
-  'Pintura eggshell interior — habitaciones / áreas de sala medidas',eggGallons,'gal',37.98,basis+'; $37.98/gal cached retailer example, not live'),
+ if(eggGallons)lines.push({...line('eggshell','Two coats of eggshell finish — bedrooms and measured living areas',
+  'Dos manos de pintura eggshell — habitaciones y áreas de sala medidas',eggGallons,'gal',37.98,basis+'; $37.98/gal cached retailer example, not live'),
   priceEvidence:{kind:'cached_retail_reference',merchant:'Home Depot',observedOn:'2026-11-11',
    referenceUrl:'https://www.homedepot.com/p/204405954',detail:'Interior eggshell paint, one-gallon example; confirm grade and store price'}});
- if(semiGallons)lines.push({...line('semigloss','Interior semigloss paint — kitchen and bathrooms',
-  'Pintura semi-gloss interior — cocina y baños',semiGallons,'gal',45,basis+'; $45/gal unverified planning allowance'),
+ if(semiGallons)lines.push({...line('semigloss','Two coats of semigloss finish — kitchen and bathrooms',
+  'Dos manos de pintura semi-gloss — cocina y baños',semiGallons,'gal',45,basis+'; $45/gal unverified planning allowance'),
   priceEvidence:{kind:'planning_allowance',detail:'Semigloss paint $45/gal; replace with actual retailer reference when refreshed'}});
- if(primerGallons)lines.push({...line('primer','One coat of primer — kitchen and bathrooms',
-  'Una mano de primer — cocina y baños',primerGallons,'gal',25,basis+'; $25/gal unverified planning allowance'),
+ if(primerGallons)lines.push({...line('primer','One coat of primer — ALL included rooms and wall areas',
+  'Una mano de primer — TODAS las habitaciones y áreas de muros incluidas',primerGallons,'gal',25,basis+'; $25/gal unverified planning allowance'),
   priceEvidence:{kind:'planning_allowance',detail:'Primer $25/gal; replace with actual retailer reference when refreshed'}});
  lines.push(line('prep','Ordinary masking, surface preparation and supplies — one job',
   'Protección, preparación básica y materiales — un solo trabajo',1,'job',prep,basis+'; $0.10/sq ft provisional prep'));
@@ -109,7 +109,31 @@ export function mobilePaintingEstimate(description:string,measurements:PaintingM
   'Mano de obra de pintura para todos los espacios medidos — horas totales',hours,'hr',60,basis+'; $60/crew-hour placeholder loaded labor COST'));
  lines.push(line('mobilization','Travel and purchasing — once for entire job',
   'Viaje y compras — una sola vez para todo el trabajo',1,'job',75,basis+'; once per job'));
+ const labels:{[key in Area['category']]:{en:string;es:string}}={
+  bedroom:{en:'Bedrooms',es:'Habitaciones'},bathroom:{en:'Bathrooms',es:'Baños'},
+  kitchen:{en:'Kitchen',es:'Cocina'},living:{en:'Living / dining area',es:'Sala / comedor'}
+ };
+ const roomsEn=areas.map(a=>a.count+' '+labels[a.category].en+' ('+a.length+' × '+a.width+' ft)');
+ const roomsEs=areas.map(a=>a.count+' '+labels[a.category].es+' ('+a.length+' × '+a.width+' pies)');
+ const customerScope={
+  en:[
+   'Interior wall painting — '+roomsEn.join('; '),
+   ...(primerAllAreas?['Apply ONE complete coat of primer to all included wall surfaces, including bedrooms, kitchen, bathrooms and measured living areas.']:[]),
+   ...(eggshellSf?['Apply TWO finish coats of eggshell paint to all included bedrooms and measured living/dining areas.']:[]),
+   ...(semiSf?['Apply TWO finish coats of semi-gloss paint to kitchen and bathroom walls.']:[]),
+   'Provide standard surface protection, masking, minor preparation and cleanup.',
+   'Estimated wall height: '+wallHeight+' ft. Walls only; ceilings, trim, doors, major repairs and unmeasured areas are not included.'
+  ],
+  es:[
+   'Pintura de muros interiores — '+roomsEs.join('; '),
+   ...(primerAllAreas?['Aplicar UNA mano completa de primer a todos los muros incluidos: habitaciones, cocina, baños y áreas de sala medidas.']:[]),
+   ...(eggshellSf?['Aplicar DOS manos de pintura eggshell a las habitaciones y áreas de sala/comedor incluidas.']:[]),
+   ...(semiSf?['Aplicar DOS manos de pintura semi-gloss a los muros de cocina y baños.']:[]),
+   'Incluir protección de superficies, enmascarado, preparación menor y limpieza.',
+   'Altura de muros estimada: '+wallHeight+' pies. Solo muros; no incluye cielos, molduras, puertas, reparaciones mayores ni áreas sin medir.'
+  ]
+ };
  unknowns.push('Planning quote for measured walls only; ceilings, doors, trim and repairs not included. / Borrador solo para muros medidos; cielos, puertas, molduras y reparaciones excluidos.');
  unknowns.push('Paint brand/finish and all material allowances are editable; no live supplier quote. / Marca, acabados y costos de material son editables; no hay cotización de tienda en vivo.');
- return {lines,unknowns,recognized:true,missingMeasurements};
+ return {lines,unknowns,recognized:true,missingMeasurements,customerScope};
 }
