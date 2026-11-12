@@ -37,3 +37,27 @@ test('Private transcript is not copied into line descriptions',()=>{
  assert.ok(r);
  assert.ok(!r.lines.some(x=>x.description_en.includes('OK, este es')));
 });
+
+test('Only missing living room dimensions are requested, then recalculated into eggshell/labor',()=>{
+ const old=mobilePaintingEstimate(spoken);
+ assert.ok(old);assert.equal(old.missingMeasurements.join(','),'living');
+ const filled=mobilePaintingEstimate(spoken,{livingLengthFt:15,livingWidthFt:20});
+ assert.ok(filled);
+ assert.equal(filled.missingMeasurements.length,0);
+ assert.ok(find(filled,'eggshell').quantity>find(old,'eggshell').quantity);
+ assert.ok(find(filled,'labor').quantity>find(old,'labor').quantity);
+ assert.ok(!filled.unknowns.some(x=>x.includes('Living-room area not measured')));
+});
+test('Deliberate living room exclusion does not invent or price its area',()=>{
+ const r=mobilePaintingEstimate(spoken,{excludeLivingRoom:true});
+ assert.ok(r);assert.equal(r.missingMeasurements.length,0);
+ assert.equal(find(r,'eggshell').quantity,9);
+});
+test('Saved retailer reference is dated, while primer and semi-gloss are clearly unverified',()=>{
+ const r=mobilePaintingEstimate(spoken);
+ assert.ok(r);
+ assert.equal(find(r,'eggshell').priceEvidence.kind,'cached_retail_reference');
+ assert.equal(find(r,'eggshell').priceEvidence.observedOn,'2026-11-11');
+ assert.equal(find(r,'semigloss').priceEvidence.kind,'planning_allowance');
+ assert.equal(find(r,'primer').priceEvidence.kind,'planning_allowance');
+});
