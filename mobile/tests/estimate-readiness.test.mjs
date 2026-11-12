@@ -67,3 +67,19 @@ test('Shared actionable missing scope detector recognizes omitted dimensions but
 test('follow-up pipeline provides six status choices',()=>{
  assert.deepEqual(Object.keys(JOB_STATUSES).sort(),['accepted','completed','declined','draft','in_progress','sent'].sort());
 });
+
+test('Material price provenance is correctly classified in all trades, never invented as live',()=>{
+ const {itemCostEvidence,priceEvidenceSummary}=mod.exports;
+ for(const trade of ['electrical','plumbing','painting','concrete','handyman','remodel','cleaning']){
+  const lines=[
+   {...item(3,37.98),priceEvidence:{kind:'cached_retail_reference',merchant:'Home Depot',observedOn:'2026-11-11'}},
+   {...item(2,45),id:'unverified',rateSource:'Illustrative pricing assumption'},
+   {...item(1,20),id:'contractor',rateSource:'Contractor-entered rate / Tarifa ingresada por contratista'}
+  ];
+  const counts=priceEvidenceSummary(lines);
+  assert.equal(counts.cached_retail_reference,1,trade);
+  assert.equal(counts.planning_allowance,1,trade);
+  assert.equal(counts.contractor_entered,1,trade);
+  assert.equal(itemCostEvidence(lines[1]).kind,'planning_allowance');
+ }
+});
