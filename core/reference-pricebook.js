@@ -156,7 +156,7 @@ function fromTranscript(input,{tiers={},now=DATE}={}){
    retailReferenceDate:DATE,source:'offline_cached_retail_references'};
 }
 function totals(result){
- const missing=result.lines.some(x=>x.total===null);
+ const missing=result.lines.length===0||result.lines.some(x=>x.total===null);
  return {materialSubtotal:missing?null:money(result.lines.reduce((s,x)=>s+x.total,0)),
    complete:!missing&&result.questions.length===0};
 }
