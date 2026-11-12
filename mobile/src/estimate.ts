@@ -8,6 +8,7 @@ export const JOB_STATUSES:Record<JobStatus,{en:string;es:string}>={draft:{en:'Dr
 export type EstimateLine={
  id:string;description_en:string;description_es:string;
  quantity:number;unit:string;rate:number;status:'included_now'|'allowance_to_confirm';
+ priceEvidence?:{kind:'cached_retail_reference'|'planning_allowance'|'contractor_entered';merchant?:string;observedOn?:string;referenceUrl?:string;detail?:string};
  costHoursPerUnit?:number;costMaterialsPerUnit?:number;costEquipmentPerUnit?:number;costHourlyWage?:number;costLaborBurdenMultiplier?:number;rateSource?:string;
 };
 export type Interpretation={
@@ -19,6 +20,7 @@ export type Project={
  trade:Trade;contractor:string;customer:string;city:string;description:string;
  lines:EstimateLine[];exclusions:string[];futureWork:string[];unknowns:string[];
  customerNotes:string;language:Language;overheadPct:number;profitPct:number;
+ paintingMeasurements?:{livingLengthFt?:number;livingWidthFt?:number;excludeLivingRoom?:boolean};
  status?:JobStatus;followUpDate?:string;followUpNotes?:string;lastProposalPreparedAt?:string;
  address?:string;cleaning?:CleaningDetails;cleaningQuoteSignature?:string;
  propertyArea?:{squareFootage:number;source:string;matchedAddress:string;lookedUpAddress:string;retrievedAt:string};
