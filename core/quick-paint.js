@@ -28,7 +28,7 @@ function classify(prefix){
  if(/\b(?:banos?|bathrooms?|baths?)\b/.test(prefix))return 'bathroom';
  if(/\b(?:cocina|kitchen)\b/.test(prefix))return 'kitchen';
  if(/\b(?:sala|comedor|living|dining|family\s+room)\b/.test(prefix))return 'living_dining';
- if(/\b(?:habitaciones?|cuartos?|recamaras?|bedrooms?|bed\s+rooms?)\b/.test(prefix))return 'bedroom';
+ if(/\b(?:habitacion(?:es)?|cuartos?|recamaras?|bedrooms?|bed\s+rooms?)\b/.test(prefix))return 'bedroom';
  return 'other';
 }
 function closetCount(prefix){
@@ -61,9 +61,6 @@ function parse(text){
     floorSf:money(l*w*qty),perimeterLf:money(2*(l+w)*qty)});
  }
  if(zones.length<2)return null; // legacy single-room flow remains unchanged
- const expected={
-  bedroom:(d.match(/\b(?:\d+|tres|three|dos|two|cuatro|four|cinco|five)\s+(?:habitaciones|bedrooms|cuartos|recamaras)\b/)||[])[0]
- };
  const reportedBedrooms=d.match(new RegExp('\\b('+term+')\\s+(?:habitaciones|bedrooms|cuartos|recamaras)\\b'));
  if(reportedBedrooms){
   const reported=val(reportedBedrooms[1]);
