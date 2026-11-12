@@ -110,7 +110,7 @@ function prepareQuickEstimate(){
    quantity:e.paintGallons,unit:'gal',rate:e.paintUnitCost,copKind:'paint',copSourceDate:reference.observedOn},
   {description:wording('Masking and ordinary surface prep — job allowance','Protección y preparación básica — provisión por trabajo'),
    quantity:1,unit:'job',rate:e.prepCost,copKind:'prep'},
-  {description:wording('Wall painting labor — total crew hours','Pintura de muros — horas totales de trabajo'),
+  {description:wording('Wall painting labor — total crew hours','Pintura de muros — mano de obra (horas totales)'),
    quantity:e.totalLaborHours,unit:'hr',rate:e.settings.loadedLaborCostPerHour,copKind:'labor'},
   {description:wording('Mobilization and purchasing — once per job','Movilización y compras — una vez por trabajo'),
    quantity:1,unit:'job',rate:e.mobilization,copKind:'mobilization'}
