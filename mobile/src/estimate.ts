@@ -99,13 +99,13 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const recurring=cleaning&&cleaning.frequency!=='once'?cleaning:undefined;
  const dustLabel=(level:NonNullable<CleaningDetails['dustLevel']>)=>({light:es?'Ligero':'Light',moderate:es?'Moderado':'Moderate',heavy:es?'Abundante':'Heavy'}[level]);
  const frequencyLabel=(value:CleaningFrequency)=>({once:es?'Una sola vez':'One-time service',weekly:es?'Semanal':'Weekly',biweekly:es?'Cada dos semanas':'Every two weeks',twice_monthly:es?'Dos veces al mes':'Twice monthly',monthly:es?'Mensual':'Monthly'}[value]);
- const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||p.unknowns.length>0;
+ const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||estimationScopeIssues(p).length>0;
  const list=(title:string,items:string[])=>items.length?'<h3>'+esc(title)+'</h3><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
  const isCleaning=p.trade==='cleaning';
  // Cleaning is quoted as one bundled service, even when the owner adds extra tasks.
  // Never repeat the grand total on each line, and never disclose internal cost categories.
  const customerTasks=p.lines.filter(x=>x.quantity>0&&!/\b(?:labor|mano de obra|mobilization|movilizacion|purchasing|compras|preparation|preparacion|masking|proteccion|equipment|suministros)\b/i.test(x.description_en+' '+x.description_es));
- const scopeList='<ul>'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+'</li>').join('')+'</ul>';
+ const scopeList=customerTasks.length?'<ul>'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+'</li>').join('')+'</ul>':'<p>'+esc(es?'Trabajo de '+TRADES[p.trade].es.toLowerCase()+' según alcance acordado.':'Work in '+TRADES[p.trade].en.toLowerCase()+' as agreed in the scope.')+'</p>';
  const rows='<tr><td>'+esc(es?'Trabajo incluido — precio por el proyecto':'Included work — total project price')+'</td><td>1</td><td>'+(es?'trabajo':'job')+'</td><td>'+esc(money(sum.total))+'</td></tr>';
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
