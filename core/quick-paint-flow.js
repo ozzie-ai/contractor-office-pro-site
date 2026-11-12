@@ -11,7 +11,8 @@ const $=id=>document.getElementById(id);
 const wording=(en,es)=>lang==='es'?es:en;
 const money=n=>Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
 const currency=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(n);
-let active=null,lastEstimate=null,paintReference=null,markupTouched=false;
+let active=null,lastEstimate=null,paintReference=null,markupTouched=false,customerLanguageTouched=false;
+$('customerLang').addEventListener('change',()=>customerLanguageTouched=true);
 const newRatesKey='cop-quickpaint-labor-v1';
 function savedPaintLabor(){try{const v=Number(localStorage.getItem(newRatesKey));return Number.isFinite(v)&&v>0?v:null}catch{return null}}
 function storePaintLabor(n){try{localStorage.setItem(newRatesKey,String(n))}catch{}}
@@ -101,6 +102,7 @@ function prepareQuickEstimate(){
  const settings=savedRate?{loadedLaborCostPerHour:savedRate}:{};
  const e=parser.estimate(active,{paintUnitCost:reference.unitCost,settings});
  lastEstimate=e;
+ if(!customerLanguageTouched)$('customerLang').value=lang==='es'?'es':'en';
  applyMarkup(e);
  // The contractor only sees four understandable, editable cost groups.
  estimateItems=[
