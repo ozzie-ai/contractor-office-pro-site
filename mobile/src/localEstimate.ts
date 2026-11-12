@@ -1,5 +1,6 @@
 import {EstimateLine,Trade} from './estimate';
 import {mobilePaintingEstimate} from './paintingEstimate';
+import type {PaintingMeasurements} from './paintingEstimate';
 type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean};
 type Dim={a:number;b:number;index:number;end:number};
 const has=(s:string,re:RegExp)=>re.test(s);
@@ -20,10 +21,10 @@ const near=(s:string,all:Dim[],re:RegExp):Dim|undefined=>{
 };
 const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuarto)\b/;
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
-export function localEstimate(description:string,_trade:Trade):LocalDraft{
+export function localEstimate(description:string,_trade:Trade,paintingMeasurements:PaintingMeasurements={}):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
  if(_trade==='painting'){
-  const painting=mobilePaintingEstimate(description);
+  const painting=mobilePaintingEstimate(description,paintingMeasurements);
   if(painting)return painting;
  }
 
