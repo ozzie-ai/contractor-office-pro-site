@@ -4,6 +4,10 @@
 'use strict';
 if(!window.COPCosting || !document.getElementById('estimateHint'))return;
 const cost=window.COPCosting,$=id=>document.getElementById(id);
+const policyKey='cop-labor-cost-policy-v1';
+function loadPolicy(){try{return JSON.parse(localStorage.getItem(policyKey)||'null')}catch{return null}}
+function savePolicy(p){try{localStorage.setItem(policyKey,JSON.stringify(p))}catch{}}
+
 const es=()=>lang==='es';
 const text=(en,sp)=>es()?sp:en;
 const tag=(name,props={},content)=>{
@@ -88,11 +92,20 @@ function renderOutletForm(parsed){
  ));
  const ack=tag('label',{className:'checkrow'}),ackBox=tag('input',{id:'cop_verified',type:'checkbox'});
  ackBox.style.cssText='width:20px;height:20px';
- ack.append(ackBox,tag('span',{},text('I checked the exact material types and entered current retailer or invoice prices above.','Verifiqué el tipo de material y escribí los precios actuales de tienda o factura.')));
+ ack.append(ackBox,tag('span',{},text('I reviewed the material type, quantity and reference price shown above.','Revisé el tipo, la cantidad y el precio de referencia del material mostrado arriba.')));
  content.append(ack);
  const apply=tag('button',{type:'button',className:'btn wide'},text('Calculate from verified costs','Calcular usando costos verificados'));
  const status=tag('p',{id:'cop_status',className:'status'},text('No final estimate until material prices, labor and the shared trip cost are confirmed.','No se genera precio final hasta confirmar materiales, mano de obra y viaje.'));
  content.append(apply,status);reflectMaterial();
+ const saved=loadPolicy();
+ if(saved){
+  for(const [id,key] of [['cop_hourRate','hourlyCost'],['cop_trip','tripCost'],['cop_misc','miscCost']]){
+   if(typeof saved[key]==='number'&&Number.isFinite(saved[key])&&saved[key]>=0)$(id).value=String(saved[key]);
+  }
+  for(const [id,key] of [['overhead','overheadPct'],['profit','profitPct']]){
+   if($(id).value==='0'&&typeof saved[key]==='number'&&Number.isFinite(saved[key])&&saved[key]>=0)$(id).value=String(saved[key]);
+  }
+ }
  apply.onclick=()=>{
   try{
    const gfciCount=gfi.value===''?NaN:Number(gfi.value);
@@ -105,7 +118,9 @@ function renderOutletForm(parsed){
     for(const [id,qty,title] of [['standard',scope.standardCount,text('Standard duplex receptacle — material','Tomacorriente estándar — material')],['gfci',scope.gfciCount,text('GFCI receptacle — material','Tomacorriente GFCI — material')]]){
      if(!qty)continue;
      const val=parsedNum('cop_'+id+'_cost'),store=$('cop_'+id+'_store').value;
-     const pricing={unitCost:val,retailer:store,checkedOn:store&&val!==null?actualCheckDate():''};
+     const inputField=$('cop_'+id+'_cost');
+     const cachedDate=inputField.dataset.referenceDate||'';
+     const pricing={unitCost:val,retailer:store,checkedOn:store&&val!==null?(cachedDate||actualCheckDate()):''};
      materials.push({id,quantity:qty,description:title,pricing});
      entries.push({description:title,quantity:qty,unit:'ea',rate:val,source:{retailer:store,checkedOn:pricing.checkedOn}});
     }
@@ -121,6 +136,8 @@ function renderOutletForm(parsed){
      {description:text('Plates, connectors and supplies','Tapas, conectores y consumibles'),quantity:1,unit:'job',rate:audited.totals.supplies}
    ].filter(x=>Number(x.quantity)>0);
    confirmedOutlet=true;pricingEvidence=new Map(entries.map((x,i)=>[i,x.source]));
+   savePolicy({hourlyCost:hourRate,tripCost:trip,miscCost:misc,
+    overheadPct:Number($('overhead').value)||0,profitPct:Number($('profit').value)||0});
    initialized=true;renderItems();buildCustomerScope();calculateTakeoff();
    status.textContent=text('Cost-based estimate created. Review overhead and profit below before sharing.','Estimado por costos preparado. Revisa gastos generales y ganancia abajo antes de compartir.');
    detail.open=false;renderGenericResearch();
@@ -183,6 +200,8 @@ function renderGenericResearch(){
   wrap.append(box);
  }
 }
+window.COPRefreshRetailReferences=renderGenericResearch;
+window.COPRegisterRetailReference=(index,ref)=>pricingEvidence.set(index,ref);
 const previousSuggestedItems=suggestedItems;
 suggestedItems=function(){
  pricingEvidence=new Map();activeOutlet=null;confirmedOutlet=false;

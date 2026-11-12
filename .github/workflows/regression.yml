@@ -23,9 +23,13 @@ jobs:
           node-version: '22'
       - name: Run electrical regression cases
         run: node tests/run-tests.mjs
+      - name: Run generic offline reference pricebook tests
+        run: node tests/reference-pricebook.test.mjs
       - name: Run cost-model and retailer verification regression checks
         run: node tests/job-pricing.test.mjs
       - name: Browser-test original bilingual estimator and cost review
         run: node tests/pricing-browser.test.mjs
+      - name: Browser test original app with offline pricebook
+        run: node tests/reference-pricebook-browser.test.mjs
       - name: Run Level 2 backend smoke tests
         run: node tests/level2-api.test.mjs
