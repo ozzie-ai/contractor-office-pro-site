@@ -83,3 +83,31 @@ test('Material price provenance is correctly classified in all trades, never inv
   assert.equal(itemCostEvidence(lines[1]).kind,'planning_allowance');
  }
 });
+
+test('Customer document includes a professional detailed scope but never contractor cost details',()=>{
+ const project={...sample,trade:'painting',customerScope:{
+  en:['Paint 3 bedrooms, kitchen, 3 bathrooms and measured living areas',
+      'One primer coat on ALL included walls',
+      'Two coats eggshell in bedrooms / living areas',
+      'Two coats semi-gloss in kitchen and bathrooms',
+      'Protect floors, mask fixtures, minor prep, cleanup',
+      'Ceilings and major repairs excluded'],
+  es:['Pintura de 3 habitaciones, cocina, 3 baños y sala medida']
+ },lines:[
+  {id:'paint',description_en:'Two coats eggshell paint',description_es:'Dos manos eggshell',quantity:9,unit:'gal',rate:37.98,status:'allowance_to_confirm'},
+  {id:'primer',description_en:'One primer coat',description_es:'Una mano primer',quantity:7,unit:'gal',rate:25,status:'allowance_to_confirm'},
+  {id:'labor',description_en:'Painting labor',description_es:'Mano de obra',quantity:48.5,unit:'hr',rate:60,status:'allowance_to_confirm'}
+ ]};
+ const html=proposalHtml(project);
+ for(const phrase of project.customerScope.en)assert.ok(html.includes(phrase),phrase);
+ assert.ok(html.includes(money(totals(project).total)));
+ assert.ok(!html.includes('$37.98'));
+ assert.ok(!html.includes('$25.00'));
+ assert.ok(!html.includes('$60.00'));
+ assert.ok(!html.includes('Overhead'));
+ assert.ok(!html.includes('Profit'));
+ assert.ok(!html.includes('PRIVATE JOB NOTES'));
+ const spanish=proposalHtml({...project,language:'es'});
+ assert.ok(spanish.includes('Pintura de 3 habitaciones'));
+ assert.ok(!spanish.includes('$37.98'));
+});
