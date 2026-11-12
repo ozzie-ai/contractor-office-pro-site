@@ -37,6 +37,33 @@ test('formal proposal contains proposal title but not private follow-up notes or
  assert.equal(html.includes('PRIVATE: ask client'),false);
  assert.ok(html.includes('Tile shower walls'));
 });
+test('Every trade customer PDF hides individual labor, material purchase rates, overhead and profit',()=>{
+ const trades=['electrical','plumbing','painting','concrete','handyman','remodel','cleaning'];
+ for(const trade of trades){
+  const p={...sample,trade,cleaning:undefined,unknowns:[],lines:[
+   {id:'material',description_en:'Interior eggshell paint',description_es:'Pintura eggshell interior',quantity:9,unit:'gal',rate:37.98,status:'allowance_to_confirm'},
+   {id:'labor',description_en:'Painting labor total crew hours',description_es:'Mano de obra horas totales',quantity:38.5,unit:'hr',rate:60,status:'allowance_to_confirm'},
+   {id:'mobilization',description_en:'Mobilization and purchasing cost',description_es:'Movilización y compras',quantity:1,unit:'job',rate:75,status:'allowance_to_confirm'}
+  ]};
+  const html=proposalHtml(p);
+  assert.ok(html.includes('Interior eggshell paint'),trade+' scope missing');
+  assert.ok(html.includes('total project price'),trade+' bundled selling price missing');
+  for(const leaked of ['Painting labor total crew hours','Mobilization and purchasing cost','$37.98','$60.00','$75.00','Overhead','Profit markup','>Profit<','>Subtotal<'])assert.equal(html.includes(leaked),false,trade+' leaked '+leaked);
+  assert.ok(html.includes(money(totals(p).total)),trade+' selling price missing');
+ }
+});
+test('Shared actionable missing scope detector recognizes omitted dimensions but not ordinary planning cautions',()=>{
+ const {estimationScopeIssues}=mod.exports;
+ const issues=estimationScopeIssues({unknowns:[
+  'Living-room area not measured; not included in priced quantities',
+  'Normal prep only, verify wall condition',
+  'Missing quantity for outlets',
+  'Living-room area not measured; not included in priced quantities'
+ ]});
+ assert.equal(issues.length,2);
+ assert.ok(issues.some(x=>x.includes('Living-room')));
+ assert.ok(issues.some(x=>x.includes('outlets')));
+});
 test('follow-up pipeline provides six status choices',()=>{
  assert.deepEqual(Object.keys(JOB_STATUSES).sort(),['accepted','completed','declined','draft','in_progress','sent'].sort());
 });
