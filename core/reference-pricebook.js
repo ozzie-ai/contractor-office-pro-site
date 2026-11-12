@@ -37,6 +37,21 @@ const catalog=Object.freeze([
   unit:'bag',defaultTier:'standard',options:[
    option('standard',13.62,'Home Depot','https://www.homedepot.com/b/Building-Materials-Drywall-Joint-Compound/USG-Sheetrock-Brand/USG-Corporation-Joint-Compound/Powder-Joint-Compound/N-5yc1vZard1ZomdZ1z10nw1Z1z23xuf','20-minute setting compound 18 lb'),
    option('alternative',18.49,'Lowe\'s Pro Supply','https://www.lowesprosupply.com/Product/Easy-Sand-20-Min-Joint-C-USG-EASY-SAND-804191','20-minute setting compound 18 lb')
+  ]},
+ {id:'concrete-80lb-bag',trade:'concrete',en:'General-purpose concrete mix — 80 lb bag',es:'Concreto preparado de uso general — saco de 80 lb',
+  unit:'bag',defaultTier:'standard',options:[
+   option('standard',6.47,'Home Depot','https://www.homedepot.com/b/Building-Materials-Concrete-Cement-Masonry-Concrete/80-lb/N-5yc1vZcdptZ1z1a6zj','80 lb Quikrete, approximately 0.6 cu ft yield'),
+   option('alternative',6.47,'Lowe\'s','https://www.lowes.com/collections/QUIKRETE-Concrete-Planter/GR_8408','80 lb general purpose concrete mix')
+  ]},
+ {id:'interior-paint-1gal',trade:'painting',en:'Interior wall paint — 1 gallon',es:'Pintura interior para paredes — 1 galón',
+  unit:'gal',defaultTier:'standard',options:[
+   option('basic-flat',23.98,'Home Depot','https://www.homedepot.com/p/206751486','Glidden interior flat, 1 gallon'),
+   option('standard',37.98,'Home Depot','https://www.homedepot.com/p/204405954','Behr Premium Plus interior eggshell, 1 gallon')
+  ]},
+ {id:'bathroom-faucet-4in',trade:'plumbing',en:'Chrome 4-inch centerset bathroom faucet',es:'Grifo cromado para lavamanos, 4 pulgadas entre centros',
+  unit:'ea',defaultTier:'single-handle',options:[
+   option('two-handle',34.98,'Home Depot','https://www.homedepot.com/p/309237986','4in centerset chrome two-handle faucet'),
+   option('single-handle',39.98,'Home Depot','https://www.homedepot.com/p/206390785','4in centerset chrome one-handle faucet')
   ]}
 ].map(x=>Object.freeze({...x,options:Object.freeze(x.options)})));
 const byId=new Map(catalog.map(x=>[x.id,x]));
@@ -142,6 +157,35 @@ function parseMud(text,lines,questions,opts,now){
  const count=numUnit(text,'(?:bags?|sacos?|bolsas?)');
  add(lines,questions,'joint-20min-18lb',count,'18lb bag count: '+(count||'missing'),opts['joint-20min-18lb'],now);
 }
+function parseConcreteBags(text,lines,questions,opts,now){
+ if(!/(?:concrete|concreto|quikrete)/.test(text))return;
+ if(!/(?:80\s*(?:lb|lbs|pounds?|libras?)|ochenta\s*libras?)/.test(text))return;
+ const count=numUnit(text,'(?:80\\s*(?:lb|lbs)?\\s*)?(?:bags?|sacos?|bolsas?)');
+ add(lines,questions,'concrete-80lb-bag',count,'explicit 80lb bag quantity',opts['concrete-80lb-bag'],now);
+}
+function parseInteriorPaint(text,lines,questions,opts,now){
+ if(!/(?:paint|painting|pintura|pintar)/.test(text))return;
+ if(/\b(?:exterior|outside|fachada)\b/.test(text))return;
+ if(!/(?:interior|inside|paredes|walls?|habitacion|cuarto|bedroom|room)\b/.test(text))return;
+ const gal=numUnit(text,'(?:gallons?|galones?|galon|gal\\b)');
+ if(gal===null){questions.push({code:'paint_quantity',message:'Confirm paint gallons or wall area and coverage'});return}
+ const tier=opts['interior-paint-1gal']||(/(?:\bflat\b|mate\b|economica)/.test(text)?'basic-flat':'standard');
+ add(lines,questions,'interior-paint-1gal',gal,'number of gallons described, confirm sheen and coats',tier,now);
+ if(!/(?:eggshell|satin|satinado|flat|mate|low sheen)/.test(text))
+  questions.push({code:'paint_sheen',message:'Confirm paint finish; default reference is eggshell'});
+}
+function parseBathroomFaucets(text,lines,questions,opts,now){
+ if(!/(?:faucet|grifo|griferia|llave\s+de\s+lavamanos)/.test(text))return;
+ if(/(?:kitchen|cocina|fregadero|shower|ducha|tina|bathtub)/.test(text))return;
+ if(!/(?:bathroom|lavamanos|bano|bath|4\s*(?:in|inch|pulgadas?)|centerset)/.test(text))return;
+ const n=numUnit(text,'(?:bathroom\\s+)?(?:faucets?|grifos?|llaves?)');
+ const options={...opts};
+ if(!options['bathroom-faucet-4in']&&/(?:2\\s*handle|two\\s*handle|dos\\s*manijas|doble\\s*manija)/.test(text))
+  options['bathroom-faucet-4in']='two-handle';
+ add(lines,questions,'bathroom-faucet-4in',n,'4in centerset bathroom faucet; confirm mounting and supply',options['bathroom-faucet-4in'],now);
+ if(!/(?:4\s*(?:in|inch|pulgadas?)|centerset|centro\s+a\s+centro)/.test(text))
+  questions.push({code:'faucet_mount',message:'Confirm faucet centerset spacing and number of handles'});
+}
 function fromTranscript(input,{tiers={},now=DATE}={}){
  const text=lower(input),lines=[],questions=[];
  if(!text)return {lines,questions:[{code:'description',message:'Describe the job'}],status:'needs_review',retailReferenceDate:DATE};
@@ -149,6 +193,9 @@ function fromTranscript(input,{tiers={},now=DATE}={}){
  parseWire(text,lines,questions,tiers,now);
  parseDrywall(text,lines,questions,tiers,now);
  parseMud(text,lines,questions,tiers,now);
+ parseConcreteBags(text,lines,questions,tiers,now);
+ parseInteriorPaint(text,lines,questions,tiers,now);
+ parseBathroomFaucets(text,lines,questions,tiers,now);
  if(!lines.length&&!questions.length)questions.push({code:'no_catalog_match',message:'This job has no matching priced reference yet; do not invent a material price'});
  const stale=lines.some(x=>x.isStale);
  if(stale)questions.push({code:'stale_prices',message:'Cached retail prices are older than 45 days; refresh when possible'});
