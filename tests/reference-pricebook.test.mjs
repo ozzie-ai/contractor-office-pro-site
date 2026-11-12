@@ -76,4 +76,23 @@ test('Unrecognized plumbing and painting materials never get invented costs',()=
   assert.equal(r.status,'needs_review');
  }
 });
+test('Concrete: only 80lb bagged mix explicitly described, no ready-mix substitution',()=>{
+ const r=book.fromTranscript('Pour small curb using five 80 lb bags of Quikrete concrete');
+ assert.deepEqual(r.lines.map(x=>[x.id,x.quantity,x.total]),[['concrete-80lb-bag',5,32.35]]);
+ assert.equal(book.fromTranscript('Pour 10 yards of ready-mix concrete').lines.length,0);
+});
+test('Painting: standard interior gallon reference, flat paint is different tier',()=>{
+ const r=book.fromTranscript('Pintar paredes interiores con dos galones de pintura eggshell');
+ assert.deepEqual(r.lines.map(x=>[x.id,x.quantity,x.total]),[['interior-paint-1gal',2,75.96]]);
+ const flat=book.fromTranscript('Paint walls inside using 2 gallons flat interior paint');
+ assert.equal(flat.lines[0].unitCost,23.98);
+});
+test('Plumbing: 4-inch bathroom faucet material reference, not kitchen or customer-supplied',()=>{
+ const r=book.fromTranscript('Replace two bathroom faucets 4 inch centerset chrome');
+ assert.deepEqual(r.lines.map(x=>[x.id,x.quantity,x.total]),[['bathroom-faucet-4in',2,79.96]]);
+ const owner=book.fromTranscript('Replace two bathroom faucets, customer supplies fixtures');
+ assert.equal(owner.lines.length,0);
+ assert.ok(owner.questions.some(x=>x.code==='customer_supplied_fixture'));
+ assert.equal(book.fromTranscript('Replace one kitchen faucet').lines.length,0);
+});
 console.log('PASS '+n+' generic offline pricebook regression cases');
