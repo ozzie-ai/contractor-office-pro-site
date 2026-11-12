@@ -186,6 +186,7 @@ function renderGenericResearch(){
  }
 }
 window.COPRefreshRetailReferences=renderGenericResearch;
+window.COPRegisterRetailReference=(index,ref)=>pricingEvidence.set(index,ref);
 const previousSuggestedItems=suggestedItems;
 suggestedItems=function(){
  pricingEvidence=new Map();activeOutlet=null;confirmedOutlet=false;
