@@ -528,7 +528,7 @@ export default function App(){
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
     <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>)}</View>
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
-    <Action title={tr("Next: Scope","Siguiente: Alcance")} onPress={()=>setStage(1)}/>
+    <Action title={project.trade==='painting'?tr("Create painting estimate","Crear estimado de pintura"):tr("Next: Scope","Siguiente: Alcance")} onPress={()=>project.trade==='painting'?createLocalDraft():setStage(1)}/>
    </View>}
    {stage===1&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("2 · Prepare scope","2 · Preparar alcance")}</Text>
