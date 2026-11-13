@@ -13,6 +13,14 @@ struct RootView: View {
                 ContentUnavailableView("home.backend.missing", systemImage: "exclamationmark.icloud")
             case .signedOut:
                 SignInView()
+            case .offline:
+                ContentUnavailableView {
+                    Label("session.offline.title", systemImage: "wifi.slash")
+                } description: {
+                    Text("session.offline.message")
+                } actions: {
+                    Button("session.offline.retry") { Task { await session.start() } }
+                }
             case .needsOrganization:
                 OrganizationSetupView()
             case .ready(let orgId, _):
@@ -46,8 +54,6 @@ struct HomeView: View {
                 Text("home.backend.configured")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Button("auth.sign_out", role: .destructive) { Task { await session.signOut() } }
-                    .padding(.top)
             }
             .padding()
             .navigationTitle(Text("app.name"))

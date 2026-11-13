@@ -37,9 +37,6 @@ struct OrganizationSetupView: View {
                 .disabled(working || businessName.trimmingCharacters(in: .whitespaces).isEmpty
                           || ownerName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            Section {
-                Button("auth.sign_out", role: .destructive) { Task { await session.signOut() } }
-            }
         }
     }
 

@@ -12,6 +12,8 @@ final class SessionStore {
         case loading
         case backendMissing
         case signedOut
+        /// First launch with no connection: anonymous sign-in needs the network once.
+        case offline
         case needsOrganization(userId: UUID, email: String?)
         case ready(orgId: UUID, memberId: UUID)
     }
@@ -35,10 +37,17 @@ final class SessionStore {
 
     func start() async {
         guard let client else { state = .backendMissing; return }
-        if let session = try? await client.auth.session, !session.isExpired {
+        if let session = try? await client.auth.session {
             await resolve(user: session.user)
-        } else {
-            state = .signedOut
+            return
+        }
+        // Dev mode (ADR 0004): no login screen. Sign in anonymously; an email can be linked to this
+        // same account later without losing data. The email-code flow below stays for that.
+        do {
+            let session = try await client.auth.signInAnonymously()
+            await resolve(user: session.user)
+        } catch {
+            state = .offline
         }
     }
 
