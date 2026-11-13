@@ -33,6 +33,8 @@ def install_error_handlers(app: FastAPI) -> None:
     async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
         # FastAPI's default echoes the offending input; ours lists only field locations.
         fields = sorted({".".join(str(p) for p in err.get("loc", ()) if p != "body") for err in exc.errors()})
+        # Field locations and error types only, never values (they may contain private notes).
+        log.warning("invalid request: %s", sorted({f"{'.'.join(map(str, e.get('loc', ())))}:{e.get('type')}" for e in exc.errors()}))
         return JSONResponse(error_body("invalid_request", f"Check these fields: {', '.join(fields) or 'body'}"),
                             status_code=400)
 

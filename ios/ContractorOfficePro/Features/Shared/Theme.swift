@@ -59,12 +59,14 @@ private struct ThemedList: ViewModifier {
     }
 }
 
+/// The accent flips between black (light) and white (dark), so the label must use the opposite color;
+/// the system default label color is white, which vanished on the white dark-mode button.
 private struct PrimaryActionStyle: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
-            content.buttonStyle(.glassProminent).tint(Theme.accent)
+            content.buttonStyle(.glassProminent).tint(Theme.accent).foregroundStyle(Theme.onAccent)
         } else {
-            content.buttonStyle(.borderedProminent).tint(Theme.accent)
+            content.buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(Theme.onAccent)
         }
     }
 }

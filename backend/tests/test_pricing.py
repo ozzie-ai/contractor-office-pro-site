@@ -135,3 +135,14 @@ def test_admin_import_validation():
     assert len(clean) == 1 and clean[0]["source_id"] == "s1"
     assert len(errors) == 5
     assert any("commercial reuse" in e for e in errors) and any("price basis" in e for e in errors)
+
+
+def test_price_accepts_tasks_with_omitted_null_fields(client, auth_headers):
+    """Regression: the iOS encoder omits nil keys, so uncataloged tasks arrive without task_code/quantity/unit."""
+    body = {"tasks": [{"description_en": "Patch drywall around the old panel", "description_es": "Resanar"},
+                      {"task_code": "ELEC.PANEL.UPGRADE", "description_en": "Panel", "description_es": "Panel", "quantity": 1}]}
+    r = client.post("/v1/estimate/price", json=body, headers=auth_headers)
+    assert r.status_code == 200
+    lines = r.json()["lines"]
+    assert lines[0]["task_code"] is None and lines[0]["needs"] == ["price", "quantity"]
+    assert lines[1]["unit_price"] == "2100.00"

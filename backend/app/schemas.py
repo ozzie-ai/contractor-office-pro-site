@@ -67,7 +67,8 @@ class InterpretResponse(BaseModel):
 class PriceTaskInput(BaseModel):
     """A work item to price (typically a task from /v1/interpret, possibly edited by the contractor)."""
     model_config = ConfigDict(extra="ignore")
-    task_code: TaskCode | None
+    # Optional with a default: clients may omit null keys (the iOS JSON encoder does).
+    task_code: TaskCode | None = None
     description_en: str
     description_es: str = ""
     quantity: float | None = Field(default=None, ge=0)

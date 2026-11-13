@@ -52,6 +52,8 @@ final class SmokeUITests: XCTestCase {
         let job = app.staticTexts["Bathroom remodel"]
         XCTAssertTrue(job.waitForExistence(timeout: 10))
         job.tap()
+        XCTAssertTrue(app.buttons["New estimate with AI"].waitForExistence(timeout: 5)); Thread.sleep(forTimeInterval: 0.8)
+        snap("8b-job-detail-buttons")
         app.buttons["New estimate with AI"].tap()
         let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
         XCTAssertTrue(notes.waitForExistence(timeout: 5))
