@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct JobListView: View {
+    @Environment(Workspace.self) private var workspace
     @Query(filter: #Predicate<Job> { $0.deletedAt == nil }, sort: \Job.updatedAt, order: .reverse)
     private var jobs: [Job]
     @Query(filter: #Predicate<Client> { $0.deletedAt == nil })
@@ -14,6 +15,11 @@ struct JobListView: View {
 
     var body: some View {
         List {
+            Section {
+                DashboardHeader(memberID: workspace.memberID)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+            }
             Section {
                 Picker(selection: $filter) {
                     ForEach(JobFilter.allCases) { Text($0.title).tag($0) }
@@ -30,14 +36,16 @@ struct JobListView: View {
                         NavigationLink(value: AppRoute.job(job.id)) {
                             JobRow(job: job, clientName: job.clientId.flatMap { clientNames[$0] })
                         }
+                        .zoomSource(.job(job.id))
                     }
                 } header: {
                     StatusBadge(status: section.status)
                 }
             }
         }
+        .refreshable { await workspace.sync.syncNow() }
         .overlay {
-            if sections.isEmpty { emptyState }
+            if sections.isEmpty { emptyState.padding(.top, 180) }
         }
         .themedList()
         .navigationTitle(Text(.jobsTitle))

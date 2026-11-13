@@ -85,6 +85,10 @@ struct EstimateDraftSheet: View {
             .interactiveDismissDisabled(phase != nil || !notes.trimmed.isEmpty)
             .onAppear { notesFocused = true }
         }
+        .overlay {
+            if phase != nil { AIGlow().transition(.opacity) }
+        }
+        .animation(.smooth(duration: 0.4), value: phase != nil)
     }
 
     private func draft() {

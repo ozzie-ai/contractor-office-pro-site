@@ -22,6 +22,7 @@ struct ClientListView: View {
 
 /// Separate view so the @Query is rebuilt when the search text changes.
 private struct ClientList: View {
+    @Environment(Workspace.self) private var workspace
     @Query private var clients: [Client]
     let search: String
     let onAdd: () -> Void
@@ -40,7 +41,9 @@ private struct ClientList: View {
             NavigationLink(value: AppRoute.client(client.id)) {
                 ClientRow(client: client)
             }
+            .zoomSource(.client(client.id))
         }
+        .refreshable { await workspace.sync.syncNow() }
         .themedList()
         .overlay {
             if clients.isEmpty {

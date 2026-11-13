@@ -7,7 +7,7 @@ final class SmokeUITests: XCTestCase {
     @MainActor
     func testTourAndCreateClient() {
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let panelJob = app.staticTexts["Panel upgrade 100A → 200A"]
@@ -46,7 +46,7 @@ final class SmokeUITests: XCTestCase {
     @MainActor
     func testDraftEstimateWithAI() {
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
 
         let job = app.staticTexts["Bathroom remodel"]
@@ -58,6 +58,8 @@ final class SmokeUITests: XCTestCase {
         notes.typeText("Cambiar panel de 100 a 200 amperios, transferir 20 circuitos, circuito de 40A para cargador.")
         snap("9-draft-notes")
         app.buttons["Draft estimate"].tap()
+        Thread.sleep(forTimeInterval: 0.7)
+        snap("9b-ai-glow")
 
         XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 10))
         snap("10a-estimate-top")
@@ -82,9 +84,21 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testSplashSettlesIntoTheApp() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        Thread.sleep(forTimeInterval: 0.25); snap("splash-a")
+        Thread.sleep(forTimeInterval: 0.45); snap("splash-b")
+        Thread.sleep(forTimeInterval: 0.6); snap("splash-c")
+        XCTAssertTrue(app.staticTexts["Fence repair"].waitForExistence(timeout: 5), "app appears after the splash")
+        Thread.sleep(forTimeInterval: 0.6); snap("splash-d-app")
+    }
+
+    @MainActor
     func testSpanish() {
         let app = XCUIApplication()
-        app.launchArguments = ["-demo", "-AppleLanguages", "(es)", "-AppleLocale", "es_US"]
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(es)", "-AppleLocale", "es_US"]
         app.launch()
         XCTAssertTrue(app.staticTexts["Trabajos"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.tabBars.buttons["Clientes"].exists)

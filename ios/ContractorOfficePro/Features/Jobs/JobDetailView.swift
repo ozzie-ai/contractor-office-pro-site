@@ -116,6 +116,8 @@ struct JobDetailView: View {
             EstimateDraftSheet(job: job, defaultLanguage: client?.preferredLanguage ?? .en) { openedEstimate = $0 }
         }
         .navigationDestination(item: $openedEstimate) { EstimateView(estimateID: $0) }
+        .sensoryFeedback(.success, trigger: openedEstimate) { _, new in new != nil }
+        .sensoryFeedback(.selection, trigger: job.status)
         .confirmationDialog(Text(.jobDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
                 if (try? workspace.delete(job)) != nil { dismiss() } else { saveFailed = true }

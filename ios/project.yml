@@ -53,7 +53,8 @@ targets:
         CFBundleLocalizations: [en, es]
         # Only standard HTTPS (exempt), so TestFlight doesn't ask the export-compliance question each upload.
         ITSAppUsesNonExemptEncryption: false
-        UILaunchScreen: {}
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)

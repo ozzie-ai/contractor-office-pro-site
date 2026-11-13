@@ -10,9 +10,13 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
     private var offline: Bool
     private var clock = Date(timeIntervalSince1970: 1_800_000_000)
 
-    init(signedInUser: UUID? = nil, offline: Bool = false) {
+    /// Simulated AI latency for demo mode/previews (tests keep zero).
+    private let aiDelay: Duration
+
+    init(signedInUser: UUID? = nil, offline: Bool = false, aiDelay: Duration = .zero) {
         currentUser = signedInUser
         self.offline = offline
+        self.aiDelay = aiDelay
     }
 
     func setOffline(_ value: Bool) { offline = value }
@@ -95,6 +99,7 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
 
     func interpret(_ request: InterpretRequestBody) async throws -> InterpretResponseDTO {
         if offline { throw BackendError.offline }
+        if aiDelay > .zero { try await Task.sleep(for: aiDelay) }
         interpretCalls += 1
         func task(_ code: String?, _ en: String, _ es: String, _ qty: Double?, _ unit: String?) -> WorkTaskDTO {
             WorkTaskDTO(taskCode: code, category: "electrical", descriptionEn: en, descriptionEs: es, quantity: qty,

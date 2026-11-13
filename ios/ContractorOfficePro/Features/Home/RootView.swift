@@ -4,10 +4,29 @@ import SwiftUI
 /// Routes on session state. The account flow is the one place a top-level switch is the right tool.
 struct RootView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var splashFinished = ProcessInfo.processInfo.arguments.contains("-noSplash")
+
+    private var showSplash: Bool { !splashFinished || session.state == .loading }
 
     var body: some View {
-        content
-            .task { await session.start() }
+        ZStack {
+            content
+                .scaleEffect(showSplash && !reduceMotion ? 0.96 : 1)
+                .opacity(showSplash ? 0 : 1)
+            if showSplash {
+                SplashView()
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 1.04)))
+                    .zIndex(1)
+            }
+        }
+        .animation(.smooth(duration: 0.5), value: showSplash)
+        .task { await session.start() }
+        .task {
+            guard !splashFinished else { return }
+            try? await Task.sleep(for: .seconds(reduceMotion ? 0.6 : 1.6))
+            splashFinished = true
+        }
     }
 
     @ViewBuilder

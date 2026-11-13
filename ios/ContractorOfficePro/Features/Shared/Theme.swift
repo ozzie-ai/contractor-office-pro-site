@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 
 /// Monochrome, Vercel-inspired palette. Light: near-white canvas, black accent. Dark: pure black canvas, white accent.
-enum Theme {
+/// nonisolated: SwiftUI may resolve colors off the main thread.
+nonisolated enum Theme {
     static let canvas = Color(light: 0xFAFAFA, dark: 0x000000)
     static let surface = Color(light: 0xFFFFFF, dark: 0x0A0A0A)
     static let border = Color(light: 0xEAEAEA, dark: 0x262626)
@@ -16,7 +17,9 @@ enum Theme {
     static let violet = Color(light: 0x7C3AED, dark: 0xA78BFA)
 }
 
-extension Color {
+nonisolated extension Color {
+    /// The provider closure runs wherever UIKit/SwiftUI resolves the color (not always the main actor),
+    /// so it must not inherit MainActor isolation — that crashed with an isolation assertion.
     init(light: UInt32, dark: UInt32) {
         self = Color(uiColor: UIColor { traits in
             let hex = traits.userInterfaceStyle == .dark ? dark : light
