@@ -188,23 +188,6 @@
         }
       }
     },
-    "auth.sign_out": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign out"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cerrar sesión"
-          }
-        }
-      }
-    },
     "auth.subtitle": {
       "extractionState": "manual",
       "localizations": {
@@ -235,23 +218,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Iniciar sesión"
-          }
-        }
-      }
-    },
-    "home.backend.configured": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Backend connected"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Servidor conectado"
           }
         }
       }
@@ -477,19 +443,43 @@
         }
       }
     },
-    "sync.pending %lld": {
+    "sync.pending": {
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld changes waiting to upload"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld change waiting to upload"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld changes waiting to upload"
+                }
+              }
+            }
           }
         },
         "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%lld cambios pendientes de subir"
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld cambio pendiente de subir"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld cambios pendientes de subir"
+                }
+              }
+            }
           }
         }
       }
@@ -545,19 +535,19 @@
         }
       }
     },
-    "sync.status.synced %@": {
+    "sync.status.synced": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Synced %@ ago"
+            "value": "Synced %1$(time)@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sincronizado hace %@"
+            "value": "Sincronizado %1$(time)@"
           }
         }
       }
@@ -580,5 +570,5 @@
       }
     }
   },
-  "version": "1.0"
+  "version": "1.1"
 }

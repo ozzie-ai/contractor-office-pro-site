@@ -1,11 +1,9 @@
 import Foundation
 import Observation
-import Supabase
 import SwiftData
 
-/// Sign-in state and first-run org setup.
-/// Flow: email → 6-digit code → (first time) business name → ready.
-@MainActor
+/// Account + business state for the app (MV pattern: views read it from the environment).
+/// Dev mode (ADR 0004): signs in anonymously, no login screen. The email-code methods stay for later.
 @Observable
 final class SessionStore {
     enum State: Equatable {
@@ -14,169 +12,153 @@ final class SessionStore {
         case signedOut
         /// First launch with no connection: anonymous sign-in needs the network once.
         case offline
-        case needsOrganization(userId: UUID, email: String?)
-        case ready(orgId: UUID, memberId: UUID)
+        case needsOrganization(userID: UUID)
+        case ready(orgID: UUID, memberID: UUID)
     }
 
-    /// User-facing errors are String Catalog keys, never raw server text.
-    enum Failure: String, Error {
-        case invalidEmail = "auth.error.invalid_email"
-        case invalidCode = "auth.error.invalid_code"
-        case network = "auth.error.network"
-        case orgSetup = "auth.error.org_setup"
+    enum Failure: Error, Equatable {
+        case invalidEmail, invalidCode, network, organizationSetup
+
+        @MainActor var message: LocalizedStringResource {
+            switch self {
+            case .invalidEmail: .authErrorInvalidEmail
+            case .invalidCode: .authErrorInvalidCode
+            case .network: .authErrorNetwork
+            case .organizationSetup: .authErrorOrgSetup
+            }
+        }
     }
 
     private(set) var state: State = .loading {
-        didSet { startSyncIfReady() }
+        didSet { makeSyncEngineIfReady(previous: oldValue) }
     }
-    /// Created once the user's business is known.
+    /// Exists once the business is known; HomeView runs it with `.task`.
     private(set) var sync: SyncEngine?
-    private let client: SupabaseClient?
-    private let context: ModelContext
 
-    init(client: SupabaseClient? = Backend.client, context: ModelContext) {
-        self.client = client
+    private let account: (any AccountClient)?
+    private let transport: (any SyncTransport)?
+    private let context: ModelContext
+    private let defaults: UserDefaults
+
+    init(account: (any AccountClient)?, transport: (any SyncTransport)?, context: ModelContext,
+         defaults: UserDefaults = .standard) {
+        self.account = account
+        self.transport = transport
         self.context = context
+        self.defaults = defaults
+    }
+
+    static func live(context: ModelContext) -> SessionStore {
+        SessionStore(account: Backend.client.map(SupabaseAccountClient.init),
+                     transport: Backend.client.map(SupabaseSyncTransport.init),
+                     context: context)
     }
 
     func start() async {
-        guard let client else { state = .backendMissing; return }
-        if let session = try? await client.auth.session {
-            await resolve(user: session.user)
+        guard let account else { state = .backendMissing; return }
+        if let userID = await account.currentUserID() {
+            await resolve(userID: userID)
             return
         }
-        // Dev mode (ADR 0004): no login screen. Sign in anonymously; an email can be linked to this
-        // same account later without losing data. The email-code flow below stays for that.
         do {
-            let session = try await client.auth.signInAnonymously()
-            await resolve(user: session.user)
+            await resolve(userID: try await account.signInAnonymously())
         } catch {
             state = .offline
         }
     }
 
     func sendCode(to rawEmail: String) async throws(Failure) {
-        let email = rawEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard email.contains("@"), email.contains(".") else { throw .invalidEmail }
-        do {
-            try await client?.auth.signInWithOTP(email: email, shouldCreateUser: true)
-        } catch {
-            throw .network
-        }
+        let email = Self.normalize(rawEmail)
+        guard email.contains("@"), email.contains("."), let account else { throw .invalidEmail }
+        do { try await account.sendCode(to: email) } catch { throw .network }
     }
 
     func verify(email rawEmail: String, code: String) async throws(Failure) {
-        let email = rawEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let token = code.filter(\.isNumber)
-        guard token.count == 6, let client else { throw .invalidCode }
+        guard token.count == 6, let account else { throw .invalidCode }
         do {
-            let response = try await client.auth.verifyOTP(email: email, token: token, type: .email)
-            await resolve(user: response.user)
+            await resolve(userID: try await account.verify(email: Self.normalize(rawEmail), code: token))
         } catch {
             throw .invalidCode
         }
     }
 
-    /// First sign-in: create the org and owner locally (device-generated ids), then register them on the server.
+    /// First run: register the business with device-generated ids, then mirror it locally.
     func createOrganization(name: String, ownerName: String, language: AppLanguage) async throws(Failure) {
-        guard case .needsOrganization(let userId, _) = state, let client else { throw .orgSetup }
-        let org = Organization(name: name.trimmingCharacters(in: .whitespaces), defaultLanguage: language)
-        let owner = Member(orgId: org.id, userId: userId, displayName: ownerName.trimmingCharacters(in: .whitespaces),
-                           role: .owner, preferredLanguage: language)
+        guard case .needsOrganization(let userID) = state, let account else { throw .organizationSetup }
+        let request = NewOrganization(name: name.trimmingCharacters(in: .whitespaces),
+                                      ownerName: ownerName.trimmingCharacters(in: .whitespaces),
+                                      language: language)
         do {
-            let serverOrgId: UUID = try await client.rpc("create_org_for_user", params: CreateOrgParams(
-                p_org_id: org.id, p_member_id: owner.id, p_org_name: org.name,
-                p_display_name: owner.displayName, p_language: language.rawValue
-            )).execute().value
-
-            if serverOrgId == org.id {
+            let serverOrgID = try await account.createOrganization(request)
+            if serverOrgID == request.orgID {
+                let org = Organization(id: request.orgID, name: request.name, defaultLanguage: language)
+                let owner = Member(id: request.memberID, orgId: request.orgID, userId: userID,
+                                   displayName: request.ownerName, role: .owner, preferredLanguage: language)
                 org.needsSync = false
                 owner.needsSync = false
                 context.insert(org)
                 context.insert(owner)
                 try context.save()
-                state = .ready(orgId: org.id, memberId: owner.id)
-            } else {
-                // This account already has a business (e.g. new phone). Use the server's copy.
-                try await downloadOrganization(for: userId)
+                state = .ready(orgID: org.id, memberID: owner.id)
+            } else if try await !downloadMembership(for: userID) {
+                throw Failure.organizationSetup
             }
         } catch {
-            throw .orgSetup
+            throw .organizationSetup
         }
     }
 
     func signOut() async {
-        try? await client?.auth.signOut()
+        await account?.signOut()
         state = .signedOut
     }
 
     // MARK: - Private
 
-    private func startSyncIfReady() {
-        guard case .ready(let orgId, _) = state, let client else { sync = nil; return }
-        let engine = SyncEngine(client: client, context: context, orgId: orgId)
-        sync = engine
-        engine.startMonitoring()
-        Task { await engine.syncNow() }
-    }
-
-    private func resolve(user: User) async {
-        let uid = user.id
-        if let member = localMember(for: uid) {
-            state = .ready(orgId: member.orgId, memberId: member.id)
+    private func resolve(userID: UUID) async {
+        if let member = localMember(for: userID) {
+            state = .ready(orgID: member.orgId, memberID: member.id)
+        } else if (try? await downloadMembership(for: userID)) == true {
             return
-        }
-        do {
-            try await downloadOrganization(for: uid)
-        } catch {
-            state = .needsOrganization(userId: uid, email: user.email)
+        } else {
+            state = .needsOrganization(userID: userID)
         }
     }
 
-    private func localMember(for userId: UUID) -> Member? {
-        let descriptor = FetchDescriptor<Member>(predicate: #Predicate { $0.userId == userId && $0.deletedAt == nil })
+    private func localMember(for userID: UUID) -> Member? {
+        let descriptor = FetchDescriptor<Member>(predicate: #Predicate { $0.userId == userID && $0.deletedAt == nil })
         return try? context.fetch(descriptor).first
     }
 
-    /// Pulls this user's org + member rows (RLS limits results to orgs they belong to).
-    private func downloadOrganization(for userId: UUID) async throws {
-        guard let client else { throw Failure.orgSetup }
-        let members: [MemberDTO] = try await client.from("members")
-            .select().eq("user_id", value: userId).is("deleted_at", value: nil)
-            .limit(1).execute().value
-        guard let memberDTO = members.first else { throw Failure.orgSetup }
-        let orgDTO: OrganizationDTO = try await client.from("organizations")
-            .select().eq("id", value: memberDTO.orgId).single().execute().value
-
-        upsert(orgDTO)
-        upsert(memberDTO)
+    /// An existing account on a new device: pull its business and owner row.
+    private func downloadMembership(for userID: UUID) async throws -> Bool {
+        guard let membership = try await account?.membership(for: userID),
+              let org = upsertLocal(membership.organization, as: Organization.self),
+              let member = upsertLocal(membership.member, as: Member.self) else { return false }
         try context.save()
-        state = .ready(orgId: memberDTO.orgId, memberId: memberDTO.id)
+        state = .ready(orgID: org.id, memberID: member.id)
+        return true
     }
 
-    private func upsert(_ dto: OrganizationDTO) {
-        let id = dto.id
-        if let existing = try? context.fetch(FetchDescriptor<Organization>(predicate: #Predicate { $0.id == id })).first {
-            existing.apply(dto)
-        } else {
-            context.insert(Organization(dto))
+    private func upsertLocal<T: SyncRecord>(_ row: Row, as type: T.Type) -> T? {
+        guard let id = row.uuid("id") else { return nil }
+        if let existing = try? context.fetch(FetchDescriptor<T>()).first(where: { $0.id == id }) {
+            existing.apply(row)
+            return existing
         }
+        guard let created = T.make(row) else { return nil }
+        context.insert(created)
+        return created
     }
 
-    private func upsert(_ dto: MemberDTO) {
-        let id = dto.id
-        if let existing = try? context.fetch(FetchDescriptor<Member>(predicate: #Predicate { $0.id == id })).first {
-            existing.apply(dto)
-        } else {
-            context.insert(Member(dto))
-        }
+    private func makeSyncEngineIfReady(previous: State) {
+        guard state != previous else { return }
+        guard case .ready(let orgID, _) = state, let transport else { sync = nil; return }
+        sync = SyncEngine(transport: transport, context: context, orgID: orgID, defaults: defaults)
     }
-}
 
-private struct CreateOrgParams: Encodable, Sendable {
-    let p_org_id: UUID
-    let p_member_id: UUID
-    let p_org_name: String
-    let p_display_name: String
-    let p_language: String
+    private static func normalize(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
 }

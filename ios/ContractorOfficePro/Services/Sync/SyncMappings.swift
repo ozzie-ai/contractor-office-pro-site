@@ -3,7 +3,7 @@ import Supabase
 import SwiftData
 
 /// How a model maps to its Supabase table. Column lists mirror supabase/migrations.
-protocol SyncRecord: Syncable {
+nonisolated protocol SyncRecord: Syncable {
     static var table: String { get }
     /// organizations/members are created only by create_org_for_user, so they sync with UPDATE, never INSERT.
     static var pushesWithUpdateOnly: Bool { get }
@@ -15,7 +15,7 @@ protocol SyncRecord: Syncable {
     static func make(_ r: Row) -> Self?
 }
 
-extension SyncRecord {
+nonisolated extension SyncRecord {
     static var pushesWithUpdateOnly: Bool { false }
 
     func row() -> Row {
@@ -38,7 +38,7 @@ extension SyncRecord {
     }
 }
 
-enum SyncRules {
+nonisolated enum SyncRules {
     /// Last-write-wins on pull: keep a local unsynced edit only if it's newer than the server's copy.
     /// 1 ms tolerance because the server stores millisecond timestamps.
     static func shouldApplyRemote(localDirty: Bool, localUpdatedAt: Date, remoteUpdatedAt: Date) -> Bool {
@@ -46,12 +46,12 @@ enum SyncRules {
     }
 }
 
-private func base(_ r: Row) -> (id: UUID, org: UUID, created: Date)? {
+nonisolated private func base(_ r: Row) -> (id: UUID, org: UUID, created: Date)? {
     guard let id = r.uuid("id"), let org = r.uuid("org_id") else { return nil }
     return (id, org, r.date("created_at") ?? .now)
 }
 
-extension Organization: SyncRecord {
+nonisolated extension Organization: SyncRecord {
     static let table = "organizations"
     static var pushesWithUpdateOnly: Bool { true }
     var fields: Row {
@@ -71,7 +71,7 @@ extension Organization: SyncRecord {
     }
 }
 
-extension Member: SyncRecord {
+nonisolated extension Member: SyncRecord {
     static let table = "members"
     static var pushesWithUpdateOnly: Bool { true }
     var fields: Row {
@@ -89,7 +89,7 @@ extension Member: SyncRecord {
     }
 }
 
-extension Client: SyncRecord {
+nonisolated extension Client: SyncRecord {
     static let table = "clients"
     var fields: Row {
         ["name": J.s(name), "phone": J.s(phone), "email": J.s(email), "address": J.s(address),
@@ -108,7 +108,7 @@ extension Client: SyncRecord {
     }
 }
 
-extension Job: SyncRecord {
+nonisolated extension Job: SyncRecord {
     static let table = "jobs"
     var fields: Row {
         ["client_id": J.u(clientId), "title": J.s(title), "address": J.s(address), "status": J.s(statusRaw),
@@ -126,7 +126,7 @@ extension Job: SyncRecord {
     }
 }
 
-extension TimeEntry: SyncRecord {
+nonisolated extension TimeEntry: SyncRecord {
     static let table = "time_entries"
     var fields: Row {
         ["job_id": J.u(jobId), "member_id": J.u(memberId), "clock_in": J.t(clockIn),
@@ -143,7 +143,7 @@ extension TimeEntry: SyncRecord {
     }
 }
 
-extension PriceBookItem: SyncRecord {
+nonisolated extension PriceBookItem: SyncRecord {
     static let table = "price_book_items"
     var fields: Row {
         ["kind": J.s(kindRaw), "name_en": J.s(nameEn), "name_es": J.s(nameEs), "unit": J.s(unit),
@@ -161,7 +161,7 @@ extension PriceBookItem: SyncRecord {
     }
 }
 
-extension Estimate: SyncRecord {
+nonisolated extension Estimate: SyncRecord {
     static let table = "estimates"
     var fields: Row {
         ["job_id": J.u(jobId), "number": J.s(number), "status": J.s(statusRaw), "language": J.s(languageRaw),
@@ -180,7 +180,7 @@ extension Estimate: SyncRecord {
     }
 }
 
-extension LineItem: SyncRecord {
+nonisolated extension LineItem: SyncRecord {
     static let table = "line_items"
     var fields: Row {
         ["estimate_id": J.u(estimateId), "price_book_item_id": J.u(priceBookItemId), "position": J.i(position),
@@ -200,7 +200,7 @@ extension LineItem: SyncRecord {
     }
 }
 
-extension Receipt: SyncRecord {
+nonisolated extension Receipt: SyncRecord {
     static let table = "receipts"
     var fields: Row {
         ["job_id": J.u(jobId), "store": J.s(store), "purchased_on": J.day(purchasedOn), "subtotal": J.dec(subtotal),
@@ -217,7 +217,7 @@ extension Receipt: SyncRecord {
     }
 }
 
-extension ReceiptLineItem: SyncRecord {
+nonisolated extension ReceiptLineItem: SyncRecord {
     static let table = "receipt_line_items"
     var fields: Row {
         ["receipt_id": J.u(receiptId), "sku": J.s(sku), "description": J.s(itemDescription), "qty": J.dec(qty),
@@ -234,7 +234,7 @@ extension ReceiptLineItem: SyncRecord {
     }
 }
 
-extension Expense: SyncRecord {
+nonisolated extension Expense: SyncRecord {
     static let table = "expenses"
     var fields: Row {
         ["job_id": J.u(jobId), "receipt_id": J.u(receiptId), "category": J.s(category),
@@ -251,7 +251,7 @@ extension Expense: SyncRecord {
     }
 }
 
-extension Media: SyncRecord {
+nonisolated extension Media: SyncRecord {
     static let table = "media"
     var fields: Row {
         ["job_id": J.u(jobId), "kind": J.s(kindRaw), "storage_path": J.s(storagePath),

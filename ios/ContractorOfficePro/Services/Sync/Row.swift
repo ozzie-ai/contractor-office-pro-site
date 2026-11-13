@@ -4,37 +4,25 @@ import Supabase
 /// A Supabase row as loose JSON. Mappings in SyncMappings.swift convert models <-> rows.
 typealias Row = [String: AnyJSON]
 
-enum SyncDate {
-    nonisolated(unsafe) private static let fractional: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f
-    }()
-    nonisolated(unsafe) private static let whole: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        return f
-    }()
-    private static let day: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.calendar = Calendar(identifier: .gregorian)
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
+/// Timestamp/date conversions for the wire format. FormatStyles are Sendable, so no unsafe statics.
+nonisolated enum SyncDate {
+    private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let whole = Date.ISO8601FormatStyle()
+    private static let day = Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash)
 
-    /// Postgres sends microseconds ("…:00.123456+00:00"); trim to milliseconds before parsing.
+    /// Postgres sends microseconds and "+00:00" ("…:30.123456+00:00"); normalize to "…:30.123Z" first.
     static func parse(_ raw: String) -> Date? {
-        let trimmed = raw.replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1", options: .regularExpression)
-        return fractional.date(from: trimmed) ?? whole.date(from: trimmed)
+        var s = raw.replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\+00:?00$"#, with: "Z", options: .regularExpression)
+        return (try? fractional.parse(s)) ?? (try? whole.parse(s))
     }
 
-    static func format(_ date: Date) -> String { fractional.string(from: date) }
-    static func parseDay(_ raw: String) -> Date? { day.date(from: String(raw.prefix(10))) }
-    static func formatDay(_ date: Date) -> String { day.string(from: date) }
+    static func format(_ date: Date) -> String { fractional.format(date) }
+    static func parseDay(_ raw: String) -> Date? { try? day.parse(String(raw.prefix(10))) }
+    static func formatDay(_ date: Date) -> String { day.format(date) }
 }
 
-extension Dictionary where Key == String, Value == AnyJSON {
+nonisolated extension Dictionary where Key == String, Value == AnyJSON {
     func string(_ key: String) -> String? {
         if case .string(let s) = self[key] { return s }
         return nil
@@ -48,32 +36,32 @@ extension Dictionary where Key == String, Value == AnyJSON {
     }
     func int(_ key: String) -> Int? {
         switch self[key] {
-        case .integer(let i): return i
-        case .double(let d): return Int(d)
-        default: return nil
+        case .integer(let i): i
+        case .double(let d): Int(d)
+        default: nil
         }
     }
     func double(_ key: String) -> Double? {
         switch self[key] {
-        case .integer(let i): return Double(i)
-        case .double(let d): return d
-        case .string(let s): return Double(s)
-        default: return nil
+        case .integer(let i): Double(i)
+        case .double(let d): d
+        case .string(let s): Double(s)
+        default: nil
         }
     }
     /// Numeric columns arrive as JSON numbers; we send them as strings to keep exact cents.
     func decimal(_ key: String) -> Decimal? {
         switch self[key] {
-        case .integer(let i): return Decimal(i)
-        case .double(let d): return Decimal(string: String(d))
-        case .string(let s): return Decimal(string: s)
-        default: return nil
+        case .integer(let i): Decimal(i)
+        case .double(let d): Decimal(string: String(d))
+        case .string(let s): Decimal(string: s)
+        default: nil
         }
     }
 }
 
 /// Encoders for row values. Optionals become JSON null.
-enum J {
+nonisolated enum J {
     static func s(_ v: String?) -> AnyJSON { v.map { .string($0) } ?? .null }
     static func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString.lowercased()) } ?? .null }
     static func t(_ v: Date?) -> AnyJSON { v.map { .string(SyncDate.format($0)) } ?? .null }

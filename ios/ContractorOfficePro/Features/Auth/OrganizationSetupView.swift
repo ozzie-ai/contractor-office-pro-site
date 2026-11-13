@@ -4,52 +4,63 @@ struct OrganizationSetupView: View {
     @Environment(SessionStore.self) private var session
     @State private var businessName = ""
     @State private var ownerName = ""
-    @State private var language: AppLanguage = Locale.current.language.languageCode?.identifier == "es" ? .es : .en
-    @State private var working = false
-    @State private var errorKey: String?
+    @State private var language: AppLanguage = Locale.current.language.languageCode == .spanish ? .es : .en
+    @State private var isWorking = false
+    @State private var failure: SessionStore.Failure?
+
+    private var canContinue: Bool {
+        !isWorking && !businessName.trimmingCharacters(in: .whitespaces).isEmpty
+            && !ownerName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         Form {
             Section {
-                Text("org.setup.title").font(.title2.bold())
-                Text("org.setup.subtitle").font(.subheadline).foregroundStyle(.secondary)
+                Text(.orgSetupTitle).font(.title2.bold())
+                Text(.orgSetupSubtitle).font(.subheadline).foregroundStyle(.secondary)
             }
             Section {
-                TextField("org.setup.business_name", text: $businessName)
+                TextField(String(localized: .orgSetupBusinessName), text: $businessName)
                     .textContentType(.organizationName)
-                TextField("org.setup.your_name", text: $ownerName)
+                TextField(String(localized: .orgSetupYourName), text: $ownerName)
                     .textContentType(.name)
-                Picker("org.setup.language", selection: $language) {
-                    Text("language.en").tag(AppLanguage.en)
-                    Text("language.es").tag(AppLanguage.es)
+                Picker(selection: $language) {
+                    Text(.languageEn).tag(AppLanguage.en)
+                    Text(.languageEs).tag(AppLanguage.es)
+                } label: {
+                    Text(.orgSetupLanguage)
                 }
             }
-            if let errorKey {
-                Section { Text(LocalizedStringKey(errorKey)).foregroundStyle(.red) }
+            if let failure {
+                Section { Text(failure.message).foregroundStyle(.red) }
             }
             Section {
                 Button(action: submit) {
                     HStack {
-                        Text("org.setup.continue")
-                        if working { Spacer(); ProgressView() }
+                        Text(.orgSetupContinue)
+                        if isWorking { Spacer(); ProgressView() }
                     }
                 }
-                .disabled(working || businessName.trimmingCharacters(in: .whitespaces).isEmpty
-                          || ownerName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(!canContinue)
             }
         }
     }
 
     private func submit() {
-        working = true
-        errorKey = nil
+        isWorking = true
+        failure = nil
         Task {
-            defer { working = false }
+            defer { isWorking = false }
             do {
                 try await session.createOrganization(name: businessName, ownerName: ownerName, language: language)
             } catch {
-                errorKey = (error as? SessionStore.Failure ?? .network).rawValue
+                failure = error as? SessionStore.Failure ?? .organizationSetup
             }
         }
     }
+}
+
+#Preview {
+    let (container, session) = PreviewData.firstLaunch()
+    return RootView().environment(session).modelContainer(container)
 }

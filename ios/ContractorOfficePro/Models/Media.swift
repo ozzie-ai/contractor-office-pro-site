@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class Media: Syncable {
     enum Kind: String, Codable, Sendable { case photo, voice }
     enum UploadState: String, Codable, Sendable { case pending, uploaded, failed }

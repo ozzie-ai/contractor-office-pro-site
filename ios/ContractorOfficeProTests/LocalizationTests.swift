@@ -1,66 +1,56 @@
-import XCTest
+import Foundation
+import Testing
+@testable import ContractorOfficePro
 
-/// Fails if any key in the String Catalog lacks a translated EN and ES value.
-final class LocalizationTests: XCTestCase {
-    private var catalogURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("ContractorOfficePro/Resources/Localizable.xcstrings")
-    }
+/// Keys are compile-checked by generated symbols; these tests check translations are complete.
+@Suite("Localization")
+struct LocalizationTests {
+    private static let catalogURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("ContractorOfficePro/Resources/Localizable.xcstrings")
 
-    func testEveryKeyHasEnglishAndSpanish() throws {
-        let data = try Data(contentsOf: catalogURL)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let strings = try XCTUnwrap(json["strings"] as? [String: Any])
-        XCTAssertFalse(strings.isEmpty)
+    @Test("Every key has translated English and Spanish, including plural forms")
+    func everyKeyIsTranslated() throws {
+        let json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: Self.catalogURL)) as? [String: Any])
+        let strings = try #require(json["strings"] as? [String: Any])
+        #expect(!strings.isEmpty)
 
         var missing: [String] = []
         for (key, value) in strings {
-            let locs = (value as? [String: Any])?["localizations"] as? [String: Any] ?? [:]
-            for lang in ["en", "es"] {
-                let unit = (locs[lang] as? [String: Any])?["stringUnit"] as? [String: Any]
-                let state = unit?["state"] as? String
-                let text = unit?["value"] as? String ?? ""
-                if state != "translated" || text.isEmpty { missing.append("\(key) [\(lang)]") }
+            let localizations = (value as? [String: Any])?["localizations"] as? [String: Any] ?? [:]
+            for language in ["en", "es"] where !Self.isTranslated(localizations[language]) {
+                missing.append("\(key) [\(language)]")
             }
         }
-        XCTAssertTrue(missing.isEmpty, "Missing translations: \(missing.sorted())")
+        #expect(missing.isEmpty, "Missing translations: \(missing.sorted())")
     }
 
-    func testSpanishLookupWorksAtRuntime() throws {
-        let path = try XCTUnwrap(Bundle(for: ContractorOfficeProTestsAnchor.self).path(forResource: "es", ofType: "lproj")
-            ?? Bundle.main.path(forResource: "es", ofType: "lproj"))
-        let es = try XCTUnwrap(Bundle(path: path))
-        XCTAssertEqual(es.localizedString(forKey: "home.welcome", value: nil, table: nil), "Bienvenido")
+    @Test func spanishResolvesAtRuntime() throws {
+        let path = try #require(Bundle.main.path(forResource: "es", ofType: "lproj"))
+        let spanish = try #require(Bundle(path: path))
+        #expect(spanish.localizedString(forKey: "home.welcome", value: nil, table: nil) == "Bienvenido")
     }
-}
 
-private final class ContractorOfficeProTestsAnchor {}
+    @Test(arguments: [(1, "1 cambio pendiente de subir"), (3, "3 cambios pendientes de subir")])
+    func spanishPlurals(count: Int, expected: String) throws {
+        let path = try #require(Bundle.main.path(forResource: "es", ofType: "lproj"))
+        let spanish = try #require(Bundle(path: path))
+        let format = spanish.localizedString(forKey: "sync.pending", value: nil, table: nil)
+        #expect(String.localizedStringWithFormat(format, count) == expected)
+    }
 
-/// Every dotted key literal used in app source (e.g. "auth.title") must exist in the catalog.
-final class LocalizationCoverageTests: XCTestCase {
-    func testAllKeysUsedInSourceExistInCatalog() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        let appDir = root.appendingPathComponent("ContractorOfficePro")
-        let catalogData = try Data(contentsOf: appDir.appendingPathComponent("Resources/Localizable.xcstrings"))
-        let catalog = try XCTUnwrap(JSONSerialization.jsonObject(with: catalogData) as? [String: Any])
-        let keys = Set((catalog["strings"] as? [String: Any] ?? [:]).keys)
-
-        let pattern = try NSRegularExpression(pattern: #""([a-z]+(?:\.[a-z_]+)+)""#)
-        var missing: Set<String> = []
-        let files = FileManager.default.enumerator(at: appDir, includingPropertiesForKeys: nil)!
-        for case let file as URL in files where file.pathExtension == "swift" {
-            let text = try String(contentsOf: file, encoding: .utf8)
-            for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
-                let key = String(text[Range(match.range(at: 1), in: text)!])
-                if key.hasPrefix("com.") || key.hasSuffix(".swift") { continue }
-                // SF Symbol names aren't user-facing text.
-                let before = text[..<Range(match.range, in: text)!.lowerBound].suffix(14)
-                if before.hasSuffix("systemName: ") || before.hasSuffix("systemImage: ") { continue }
-                if !keys.contains(key) { missing.insert(key) }
+    private static func isTranslated(_ localization: Any?) -> Bool {
+        guard let localization = localization as? [String: Any] else { return false }
+        if let unit = localization["stringUnit"] as? [String: Any] { return isTranslatedUnit(unit) }
+        if let plural = (localization["variations"] as? [String: Any])?["plural"] as? [String: Any] {
+            return plural["other"] != nil && plural.values.allSatisfy {
+                isTranslatedUnit(($0 as? [String: Any])?["stringUnit"] as? [String: Any])
             }
         }
-        XCTAssertTrue(missing.isEmpty, "Keys used in code but missing from Localizable.xcstrings: \(missing.sorted())")
+        return false
+    }
+
+    private static func isTranslatedUnit(_ unit: [String: Any]?) -> Bool {
+        unit?["state"] as? String == "translated" && !((unit?["value"] as? String) ?? "").isEmpty
     }
 }

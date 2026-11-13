@@ -1,12 +1,11 @@
 import Foundation
 import Network
 import Observation
-import Supabase
 import SwiftData
 
 /// Offline-first sync with last-write-wins (docs/decisions/0001-offline-sync-lww.md).
 /// Push: dirty rows, parents first. Pull: rows changed on the server since the per-table cursor.
-@MainActor
+/// Lifecycle: HomeView calls `run()` from `.task`, so monitoring stops when the view goes away.
 @Observable
 final class SyncEngine {
     enum Status: Equatable { case idle, syncing, offline, failed }
@@ -15,14 +14,13 @@ final class SyncEngine {
     private(set) var lastSyncedAt: Date?
     private(set) var pendingCount = 0
 
-    private let client: SupabaseClient
+    private let transport: any SyncTransport
     private let context: ModelContext
     private let orgId: UUID
     private let defaults: UserDefaults
     private var running = false
     private var again = false
     private var debounce: Task<Void, Never>?
-    private let monitor = NWPathMonitor()
 
     /// Push order respects foreign keys.
     private static let order: [any SyncRecord.Type] = [
@@ -33,23 +31,23 @@ final class SyncEngine {
     /// Re-read a few seconds before the cursor so a slow concurrent write isn't skipped. Applying is idempotent.
     private static let overlap: TimeInterval = 5
 
-    init(client: SupabaseClient, context: ModelContext, orgId: UUID, defaults: UserDefaults = .standard) {
-        self.client = client
+    init(transport: any SyncTransport, context: ModelContext, orgID: UUID, defaults: UserDefaults = .standard) {
+        self.transport = transport
         self.context = context
-        self.orgId = orgId
+        self.orgId = orgID
         self.defaults = defaults
         lastSyncedAt = defaults.object(forKey: key("lastSyncedAt")) as? Date
     }
 
-    func startMonitoring() {
-        monitor.pathUpdateHandler = { [weak self] path in
-            let online = path.status == .satisfied
-            Task { @MainActor in
-                guard let self else { return }
-                if online { self.syncSoon(after: 0.5) } else { self.status = .offline }
+    /// Syncs whenever the network becomes available (the monitor reports the current path first).
+    func run() async {
+        for await path in NWPathMonitor() {
+            if path.status == .satisfied {
+                await syncNow()
+            } else {
+                status = .offline
             }
         }
-        monitor.start(queue: DispatchQueue(label: "com.derekflores.contractorofficepro.sync"))
     }
 
     /// Call after local saves. Coalesces bursts of edits into one sync.
@@ -97,14 +95,12 @@ final class SyncEngine {
             for item in snapshot {
                 var row = item.row
                 for k in ["id", "org_id", "created_at", "user_id", "role"] { row[k] = nil }
-                try await client.from(T.table).update(row).eq("id", value: item.record.id).execute()
+                try await transport.update(row, id: item.record.id, in: T.table)
             }
         } else {
             for start in stride(from: 0, to: snapshot.count, by: Self.pageSize) {
                 let chunk = snapshot[start..<min(start + Self.pageSize, snapshot.count)].map(\.row)
-                try await client.from(T.table)
-                    .upsert(Array(chunk), onConflict: "id", returning: .minimal)
-                    .execute()
+                try await transport.upsert(Array(chunk), into: T.table)
             }
         }
         for item in snapshot where item.record.updatedAt == item.stamp {
@@ -118,23 +114,16 @@ final class SyncEngine {
     private func pull<T: SyncRecord>(_ type: T.Type) async throws {
         let cursorKey = key("cursor.\(T.table)")
         let cursor = (defaults.string(forKey: cursorKey)).flatMap(SyncDate.parse) ?? .distantPast
-        let since = SyncDate.format(cursor == .distantPast ? Date(timeIntervalSince1970: 0)
-                                                           : cursor.addingTimeInterval(-Self.overlap))
+        let since = cursor == .distantPast ? Date(timeIntervalSince1970: 0)
+                                           : cursor.addingTimeInterval(-Self.overlap)
         var local = Dictionary(uniqueKeysWithValues:
             try context.fetch(FetchDescriptor<T>()).map { ($0.id, $0) })
         var newest = cursor
         var offset = 0
 
         while true {
-            let rows: [Row] = try await client.from(T.table)
-                .select()
-                .eq("org_id", value: orgId)
-                .gt("server_updated_at", value: since)
-                .order("server_updated_at")
-                .order("id")
-                .range(from: offset, to: offset + Self.pageSize - 1)
-                .execute()
-                .value
+            let rows = try await transport.changes(in: T.table, orgID: orgId, since: since,
+                                                   offset: offset, limit: Self.pageSize)
 
             for r in rows {
                 guard let id = r.uuid("id") else { continue }

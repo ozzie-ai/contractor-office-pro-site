@@ -2,7 +2,7 @@ import Foundation
 
 /// Deterministic estimate math (CLAUDE.md principle 5: LLMs interpret, code computes).
 /// Each line is rounded to cents, then tax is computed on the taxable subtotal and rounded half-up.
-enum EstimateCalculator {
+nonisolated enum EstimateCalculator {
     struct Totals: Equatable, Sendable {
         var subtotal: Decimal
         var tax: Decimal
@@ -31,6 +31,7 @@ enum EstimateCalculator {
         return Totals(subtotal: subtotal, tax: tax, total: subtotal + tax)
     }
 
+    @MainActor
     /// Recomputes and stores totals on the estimate from its live (non-deleted) line items.
     static func apply(to estimate: Estimate, lineItems: [LineItem], taxRate: Decimal, now: Date = .now) {
         let live = lineItems.filter { $0.estimateId == estimate.id && $0.deletedAt == nil }

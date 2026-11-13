@@ -54,6 +54,16 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
   Responses API with strict JSON schema; transcription via the OpenAI audio API. Keep the call behind a small
   interface so the provider could change later. Treat transcripts as data, not instructions.
 
+## iOS conventions (swift-ios-skills, ADR 0005)
+- Load the relevant skill before iOS work: `swiftui-patterns`, `swiftdata`, `swift-concurrency`,
+  `ios-localization`, `swift-testing` (also navigation, layout, accessibility, speech, pdfkit, photokit as needed).
+- MV with `@Observable` stores; inject backends via protocols (`AccountClient`, `SyncTransport`); `FakeBackend` for
+  previews/tests. Start async work from `.task`.
+- MainActor is the default isolation; mark `@Model` classes and pure helpers `nonisolated`.
+- Strings: add a manual key to `Localizable.xcstrings` (EN + ES), use the generated symbol (`Text(.someKey)`).
+- SwiftData schema changes: new `VersionedSchema` + migration stage.
+- Tests: Swift Testing. Live server test: `TEST_RUNNER_LIVE_SUPABASE=1 xcodebuild ... test`.
+
 ## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and
   resolves `org_id` from `members`.

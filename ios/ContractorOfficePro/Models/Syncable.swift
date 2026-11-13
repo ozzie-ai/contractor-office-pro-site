@@ -3,7 +3,7 @@ import SwiftData
 
 /// Columns every synced table shares (mirrors the Supabase schema).
 /// See docs/decisions/0001-offline-sync-lww.md.
-protocol Syncable: PersistentModel {
+nonisolated protocol Syncable: PersistentModel {
     var id: UUID { get }
     var orgId: UUID { get }
     var createdAt: Date { get }
@@ -13,7 +13,7 @@ protocol Syncable: PersistentModel {
     var needsSync: Bool { get set }
 }
 
-extension Syncable {
+nonisolated extension Syncable {
     var isDeleted: Bool { deletedAt != nil }
 
     /// Call after every local edit: stamps the LWW clock and queues the row for push.
@@ -30,4 +30,4 @@ extension Syncable {
     }
 }
 
-enum AppLanguage: String, Codable, CaseIterable, Sendable { case en, es }
+nonisolated enum AppLanguage: String, Codable, CaseIterable, Sendable { case en, es }
