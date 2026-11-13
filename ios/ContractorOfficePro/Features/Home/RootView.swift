@@ -25,9 +25,9 @@ struct RootView: View {
             OfflineView { Task { await session.start() } }
         case .needsOrganization:
             OrganizationSetupView()
-        case .ready(let orgID, _):
-            if let sync = session.sync {
-                HomeView(orgID: orgID, sync: sync)
+        case .ready:
+            if let workspace = session.workspace {
+                MainTabView(workspace: workspace)
             }
         }
     }

@@ -28,7 +28,7 @@ struct LocalizationTests {
     @Test func spanishResolvesAtRuntime() throws {
         let path = try #require(Bundle.main.path(forResource: "es", ofType: "lproj"))
         let spanish = try #require(Bundle(path: path))
-        #expect(spanish.localizedString(forKey: "home.welcome", value: nil, table: nil) == "Bienvenido")
+        #expect(spanish.localizedString(forKey: "tab.jobs", value: nil, table: nil) == "Trabajos")
     }
 
     @Test(arguments: [(1, "1 cambio pendiente de subir"), (3, "3 cambios pendientes de subir")])

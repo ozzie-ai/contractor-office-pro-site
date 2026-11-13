@@ -2,7 +2,7 @@ name: ContractorOfficePro
 options:
   bundleIdPrefix: com.derekflores
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "18.0"
   developmentLanguage: en
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -44,6 +44,8 @@ targets:
       path: ContractorOfficePro/Resources/Info.plist
       properties:
         CFBundleDisplayName: ContractorOfficePro
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, es]
         UILaunchScreen: {}
@@ -62,12 +64,25 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/ContractorOfficePro.app/ContractorOfficePro
         BUNDLE_LOADER: $(TEST_HOST)
+  ContractorOfficeProUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ContractorOfficeProUITests
+    dependencies:
+      - target: ContractorOfficePro
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: ContractorOfficePro
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
 schemes:
   ContractorOfficePro:
     build:
       targets:
         ContractorOfficePro: all
         ContractorOfficeProTests: [test]
+        ContractorOfficeProUITests: [test]
     test:
-      targets: [ContractorOfficeProTests]
+      targets: [ContractorOfficeProTests, ContractorOfficeProUITests]
       gatherCoverageData: true

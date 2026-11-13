@@ -32,8 +32,8 @@ final class SessionStore {
     private(set) var state: State = .loading {
         didSet { makeSyncEngineIfReady(previous: oldValue) }
     }
-    /// Exists once the business is known; HomeView runs it with `.task`.
-    private(set) var sync: SyncEngine?
+    /// Exists once the business is known; MainTabView runs its sync with `.task`.
+    private(set) var workspace: Workspace?
 
     private let account: (any AccountClient)?
     private let transport: (any SyncTransport)?
@@ -154,8 +154,9 @@ final class SessionStore {
 
     private func makeSyncEngineIfReady(previous: State) {
         guard state != previous else { return }
-        guard case .ready(let orgID, _) = state, let transport else { sync = nil; return }
-        sync = SyncEngine(transport: transport, context: context, orgID: orgID, defaults: defaults)
+        guard case .ready(let orgID, let memberID) = state, let transport else { workspace = nil; return }
+        let sync = SyncEngine(transport: transport, context: context, orgID: orgID, defaults: defaults)
+        workspace = Workspace(orgID: orgID, memberID: memberID, context: context, sync: sync)
     }
 
     private static func normalize(_ email: String) -> String {

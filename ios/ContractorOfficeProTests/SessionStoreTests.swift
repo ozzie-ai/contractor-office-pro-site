@@ -18,7 +18,7 @@ struct SessionStoreTests {
         guard case .needsOrganization = session.state else {
             Issue.record("expected business setup, got \(session.state)"); return
         }
-        #expect(session.sync == nil)
+        #expect(session.workspace == nil)
     }
 
     @Test func creatingBusinessRegistersItAndBecomesReady() async throws {
@@ -31,7 +31,7 @@ struct SessionStoreTests {
         guard case .ready(let orgID, let memberID) = session.state else {
             Issue.record("not ready: \(session.state)"); return
         }
-        #expect(session.sync != nil)
+        #expect(session.workspace != nil)
         let org = try #require(try context.fetch(FetchDescriptor<Organization>()).first)
         #expect(org.id == orgID)
         #expect(org.name == "Flores Construction")
