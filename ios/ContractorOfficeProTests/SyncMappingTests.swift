@@ -60,7 +60,7 @@ struct SyncMappingTests {
         #expect(copy.preferredLanguage == .es)
         #expect(copy.isSenior65Plus)
         #expect(copy.smsConsent == .granted)
-        #expect(copy.updatedAt == client.updatedAt)
+        #expect(abs(copy.updatedAt.timeIntervalSince(client.updatedAt)) < 0.001, "ms precision survives the wire")
         #expect(!copy.needsSync)
     }
 

@@ -43,10 +43,12 @@ nonisolated enum EstimateCalculator {
         estimate.touch(now: now)
     }
 
-    static func roundCents(_ value: Decimal) -> Decimal {
+    static func roundCents(_ value: Decimal) -> Decimal { round(value, places: 2) }
+
+    static func round(_ value: Decimal, places: Int) -> Decimal {
         var input = value
         var result = Decimal()
-        NSDecimalRound(&result, &input, 2, .plain)
+        NSDecimalRound(&result, &input, places, .plain)
         return result
     }
 }

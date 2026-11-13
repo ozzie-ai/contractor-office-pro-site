@@ -7,7 +7,7 @@ from regional references → contractor reviews/approves → customer PDF (Engli
 approved costs feed future estimates.
 
 ## Team, roles and clients (see docs/decisions/0003-native-swift-client.md)
-- **The app is native Swift/SwiftUI (iOS 17+), in `ios/`.** No React Native, Expo or other cross-platform UI
+- **The app is native Swift/SwiftUI (iOS 18+), in `ios/`.** No React Native, Expo or other cross-platform UI
   frameworks in this project. Derek's decision, 2026-11-12.
 - **Derek also builds the backend** the team asked for: auth, AI interpretation + transcription endpoints, the
   multi-trade pricing service, regional pricing references and their sources, API docs, and a dev environment.
@@ -42,7 +42,7 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
    restricted catalogs (e.g. Gordian) or scrape retailer sites.
 
 ## Stack
-- **iOS app:** Swift 6, SwiftUI, SwiftData (offline store), iOS 17+. Project file from **XcodeGen** (`ios/project.yml`);
+- **iOS app:** Swift 6, SwiftUI, SwiftData (offline store), iOS 18+ (raised from 17 on 2026-11-12 for the `Tab` API). Project file from **XcodeGen** (`ios/project.yml`);
   don't hand-edit `.pbxproj`. Apple Speech for on-device dictation; server transcription as a fallback/upgrade.
   PDFs rendered on device. `supabase-swift` (SPM) for auth, data and storage.
 - **Supabase:** auth (per-user sessions), Postgres, storage. Schema changes are SQL migrations in `supabase/migrations/`.
@@ -62,7 +62,10 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
 - MainActor is the default isolation; mark `@Model` classes and pure helpers `nonisolated`.
 - Strings: add a manual key to `Localizable.xcstrings` (EN + ES), use the generated symbol (`Text(.someKey)`).
 - SwiftData schema changes: new `VersionedSchema` + migration stage.
-- Tests: Swift Testing. Live server test: `TEST_RUNNER_LIVE_SUPABASE=1 xcodebuild ... test`.
+- Tests: Swift Testing for unit tests; XCUITest smoke test (`ContractorOfficeProUITests`) taps through the app in
+  demo mode. Live server test: `TEST_RUNNER_LIVE_SUPABASE=1 xcodebuild ... test`.
+- Writes go through `Workspace` (stamps, saves, schedules sync). Editors edit a draft; Cancel discards.
+- Demo mode (DEBUG): launch with `-demo` for sample data on a fake server, never the real account.
 
 ## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and
