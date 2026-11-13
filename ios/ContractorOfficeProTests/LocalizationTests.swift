@@ -37,3 +37,30 @@ final class LocalizationTests: XCTestCase {
 }
 
 private final class ContractorOfficeProTestsAnchor {}
+
+/// Every dotted key literal used in app source (e.g. "auth.title") must exist in the catalog.
+final class LocalizationCoverageTests: XCTestCase {
+    func testAllKeysUsedInSourceExistInCatalog() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let appDir = root.appendingPathComponent("ContractorOfficePro")
+        let catalogData = try Data(contentsOf: appDir.appendingPathComponent("Resources/Localizable.xcstrings"))
+        let catalog = try XCTUnwrap(JSONSerialization.jsonObject(with: catalogData) as? [String: Any])
+        let keys = Set((catalog["strings"] as? [String: Any] ?? [:]).keys)
+
+        let pattern = try NSRegularExpression(pattern: #""([a-z]+(?:\.[a-z_]+)+)""#)
+        var missing: Set<String> = []
+        let files = FileManager.default.enumerator(at: appDir, includingPropertiesForKeys: nil)!
+        for case let file as URL in files where file.pathExtension == "swift" {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                let key = String(text[Range(match.range(at: 1), in: text)!])
+                if key.hasPrefix("com.") || key.hasSuffix(".swift") { continue }
+                // SF Symbol names aren't user-facing text.
+                let before = text[..<Range(match.range, in: text)!.lowerBound].suffix(14)
+                if before.hasSuffix("systemName: ") || before.hasSuffix("systemImage: ") { continue }
+                if !keys.contains(key) { missing.insert(key) }
+            }
+        }
+        XCTAssertTrue(missing.isEmpty, "Keys used in code but missing from Localizable.xcstrings: \(missing.sorted())")
+    }
+}
