@@ -1,0 +1,5 @@
+// Committed defaults. Real values live in Config.xcconfig (gitignored).
+// Note: "//" starts a comment in xcconfig, so write URLs as https:/$()/xyz.supabase.co
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+#include? "Config.xcconfig"

@@ -1,0 +1,4 @@
+// Copy to Config.xcconfig (gitignored) and fill in from Supabase → Project Settings → API.
+// Only the ANON key belongs here — never the service-role key.
+SUPABASE_URL = https:/$()/YOUR-PROJECT-REF.supabase.co
+SUPABASE_ANON_KEY = YOUR-ANON-KEY
