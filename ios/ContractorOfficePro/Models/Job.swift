@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class Job: Syncable {
     enum Status: String, Codable, CaseIterable, Sendable {
         case lead, estimating, scheduled, inProgress = "in_progress", completed, cancelled
@@ -42,7 +42,7 @@ final class Job: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class TimeEntry: Syncable {
     @Attribute(.unique) var id: UUID
     var orgId: UUID

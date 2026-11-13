@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class PriceBookItem: Syncable {
     enum Kind: String, Codable, CaseIterable, Sendable { case labor, material, markup, other }
 
@@ -42,7 +42,7 @@ final class PriceBookItem: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class Estimate: Syncable {
     enum Status: String, Codable, CaseIterable, Sendable { case draft, sent, accepted, declined }
 
@@ -90,7 +90,7 @@ final class Estimate: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class LineItem: Syncable {
     /// Where the line came from; shown to the contractor (AI vs. price book vs. typed).
     enum Source: String, Codable, CaseIterable, Sendable { case ai, priceBook = "price_book", manual }

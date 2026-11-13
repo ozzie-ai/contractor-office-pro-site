@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class Receipt: Syncable {
     @Attribute(.unique) var id: UUID
     var orgId: UUID
@@ -30,7 +30,7 @@ final class Receipt: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class ReceiptLineItem: Syncable {
     @Attribute(.unique) var id: UUID
     var orgId: UUID
@@ -60,7 +60,7 @@ final class ReceiptLineItem: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class Expense: Syncable {
     @Attribute(.unique) var id: UUID
     var orgId: UUID

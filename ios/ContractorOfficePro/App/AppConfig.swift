@@ -1,7 +1,7 @@
 import Foundation
 
 /// Reads non-secret client config injected from xcconfig → Info.plist.
-enum AppConfig {
+nonisolated enum AppConfig {
     static var supabaseURL: URL? {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String,
               !raw.isEmpty else { return nil }

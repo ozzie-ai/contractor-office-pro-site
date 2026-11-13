@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class Client: Syncable {
     enum SMSConsent: String, Codable, Sendable { case unknown, granted, revoked }
 

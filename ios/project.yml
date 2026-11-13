@@ -17,6 +17,11 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "6.0"
+    # swift-concurrency skill: approachable concurrency + MainActor-by-default for app code (SE-0466).
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    # ios-localization skill: compile-time-checked keys from Localizable.xcstrings.
+    STRING_CATALOG_GENERATE_SYMBOLS: YES
     LOCALIZATION_PREFERS_STRING_CATALOGS: YES
     SWIFT_EMIT_LOC_STRINGS: YES
     MARKETING_VERSION: "0.1.0"

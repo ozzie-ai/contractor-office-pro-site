@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-@Model
+@Model nonisolated
 final class Organization: Syncable {
     @Attribute(.unique) var id: UUID
     var orgId: UUID
@@ -35,7 +35,7 @@ final class Organization: Syncable {
     }
 }
 
-@Model
+@Model nonisolated
 final class Member: Syncable {
     enum Role: String, Codable, Sendable { case owner, admin, crew }
 
