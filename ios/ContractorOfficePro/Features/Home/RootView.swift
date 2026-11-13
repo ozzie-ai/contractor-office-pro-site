@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -28,6 +29,9 @@ struct RootView: View {
             }
         }
         .task { await session.start() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { session.sync?.syncSoon(after: 0.5) }
+        }
     }
 }
 
@@ -51,12 +55,42 @@ struct HomeView: View {
                 if let org = orgs.first {
                     Text(org.name).font(.headline)
                 }
-                Text("home.backend.configured")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if let sync = session.sync {
+                    SyncStatusView(sync: sync)
+                }
             }
             .padding()
             .navigationTitle(Text("app.name"))
         }
+    }
+}
+
+struct SyncStatusView: View {
+    let sync: SyncEngine
+
+    var body: some View {
+        VStack(spacing: 4) {
+            switch sync.status {
+            case .syncing:
+                Label("sync.status.syncing", systemImage: "arrow.triangle.2.circlepath")
+            case .offline:
+                Label("sync.status.offline", systemImage: "wifi.slash")
+            case .failed:
+                Label("sync.status.failed", systemImage: "exclamationmark.triangle")
+            case .idle:
+                if let last = sync.lastSyncedAt {
+                    Label { Text("sync.status.synced \(last, style: .relative)") } icon: {
+                        Image(systemName: "checkmark.icloud")
+                    }
+                } else {
+                    Label("sync.status.never", systemImage: "icloud")
+                }
+            }
+            if sync.pendingCount > 0 {
+                Text("sync.pending \(sync.pendingCount)")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 }

@@ -18,7 +18,8 @@ extension Syncable {
 
     /// Call after every local edit: stamps the LWW clock and queues the row for push.
     func touch(now: Date = .now) {
-        updatedAt = now
+        // Millisecond precision matches what the server stores, so LWW comparisons stay exact.
+        updatedAt = Date(timeIntervalSince1970: (now.timeIntervalSince1970 * 1000).rounded() / 1000)
         needsSync = true
     }
 

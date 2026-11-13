@@ -26,7 +26,11 @@ final class SessionStore {
         case orgSetup = "auth.error.org_setup"
     }
 
-    private(set) var state: State = .loading
+    private(set) var state: State = .loading {
+        didSet { startSyncIfReady() }
+    }
+    /// Created once the user's business is known.
+    private(set) var sync: SyncEngine?
     private let client: SupabaseClient?
     private let context: ModelContext
 
@@ -107,6 +111,14 @@ final class SessionStore {
     }
 
     // MARK: - Private
+
+    private func startSyncIfReady() {
+        guard case .ready(let orgId, _) = state, let client else { sync = nil; return }
+        let engine = SyncEngine(client: client, context: context, orgId: orgId)
+        sync = engine
+        engine.startMonitoring()
+        Task { await engine.syncNow() }
+    }
 
     private func resolve(user: User) async {
         let uid = user.id
