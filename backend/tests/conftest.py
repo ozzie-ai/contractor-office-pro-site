@@ -13,6 +13,7 @@ from app.auth import Authenticator
 from app.config import Settings
 from app.errors import ApiError
 from app.main import Services, create_app
+from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs
 from app.ratelimit import RateLimiter
 from app.schemas import Interpretation, InterpretRequest, Member, WorkItem
 
@@ -62,6 +63,21 @@ class FakeInterpreter:
             excluded_work=[], future_work=["Subpanel"], unknown_details=["Panel location?"], confidence_notes=[]))
 
 
+class FakePricing:
+    def __init__(self):
+        self.contractor: dict[str, ContractorPrice] = {}
+
+    async def inputs(self, org_id, task_codes, region_override):
+        from datetime import date
+        from decimal import Decimal
+        return PricingInputs(
+            org=OrgPricing(region_override or "US-CA-LA", Decimal("0.10"), Decimal("0.10")),
+            region_chain=[region_override or "US-CA-LA", "US-CA"], contractor=dict(self.contractor),
+            observations=[Observation("ELEC.PANEL.UPGRADE", "US-CA-LA", "Pilot LA planning allowance (illustrative)",
+                                      date(2026, 11, 12), bid=Decimal("2100"), confidence="low",
+                                      applies_to="200A panel")])
+
+
 class FakeTranscriber:
     async def transcribe(self, audio, filename, content_type, language):
         return "Cambiar el panel de 100 a 200 amperios"
@@ -69,7 +85,7 @@ class FakeTranscriber:
 
 @pytest.fixture
 def fakes():
-    return {"interpreter": FakeInterpreter()}
+    return {"interpreter": FakeInterpreter(), "pricing": FakePricing()}
 
 
 @pytest.fixture
@@ -77,7 +93,7 @@ def client(fakes):
     settings = Settings(openai_api_key="test", supabase_url=SUPABASE, supabase_service_key="test", ai_requests_per_hour=5)
     services = Services(settings=settings, auth=Authenticator(SUPABASE, FixedKey(), FakeMembers()),
                         interpreter=fakes["interpreter"], transcriber=FakeTranscriber(),
-                        limiter=RateLimiter(settings.ai_requests_per_hour))
+                        limiter=RateLimiter(settings.ai_requests_per_hour), pricing=fakes["pricing"])
     return TestClient(create_app(services))
 
 

@@ -16,12 +16,23 @@ All `/v1` endpoints need `Authorization: Bearer <Supabase access token>`; the se
 | Endpoint | Does |
 |---|---|
 | `POST /v1/interpret` | Notes/transcript (+ up to 6 photos) → structured tasks mapped to the catalog. Never prices. |
+| `POST /v1/estimate/price` | Work items → priced lines: your price book, then the nearest regional reference (city → metro → state), else "needs price". Every line says where its number came from; references are preliminary unless verified and fresh. |
+| `GET /v1/pricebook` | Catalog with your price and the reference price for your region |
 | `POST /v1/transcribe` | Voice memo (multipart `audio`, optional `language` en/es) → transcript |
 | `GET /health` | Liveness |
 
 Errors are always `{"error": "<code>", "message": "<safe text>"}`; codes match the team's pilot
 (`access_denied`, `no_business`, `invalid_request`, `ai_rate_limited`, `ai_timeout`, `ai_provider_failed`, `rate_limited`, …).
 Messages never echo request content.
+
+## Pricing data
+- Reference tables (`price_sources`, `trade_tasks`, `price_regions`, `unit_cost_observations`) are global and read-only to
+  the app; the server writes them. Contractor prices are `price_book_items` rows with a `task_code` (synced from the app).
+- `python -m app.admin sync-catalog` — push `app/catalog.py` to `trade_tasks`.
+- `python -m app.admin import-observations prices.csv` — add reference prices; rejects unknown tasks/regions and sources
+  that don't allow commercial reuse.
+- Formula: direct = hours × wage × burden + materials + equipment + other; price = direct × (1 + overhead) × (1 + profit).
+  Observed bids that already include markup are used as-is.
 
 ## Tests
 - `pytest` — no network; fakes for OpenAI and Supabase, real ES256 token checks.

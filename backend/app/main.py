@@ -11,11 +11,14 @@ from fastapi import Depends, FastAPI, File, Form, Header, UploadFile
 
 from .ai import Interpreter, OpenAIInterpreter, OpenAITranscriber, Transcriber
 from .auth import Authenticator, JWKSKeyProvider, SupabaseMemberDirectory
+from .catalog import CATALOG
 from .config import Settings
+from .pricing import PricingRepository, SupabasePricingRepository, price_tasks
 from .errors import ApiError, install_error_handlers
 from .ratelimit import RateLimiter
 from .schemas import ErrorResponse as ErrorModel
-from .schemas import InterpretRequest, InterpretResponse, Member, TranscribeResponse
+from .schemas import (InterpretRequest, InterpretResponse, Member, PriceBookEntry, PriceBookResponse, PriceRequest,
+                      PriceResponse, PriceTaskInput, TranscribeResponse)
 
 AUDIO_TYPES = {"audio/m4a", "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac"}
 ERRORS = {code: {"model": ErrorModel} for code in (400, 401, 403, 429, 502, 504)}
@@ -28,6 +31,7 @@ class Services:
     interpreter: Interpreter
     transcriber: Transcriber
     limiter: RateLimiter
+    pricing: PricingRepository
 
 
 def live_services() -> Services:
@@ -40,6 +44,7 @@ def live_services() -> Services:
         interpreter=OpenAIInterpreter(settings),
         transcriber=OpenAITranscriber(settings),
         limiter=RateLimiter(settings.ai_requests_per_hour),
+        pricing=SupabasePricingRepository(settings, http),
     )
 
 
@@ -95,5 +100,29 @@ def create_app(services: Services | None = None) -> FastAPI:
         svc.limiter.check(member.user_id)
         text = await svc.transcriber.transcribe(data, audio.filename or "memo.m4a", content_type, language)
         return TranscribeResponse(transcript=text)
+
+    @app.post("/v1/estimate/price", response_model=PriceResponse, responses=ERRORS, tags=["pricing"],
+              summary="Price work items: your price book, then regional references; never AI")
+    async def price(request: PriceRequest, member: Annotated[Member, Depends(current_member)]) -> PriceResponse:
+        codes = {t.task_code for t in request.tasks if t.task_code}
+        inputs = await svc.pricing.inputs(member.org_id, codes, request.region_code)
+        return price_tasks(request.tasks, inputs)
+
+    @app.get("/v1/pricebook", response_model=PriceBookResponse, responses=ERRORS, tags=["pricing"],
+             summary="Catalog with your prices and the reference price for your region")
+    async def pricebook(member: Annotated[Member, Depends(current_member)], region_code: str | None = None) -> PriceBookResponse:
+        inputs = await svc.pricing.inputs(member.org_id, {t.code for t in CATALOG}, region_code)
+        mine = price_tasks([PriceTaskInput(task_code=t.code, description_en=t.title_en) for t in CATALOG], inputs)
+        reference_only = price_tasks([PriceTaskInput(task_code=t.code, description_en=t.title_en) for t in CATALOG],
+                                     type(inputs)(org=inputs.org, region_chain=inputs.region_chain,
+                                                  observations=inputs.observations))
+        entries = [PriceBookEntry(
+            task_code=t.code, trade=t.trade, title_en=t.title_en, title_es=t.title_es, unit=t.unit,
+            your_price=own.unit_price if own.price_source == "contractor" else None,
+            reference_price=ref.unit_price, reference_source=ref.source_name, reference_applies_to=ref.applies_to,
+            reference_preliminary=ref.preliminary,
+        ) for t, own, ref in zip(CATALOG, mine.lines, reference_only.lines)]
+        return PriceBookResponse(region_code=inputs.region_chain[0], overhead_pct=inputs.org.overhead,
+                                 profit_pct=inputs.org.profit, entries=entries)
 
     return app
