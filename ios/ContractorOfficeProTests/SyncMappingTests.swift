@@ -126,6 +126,7 @@ struct SyncMappingTests {
             LineItem(orgId: org, estimateId: UUID()), Receipt(orgId: org), Expense(orgId: org, amount: 12),
             ReceiptLineItem(orgId: org, receiptId: UUID(), description: "2x4"),
             Media(orgId: org, jobId: job, kind: .photo, localFileName: nil),
+            MaterialItem(orgId: org, estimateId: UUID(), nameEn: "Wire", qty: 170, searchQuery: "8 AWG"),
         ]
         for record in records {
             #expect(remake(record) != nil, "\(type(of: record)) can't be rebuilt from its row")

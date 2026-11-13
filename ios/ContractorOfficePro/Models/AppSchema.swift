@@ -3,11 +3,11 @@ import SwiftData
 
 enum AppSchema {
     /// Push order respects foreign keys (parents before children).
-    static let models: [any PersistentModel.Type] = SchemaV2.models
+    static let models: [any PersistentModel.Type] = SchemaV3.models
 
     static func makeContainer(inMemory: Bool = false, url: URL? = nil) throws -> ModelContainer {
         let config = if let url { ModelConfiguration(url: url) } else { ModelConfiguration(isStoredInMemoryOnly: inMemory) }
-        return try ModelContainer(for: Schema(versionedSchema: SchemaV2.self),
+        return try ModelContainer(for: Schema(versionedSchema: SchemaV3.self),
                                   migrationPlan: AppMigrationPlan.self,
                                   configurations: config)
     }
@@ -22,7 +22,16 @@ nonisolated enum SchemaV2: VersionedSchema {
     }
 }
 
+/// V3: adds MaterialItem (bill of materials). Purely additive, so V2's model types are unchanged.
+nonisolated enum SchemaV3: VersionedSchema {
+    static let versionIdentifier = Schema.Version(3, 0, 0)
+    static var models: [any PersistentModel.Type] { SchemaV2.models + [MaterialItem.self] }
+}
+
 nonisolated enum AppMigrationPlan: SchemaMigrationPlan {
-    static var schemas: [any VersionedSchema.Type] { [SchemaV1.self, SchemaV2.self] }
-    static var stages: [MigrationStage] { [.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self)] }
+    static var schemas: [any VersionedSchema.Type] { [SchemaV1.self, SchemaV2.self, SchemaV3.self] }
+    static var stages: [MigrationStage] {
+        [.lightweight(fromVersion: SchemaV1.self, toVersion: SchemaV2.self),
+         .lightweight(fromVersion: SchemaV2.self, toVersion: SchemaV3.self)]
+    }
 }

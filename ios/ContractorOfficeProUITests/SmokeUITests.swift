@@ -119,6 +119,35 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testBuildMaterialsListAndShop() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        app.staticTexts["Bathroom remodel"].tap()
+        app.buttons["New estimate with AI"].tap()
+        let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 5))
+        notes.typeText("Cambiar panel de 100 a 200 amperios y circuito de 40A para cargador.")
+        app.buttons["Draft estimate"].tap()
+        XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 10))
+
+        let build = app.buttons["Build materials list with AI"]
+        for _ in 0..<5 where !build.isHittable { app.swipeUp() }
+        build.tap()
+
+        let wire = element(in: app, labeled: "8 AWG THHN copper wire")
+        XCTAssertTrue(wire.waitForExistence(timeout: 10), "materials list opens")
+        XCTAssertTrue(element(in: app, labeled: "0 of 4 bought").exists)
+        snap("16-materials")
+        app.buttons["Mark as bought"].firstMatch.tap()
+        XCTAssertTrue(element(in: app, labeled: "1 of 4 bought").waitForExistence(timeout: 3))
+        app.buttons["shop-8 AWG THHN copper wire"].tap()
+        XCTAssertTrue(app.buttons["Home Depot"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.buttons["Lowe's"].exists && app.buttons["Amazon"].exists)
+        snap("17-shop-menu")
+    }
+
+    @MainActor
     func testSplashSettlesIntoTheApp() {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

@@ -18,7 +18,8 @@ from .errors import ApiError, install_error_handlers
 from .ratelimit import RateLimiter
 from .schemas import ErrorResponse as ErrorModel
 from .schemas import (InterpretRequest, InterpretResponse, Member, PriceBookEntry, PriceBookResponse, PriceRequest,
-                      PriceResponse, PriceTaskInput, RefineRequest, RefineResponse, TranscribeResponse)
+                      PriceResponse, PriceTaskInput, RefineRequest, RefineResponse, TranscribeResponse,
+                      MaterialsRequest, MaterialsResponse)
 
 AUDIO_TYPES = {"audio/m4a", "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac"}
 ERRORS = {code: {"model": ErrorModel} for code in (400, 401, 403, 429, 502, 504)}
@@ -87,6 +88,12 @@ def create_app(services: Services | None = None) -> FastAPI:
     async def refine(request: RefineRequest, member: Annotated[Member, Depends(current_member)]) -> RefineResponse:
         svc.limiter.check(member.user_id)
         return RefineResponse(changes=await svc.interpreter.refine(request))
+
+    @app.post("/v1/materials", response_model=MaterialsResponse, responses=ERRORS, tags=["ai"],
+              summary="Draft a bill of materials (materials only, no prices) from an estimate's lines")
+    async def materials(request: MaterialsRequest, member: Annotated[Member, Depends(current_member)]) -> MaterialsResponse:
+        svc.limiter.check(member.user_id)
+        return MaterialsResponse(materials_list=await svc.interpreter.materials(request))
 
     @app.post("/v1/transcribe", response_model=TranscribeResponse, responses=ERRORS, tags=["ai"],
               summary="Transcribe a voice memo (EN/ES)")

@@ -148,6 +148,26 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
                                 preliminary: true, disclaimer: "Preliminary estimate.")
     }
 
+    func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO {
+        if offline { throw BackendError.offline }
+        if aiDelay > .zero { try await Task.sleep(for: aiDelay) }
+        func item(_ en: String, _ es: String, _ category: String, _ qty: Double?, _ unit: String, _ specs: [String],
+                  _ query: String, _ evidence: String, _ note: String = "") -> MaterialDTO {
+            MaterialDTO(nameEn: en, nameEs: es, category: category, quantity: qty, unit: unit, specifications: specs,
+                        forRefs: [], searchQuery: query, evidence: evidence, noteEn: note)
+        }
+        return MaterialsResponseDTO(materialsList: MaterialsListDTO(materials: [
+            item("200A main breaker load center", "Centro de carga 200A", "electrical", 1, "each", ["200A", "40 space"],
+                 "200 amp main breaker load center", "stated"),
+            item("40A double-pole breaker", "Breaker bipolar 40A", "electrical", 1, "each", ["40A", "2-pole"],
+                 "40 amp double pole breaker", "stated"),
+            item("8 AWG THHN copper wire", "Cable THHN 8 AWG", "electrical", 170, "ft", ["8 AWG", "copper"],
+                 "8 AWG THHN copper wire", "inferred", "2 conductors × 85 ft"),
+            item("3/4 in. EMT conduit", "Tubo EMT 3/4\"", "conduit_fittings", 90, "ft", ["3/4 in."],
+                 "3/4 inch EMT conduit 10 ft", "inferred", "Size assumed; confirm"),
+        ], assumptions: ["Copper conductors"], questions: ["What size conduit?"]))
+    }
+
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO {
         if offline { throw BackendError.offline }
         if aiDelay > .zero { try await Task.sleep(for: aiDelay) }

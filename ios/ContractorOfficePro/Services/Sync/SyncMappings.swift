@@ -207,6 +207,26 @@ nonisolated extension LineItem: SyncRecord {
     }
 }
 
+nonisolated extension MaterialItem: SyncRecord {
+    static let table = "material_items"
+    var fields: Row {
+        ["estimate_id": J.u(estimateId), "position": J.i(position), "name_en": J.s(nameEn), "name_es": J.s(nameEs),
+         "category": J.s(category), "qty": J.dec(qty), "unit": J.s(unit), "specifications": J.s(specifications),
+         "search_query": J.s(searchQuery), "evidence": J.s(evidenceRaw), "note": J.s(note), "purchased": J.b(purchased)]
+    }
+    func applyFields(_ r: Row) {
+        estimateId = r.uuid("estimate_id") ?? estimateId; position = r.int("position") ?? 0
+        nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es") ?? ""
+        category = r.string("category") ?? category; qty = r.decimal("qty") ?? 0; unit = r.string("unit") ?? unit
+        specifications = r.string("specifications"); searchQuery = r.string("search_query") ?? searchQuery
+        evidenceRaw = r.string("evidence") ?? evidenceRaw; note = r.string("note"); purchased = r.bool("purchased") ?? false
+    }
+    static func make(_ r: Row) -> MaterialItem? {
+        guard let b = base(r), let est = r.uuid("estimate_id"), let name = r.string("name_en") else { return nil }
+        let m = MaterialItem(id: b.id, orgId: b.org, estimateId: est, nameEn: name, now: b.created); m.apply(r); return m
+    }
+}
+
 nonisolated extension Receipt: SyncRecord {
     static let table = "receipts"
     var fields: Row {

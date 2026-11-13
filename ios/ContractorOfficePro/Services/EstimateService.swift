@@ -5,6 +5,7 @@ protocol EstimateService: Sendable {
     func interpret(_ request: InterpretRequestBody) async throws -> InterpretResponseDTO
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO
+    func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO
 }
 
 // MARK: - Wire types (snake_case on the wire; see backend/app/schemas.py)
@@ -87,6 +88,35 @@ nonisolated struct LineUpdateDTO: Decodable, Sendable, Equatable {
     var quantity: Double?
     var unit: String?
     var reasonEn: String
+}
+
+nonisolated struct MaterialsRequestBody: Encodable, Sendable {
+    var notes: String
+    var language: String?
+    var lines: [RefineRequestBody.CurrentLineBody]
+}
+
+nonisolated struct MaterialsResponseDTO: Decodable, Sendable {
+    var materialsList: MaterialsListDTO
+}
+
+nonisolated struct MaterialsListDTO: Decodable, Sendable {
+    var materials: [MaterialDTO]
+    var assumptions: [String]
+    var questions: [String]
+}
+
+nonisolated struct MaterialDTO: Decodable, Sendable {
+    var nameEn: String
+    var nameEs: String
+    var category: String
+    var quantity: Double?
+    var unit: String?
+    var specifications: [String]
+    var forRefs: [Int]
+    var searchQuery: String
+    var evidence: String
+    var noteEn: String
 }
 
 /// Decimals arrive as JSON strings ("2100.00") so cents stay exact.
@@ -197,6 +227,10 @@ nonisolated struct BackendClient: EstimateService {
 
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO {
         try await post("v1/refine", body: request)
+    }
+
+    func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO {
+        try await post("v1/materials", body: request)
     }
 
     private func post<Body: Encodable, Response: Decodable>(_ path: String, body: Body) async throws -> Response {

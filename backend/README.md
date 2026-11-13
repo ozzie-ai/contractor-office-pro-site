@@ -28,6 +28,8 @@ All `/v1` endpoints need `Authorization: Bearer <Supabase access token>`; the se
 | `POST /v1/interpret` | Notes/transcript (+ up to 6 photos) → structured tasks mapped to the catalog. Never prices. |
 | `POST /v1/estimate/price` | Work items → priced lines: your price book, then the nearest regional reference (city → metro → state), else "needs price". Every line says where its number came from; references are preliminary unless verified and fresh. |
 | `GET /v1/pricebook` | Catalog with your price and the reference price for your region |
+| `POST /v1/refine` | Answers to the AI's questions + current lines → proposed adds, quantity updates, exclusions, remaining questions |
+| `POST /v1/materials` | Estimate lines → bill of materials (materials only, no prices), with store search terms |
 | `POST /v1/transcribe` | Voice memo (multipart `audio`, optional `language` en/es) → transcript |
 | `GET /health` | Liveness |
 

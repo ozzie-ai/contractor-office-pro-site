@@ -117,6 +117,100 @@ private struct EmptyService: EstimateService {
     }
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO { fatalError("not called") }
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO { fatalError("not called") }
+    func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO {
+        MaterialsResponseDTO(materialsList: MaterialsListDTO(materials: [], assumptions: [], questions: []))
+    }
+}
+
+@Suite("Bill of materials")
+struct MaterialsTests {
+    let backend = FakeBackend()
+    let context: ModelContext
+    let workspace: Workspace
+    let orgID = UUID()
+    let job: Job
+
+    init() throws {
+        context = ModelContext(try AppSchema.makeContainer(inMemory: true))
+        context.insert(Organization(id: orgID, name: "Flores"))
+        let sync = SyncEngine(transport: backend, context: context, orgID: orgID, defaults: PreviewData.ephemeralDefaults())
+        workspace = Workspace(orgID: orgID, memberID: UUID(), context: context, sync: sync, estimateService: backend)
+        job = Job(orgId: orgID, title: "Panel", assignedTo: nil)
+        context.insert(job)
+    }
+
+    private func estimateWithMaterials() async throws -> Estimate {
+        let draft = try await EstimateDrafting.draft(notes: "panel", language: .en, service: backend)
+        let estimate = try workspace.createEstimate(for: job, notes: "panel", language: .en, draft: draft)
+        let list = try await MaterialsDrafting.draft(for: estimate, lines: workspace.lines(for: estimate), service: backend)
+        try workspace.replaceMaterials(of: estimate, with: list)
+        return estimate
+    }
+
+    @Test func aiListBecomesSyncedMaterialItems() async throws {
+        let estimate = try await estimateWithMaterials()
+        let items = workspace.materials(for: estimate)
+        #expect(items.count == 4)
+        #expect(items.allSatisfy { $0.needsSync && !$0.purchased })
+        let wire = try #require(items.first { $0.nameEn.contains("8 AWG") })
+        #expect(wire.qty == 170 && wire.evidence == .inferred && wire.note == "2 conductors × 85 ft")
+        #expect(wire.specifications == "8 AWG\ncopper")
+        #expect(items.map(\.position) == [0, 1, 2, 3])
+    }
+
+    @Test func rebuildKeepsPurchasedAndManualItems() async throws {
+        let estimate = try await estimateWithMaterials()
+        let panel = try #require(workspace.materials(for: estimate).first { $0.nameEn.contains("load center") })
+        try workspace.togglePurchased(panel)
+        var manual = MaterialDraft(); manual.nameEn = "Anti-oxidant compound"
+        try workspace.save(manual, to: nil, in: estimate)
+
+        let list = try await MaterialsDrafting.draft(for: estimate, lines: workspace.lines(for: estimate), service: backend)
+        try workspace.replaceMaterials(of: estimate, with: list)
+
+        let items = workspace.materials(for: estimate)
+        #expect(items.count == 5, "purchased panel + manual item kept; 3 AI items replaced; no duplicate panel")
+        #expect(items.filter { $0.nameEn.contains("load center") }.count == 1)
+        #expect(items.first { $0.nameEn.contains("load center") }?.purchased == true)
+        #expect(items.contains { $0.nameEn == "Anti-oxidant compound" && $0.evidence == .manual })
+    }
+
+    @Test func editingConfirmsAnInferredItem() async throws {
+        let estimate = try await estimateWithMaterials()
+        let wire = try #require(workspace.materials(for: estimate).first { $0.nameEn.contains("8 AWG") })
+        var draft = MaterialDraft(wire)
+        draft.qty = 180
+        try workspace.save(draft, to: wire, in: estimate)
+        #expect(wire.qty == 180 && wire.evidence == .manual)
+    }
+
+    @Test func materialsSyncToTheServer() async throws {
+        let estimate = try await estimateWithMaterials()
+        await workspace.sync.syncNow()
+        let item = try #require(workspace.materials(for: estimate).first)
+        #expect(await backend.row(in: "material_items", id: item.id)?.string("name_en") == item.nameEn)
+        #expect(!item.needsSync)
+    }
+
+    @Test func emptyListIsANothingFoundError() async throws {
+        let draft = try await EstimateDrafting.draft(notes: "panel", language: .en, service: backend)
+        let estimate = try workspace.createEstimate(for: job, notes: "panel", language: .en, draft: draft)
+        await #expect(throws: BackendError.nothingFound) {
+            _ = try await MaterialsDrafting.draft(for: estimate, lines: self.workspace.lines(for: estimate), service: EmptyService())
+        }
+    }
+}
+
+@Suite("Store links")
+struct StoreLinksTests {
+    @Test func buildsEncodedSearchURLs() throws {
+        let q = "3/4 inch EMT conduit & fittings"
+        #expect(StoreLinks.url(for: .homeDepot, query: q)?.absoluteString == "https://www.homedepot.com/s/3%2F4%20inch%20EMT%20conduit%20&%20fittings")
+        #expect(StoreLinks.url(for: .lowes, query: q)?.absoluteString == "https://www.lowes.com/search?searchTerm=3/4%20inch%20EMT%20conduit%20%26%20fittings")
+        #expect(StoreLinks.url(for: .amazon, query: "8 AWG wire")?.absoluteString == "https://www.amazon.com/s?k=8%20AWG%20wire")
+        #expect(StoreLinks.url(for: .googleShopping, query: "8 AWG wire")?.absoluteString == "https://www.google.com/search?tbm=shop&q=8%20AWG%20wire")
+        #expect(StoreLinks.url(for: .lowes, query: "   ") == nil)
+    }
 }
 
 @Suite("Answering the AI's questions")
@@ -229,6 +323,28 @@ struct BackendClientTests {
         let body = try BackendClient.encoder.encode(InterpretRequestBody(description: "x", language: "es"))
         let json = try #require(String(data: body, encoding: .utf8))
         #expect(json.contains("\"description\"") && json.contains("\"language\":\"es\""))
+    }
+}
+
+@Suite("Database upgrade V2 → V3", .serialized)
+struct MigrationV3Tests {
+    @Test func v2StoresGainMaterialsWithoutLosingData() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("migration-v3-\(UUID().uuidString).store")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let orgID = UUID(), estimateID = UUID()
+        do {
+            let v2 = try ModelContainer(for: Schema(versionedSchema: SchemaV2.self), configurations: ModelConfiguration(url: url))
+            let context = ModelContext(v2)
+            let line = LineItem(orgId: orgID, estimateId: estimateID, descriptionEn: "Panel")
+            line.taskCode = "ELEC.PANEL.UPGRADE"
+            context.insert(line)
+            try context.save()
+        }
+        let v3 = ModelContext(try AppSchema.makeContainer(url: url))
+        #expect(try v3.fetch(FetchDescriptor<LineItem>()).first?.taskCode == "ELEC.PANEL.UPGRADE")
+        v3.insert(MaterialItem(orgId: orgID, estimateId: estimateID, nameEn: "Load center"))
+        try v3.save()
+        #expect(try v3.fetchCount(FetchDescriptor<MaterialItem>()) == 1)
     }
 }
 

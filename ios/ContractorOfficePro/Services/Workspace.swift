@@ -121,6 +121,56 @@ final class Workspace {
         return line
     }
 
+    // MARK: Materials
+
+    func materials(for estimate: Estimate) -> [MaterialItem] {
+        let id = estimate.id
+        let descriptor = FetchDescriptor<MaterialItem>(predicate: #Predicate { $0.estimateId == id && $0.deletedAt == nil },
+                                                       sortBy: [SortDescriptor(\.position)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Replaces the AI draft list. Items already marked purchased (and manual additions) are kept.
+    func replaceMaterials(of estimate: Estimate, with list: MaterialsListDTO) throws {
+        let existing = materials(for: estimate)
+        let kept = existing.filter { $0.purchased || $0.evidence == .manual }
+        for item in existing where !kept.contains(where: { $0.id == item.id }) { item.softDelete() }
+        let keptNames = Set(kept.map { $0.nameEn.lowercased() })
+        var position = (kept.map(\.position).max() ?? -1) + 1
+        for material in list.materials where !keptNames.contains(material.nameEn.lowercased()) {
+            let item = insert(MaterialItem(orgId: orgID, estimateId: estimate.id, position: position,
+                                           nameEn: material.nameEn, nameEs: material.nameEs, category: material.category,
+                                           qty: material.quantity.flatMap { Decimal(string: String($0)) } ?? 0,
+                                           unit: material.unit ?? "each", searchQuery: material.searchQuery,
+                                           evidence: material.evidence == "stated" ? .stated : .inferred))
+            item.specifications = material.specifications.joined(separator: "\n").nilIfBlank
+            item.note = material.noteEn.nilIfBlank
+            position += 1
+        }
+        try context.save()
+        sync.syncSoon()
+    }
+
+    func togglePurchased(_ item: MaterialItem) throws {
+        item.purchased.toggle()
+        try commit(item)
+    }
+
+    @discardableResult
+    func save(_ draft: MaterialDraft, to item: MaterialItem?, in estimate: Estimate) throws -> MaterialItem {
+        let item = item ?? insert(MaterialItem(orgId: orgID, estimateId: estimate.id,
+                                               position: (materials(for: estimate).map(\.position).max() ?? -1) + 1,
+                                               nameEn: draft.nameEn.trimmed))
+        draft.apply(to: item)
+        try commit(item)
+        return item
+    }
+
+    func delete(_ item: MaterialItem) throws {
+        item.softDelete()
+        try commit(item, touch: false)
+    }
+
     @discardableResult
     func createBlankEstimate(for job: Job) throws -> Estimate {
         let estimate = insert(Estimate(orgId: orgID, jobId: job.id, language: organization?.defaultLanguage ?? .en))

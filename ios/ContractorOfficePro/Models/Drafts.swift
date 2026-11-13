@@ -171,6 +171,39 @@ struct LineDraft: Equatable {
     }
 }
 
+struct MaterialDraft: Equatable {
+    var nameEn = ""
+    var nameEs = ""
+    var qty: Decimal = 1
+    var unit = "each"
+    var specifications = ""
+    var searchQuery = ""
+
+    init() {}
+
+    init(_ item: MaterialItem) {
+        nameEn = item.nameEn
+        nameEs = item.nameEs
+        qty = item.qty
+        unit = item.unit
+        specifications = item.specifications ?? ""
+        searchQuery = item.searchQuery
+    }
+
+    var isValid: Bool { !nameEn.trimmed.isEmpty && qty >= 0 }
+
+    func apply(to item: MaterialItem) {
+        let changed = item.nameEn != nameEn.trimmed || item.qty != qty || item.unit != unit.trimmed
+        item.nameEn = nameEn.trimmed
+        item.nameEs = nameEs.trimmed
+        item.qty = qty
+        item.unit = unit.trimmed.isEmpty ? "each" : unit.trimmed
+        item.specifications = specifications.nilIfBlank
+        item.searchQuery = searchQuery.trimmed.isEmpty ? nameEn.trimmed : searchQuery.trimmed
+        if changed { item.evidence = .manual }   // the contractor confirmed it
+    }
+}
+
 nonisolated extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
     var nilIfBlank: String? { trimmed.isEmpty ? nil : trimmed }

@@ -6,6 +6,10 @@ struct EstimateView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var estimates: [Estimate]
     @Query private var lines: [LineItem]
+    @Query private var materials: [MaterialItem]
+    @State private var buildingMaterials = false
+    @State private var materialsFailure: BackendError?
+    @State private var openMaterials: UUID?
     @State private var editor: LineEditorRequest?
     @State private var answeringQuestions = false
     @State private var confirmingDelete = false
@@ -15,6 +19,7 @@ struct EstimateView: View {
         _estimates = Query(filter: #Predicate<Estimate> { $0.id == estimateID && $0.deletedAt == nil })
         _lines = Query(filter: #Predicate<LineItem> { $0.estimateId == estimateID && $0.deletedAt == nil },
                        sort: \LineItem.position)
+        _materials = Query(filter: #Predicate<MaterialItem> { $0.estimateId == estimateID && $0.deletedAt == nil })
     }
 
     var body: some View {
@@ -69,6 +74,32 @@ struct EstimateView: View {
             } header: {
                 Text(.estimateLinesHeader)
             }
+            Section {
+                if !materials.isEmpty {
+                    NavigationLink(value: AppRoute.materials(estimate.id)) {
+                        LabeledContent {
+                            Text(.materialsProgress(bought: materials.filter(\.purchased).count, total: materials.count))
+                                .font(.caption).foregroundStyle(Theme.muted)
+                        } label: {
+                            Label { Text(.materialsTitle) } icon: { Image(systemName: "shippingbox") }
+                        }
+                    }
+                }
+                Button { buildMaterials(for: estimate) } label: {
+                    HStack {
+                        Image(systemName: "sparkles").symbolEffect(.variableColor.iterative, isActive: buildingMaterials)
+                        Text(buildingMaterials ? .materialsBuilding : (materials.isEmpty ? .materialsBuild : .materialsRebuild))
+                    }
+                }
+                .disabled(buildingMaterials || lines.isEmpty || workspace.estimateService == nil)
+                if let materialsFailure {
+                    Text(materialsFailure.message).font(.footnote).foregroundStyle(Theme.danger)
+                }
+            } header: {
+                Text(.materialsHeader)
+            } footer: {
+                Text(.materialsFooter)
+            }
             if let exclusions = estimate.exclusions {
                 Section {
                     ForEach(exclusions.split(separator: "\n").map(String.init), id: \.self) { Text($0) }
@@ -94,6 +125,9 @@ struct EstimateView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editor) { LineEditor(request: $0, estimate: estimate) }
         .sheet(isPresented: $answeringQuestions) { AnswerQuestionsSheet(estimate: estimate, lines: lines) }
+        .navigationDestination(item: $openMaterials) { MaterialsView(estimateID: $0) }
+        .overlay { if buildingMaterials { AIGlow().transition(.opacity) } }
+        .animation(.smooth(duration: 0.4), value: buildingMaterials)
         .sensoryFeedback(.success, trigger: lines.count)
         .confirmationDialog(Text(.estimateDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
@@ -101,6 +135,24 @@ struct EstimateView: View {
             } label: { Text(.commonDelete) }
         }
         .alert(Text(.errorSaveFailed), isPresented: $saveFailed) {}
+    }
+}
+
+extension EstimateView {
+    fileprivate func buildMaterials(for estimate: Estimate) {
+        guard let service = workspace.estimateService else { return }
+        buildingMaterials = true
+        materialsFailure = nil
+        Task {
+            defer { buildingMaterials = false }
+            do {
+                let list = try await MaterialsDrafting.draft(for: estimate, lines: lines, service: service)
+                try workspace.replaceMaterials(of: estimate, with: list)
+                openMaterials = estimate.id
+            } catch {
+                materialsFailure = error as? BackendError ?? .invalidResponse
+            }
+        }
     }
 }
 

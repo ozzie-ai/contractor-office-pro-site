@@ -111,6 +111,45 @@ class RefineResponse(BaseModel):
     pricing_status: Literal["not_priced"] = "not_priced"
 
 
+MaterialCategory = Literal["electrical", "conduit_fittings", "plumbing", "lumber", "drywall", "paint", "concrete",
+                           "hardware", "fixtures", "consumables", "rental", "other"]
+
+
+class MaterialsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    notes: str = Field(default="", max_length=10_000, description="Original notes/transcript (private), for context.")
+    language: Language | None = None
+    lines: list[CurrentLine] = Field(min_length=1, max_length=100, description="The estimate's line items.")
+
+
+class Material(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name_en: str
+    name_es: str
+    category: MaterialCategory
+    quantity: float | None = Field(description="From line quantities or stated amounts; else null.")
+    unit: str | None
+    specifications: list[str] = Field(description="Ratings, sizes, materials exactly as known.")
+    for_refs: list[int] = Field(description="refs of the line items this material is for.")
+    search_query: str = Field(description="Brand-neutral product terms a store search would match.")
+    evidence: Literal["stated", "inferred"]
+    note_en: str = Field(description="Short note, e.g. assumption made; empty if none.")
+
+
+class MaterialsList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    materials: list[Material]
+    assumptions: list[str]
+    questions: list[str]
+
+
+class MaterialsResponse(BaseModel):
+    version: Literal[1] = 1
+    materials_list: MaterialsList
+    pricing_status: Literal["not_priced"] = "not_priced"
+    note: str = "AI draft. Confirm quantities and specs before buying."
+
+
 class PriceTaskInput(BaseModel):
     """A work item to price (typically a task from /v1/interpret, possibly edited by the contractor)."""
     model_config = ConfigDict(extra="ignore")

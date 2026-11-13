@@ -16,7 +16,8 @@ from app.main import Services, create_app
 from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs
 from app.ratelimit import RateLimiter
 from app.schemas import Interpretation, InterpretRequest, LineUpdate, Member, Refinement, RefineRequest, WorkItem
-from app.ai import enforce_refinement
+from app.ai import enforce_materials, enforce_refinement
+from app.schemas import Material, MaterialsList, MaterialsRequest
 
 SUPABASE = "https://example.supabase.co"
 PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
@@ -62,6 +63,21 @@ class FakeInterpreter:
                             description_es="Posible mejora de tierra", quantity=None, unit=None, specifications=[],
                             status="included_now", evidence="photo")],
             excluded_work=[], future_work=["Subpanel"], unknown_details=["Panel location?"], confidence_notes=[]))
+
+    async def materials(self, request: MaterialsRequest) -> MaterialsList:
+        if self.error:
+            raise self.error
+        raw = MaterialsList(materials=[
+            Material(name_en="200A main breaker load center", name_es="Centro de carga 200A", category="electrical",
+                     quantity=1, unit="each", specifications=["200A"], for_refs=[0, 42], search_query="  200 amp   load center  ",
+                     evidence="stated", note_en=""),
+            Material(name_en="8 AWG THHN wire", name_es="Cable THHN 8 AWG", category="electrical", quantity=-3,
+                     unit="ft", specifications=["8 AWG"], for_refs=[1], search_query="8 AWG THHN copper wire",
+                     evidence="inferred", note_en="Gauge assumed for a 40A circuit"),
+            Material(name_en="   ", name_es="", category="other", quantity=None, unit=None, specifications=[], for_refs=[],
+                     search_query="", evidence="inferred", note_en="")],
+            assumptions=["Copper conductors"], questions=["a?", "b?", "c?", "d?"])
+        return enforce_materials(raw, {l.ref for l in request.lines})
 
     async def refine(self, request: RefineRequest) -> Refinement:
         self.refine_requests = getattr(self, "refine_requests", []) + [request]

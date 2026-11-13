@@ -35,6 +35,21 @@ enum EstimateRefining {
     }
 }
 
+enum MaterialsDrafting {
+    static func draft(for estimate: Estimate, lines: [LineItem], service: any EstimateService) async throws -> MaterialsListDTO {
+        let body = MaterialsRequestBody(
+            notes: estimate.internalNotes ?? "", language: estimate.language.rawValue,
+            lines: lines.enumerated().map { ref, line in
+                RefineRequestBody.CurrentLineBody(ref: ref, taskCode: line.taskCode, descriptionEn: line.descriptionEn,
+                                                  quantity: line.qty == 0 ? nil : NSDecimalNumber(decimal: line.qty).doubleValue,
+                                                  unit: line.unit)
+            })
+        let list = try await service.materials(body).materialsList
+        guard !list.materials.isEmpty else { throw BackendError.nothingFound }
+        return list
+    }
+}
+
 enum EstimateDrafting {
     enum Phase: Equatable { case reading, pricing }
 

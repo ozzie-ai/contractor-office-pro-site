@@ -7,6 +7,7 @@ enum AppRoute: Hashable {
     case job(UUID)
     case client(UUID)
     case estimate(UUID)
+    case materials(UUID)
 }
 
 extension EnvironmentValues {
@@ -22,6 +23,7 @@ extension View {
                 case .job(let id): JobDetailView(jobID: id)
                 case .client(let id): ClientDetailView(clientID: id)
                 case .estimate(let id): EstimateView(estimateID: id)
+                case .materials(let id): MaterialsView(estimateID: id)
                 }
             }
             .modifier(ZoomDestination(route: route, namespace: namespace))
