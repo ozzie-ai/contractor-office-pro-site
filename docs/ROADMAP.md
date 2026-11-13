@@ -2,6 +2,8 @@
 
 Nov 6, 2026 · @Derek
 
+> **Update 2026-11-12:** Derek now builds the backend for the team's Expo app (ozzie-ai/contractor-office-pro-site). The native Swift app is parked. See CLAUDE.md and docs/decisions/0002-backend-for-team-app.md. The phases below are the original solo plan, kept for reference.
+
 ## Vision and principles
 
 A bilingual (English/Spanish) iOS app that runs the office side of a small trades business from the truck: voice and photo capture to estimates, invoices, expenses, scheduling and client texting. Built for Derek's own solo GC work first; productized only if it earns daily use.
