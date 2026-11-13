@@ -34,7 +34,7 @@ class SupabaseMemberDirectory:
 
     def __init__(self, settings: Settings, http: httpx.AsyncClient, ttl: float = 300):
         self._settings, self._http, self._ttl = settings, http, ttl
-        self._cache: dict[UUID, tuple[float, Member | None]] = {}
+        self._cache: dict[UUID, tuple[float, Member]] = {}
 
     async def member_for(self, user_id: UUID) -> Member | None:
         hit = self._cache.get(user_id)
@@ -50,7 +50,9 @@ class SupabaseMemberDirectory:
         if resp.status_code != 200:
             raise ApiError(503, "auth_unavailable", "Couldn't verify your account. Try again.")
         rows = resp.json()
-        member = Member(user_id=user_id, member_id=rows[0]["id"], org_id=rows[0]["org_id"], role=rows[0]["role"]) if rows else None
+        if not rows:
+            return None  # not cached: the user may be finishing business setup right now
+        member = Member(user_id=user_id, member_id=rows[0]["id"], org_id=rows[0]["org_id"], role=rows[0]["role"])
         self._cache[user_id] = (time.monotonic(), member)
         return member
 
