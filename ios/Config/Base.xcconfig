@@ -5,3 +5,6 @@ SUPABASE_ANON_KEY =
 // AI/pricing backend (FastAPI). Simulator → your Mac: http:/$()/127.0.0.1:8787
 BACKEND_URL =
 #include? "Config.xcconfig"
+
+// Release (TestFlight/App Store) builds always use the hosted backend; Debug uses BACKEND_URL above.
+BACKEND_URL[config=Release] = https:/$()/contractorofficepro-api.fly.dev

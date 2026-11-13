@@ -10,6 +10,16 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requiremen
 ```
 API docs: http://localhost:8787/docs (generated from the request/response models).
 
+## Deploy (Fly.io)
+```sh
+cd backend
+fly auth login                                  # once, opens the browser
+fly launch --copy-config --no-deploy            # once: creates the app from fly.toml
+grep -E '^(OPENAI_API_KEY|SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY)=' .env | fly secrets import   # once / on key change
+fly deploy                                      # every release
+```
+Release iOS builds call `https://contractorofficepro-api.fly.dev` (set in `ios/Config/Base.xcconfig`).
+
 ## Endpoints
 All `/v1` endpoints need `Authorization: Bearer <Supabase access token>`; the server resolves your business from `members`.
 
