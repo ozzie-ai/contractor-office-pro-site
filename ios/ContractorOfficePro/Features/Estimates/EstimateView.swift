@@ -34,7 +34,7 @@ struct EstimateView: View {
                 if needsAttention {
                     Label { Text(.estimatePreliminaryBanner) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
                         .font(.footnote)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Theme.warning)
                 }
             }
             if let questions = estimate.openQuestions {
@@ -84,6 +84,7 @@ struct EstimateView: View {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.estimateDelete) }
             }
         }
+        .themedList()
         .navigationTitle(Text(.estimateTitle))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editor) { LineEditor(request: $0, estimate: estimate) }
@@ -100,18 +101,23 @@ private struct TotalsView: View {
     let estimate: Estimate
 
     var body: some View {
-        VStack {
-            LabeledContent { Text(estimate.subtotal, format: .currency(code: "USD")) } label: { Text(.estimateSubtotal) }
+        VStack(alignment: .leading, spacing: 10) {
+            Text(.estimateTotal).font(.caption.weight(.medium)).foregroundStyle(Theme.muted).textCase(.uppercase)
+            MoneyText(amount: estimate.total, font: .system(size: 38, weight: .semibold))
+                .contentTransition(.numericText())
+                .animation(.smooth, value: estimate.total)
+                .accessibilityIdentifier("estimate-total")
+            Divider()
+            LabeledContent { MoneyText(amount: estimate.subtotal, font: .subheadline) } label: {
+                Text(.estimateSubtotal).font(.subheadline).foregroundStyle(Theme.muted)
+            }
             if estimate.tax > 0 {
-                LabeledContent { Text(estimate.tax, format: .currency(code: "USD")) } label: { Text(.estimateTax) }
+                LabeledContent { MoneyText(amount: estimate.tax, font: .subheadline) } label: {
+                    Text(.estimateTax).font(.subheadline).foregroundStyle(Theme.muted)
+                }
             }
-            LabeledContent {
-                Text(estimate.total, format: .currency(code: "USD")).font(.title3.bold())
-            } label: {
-                Text(.estimateTotal).font(.headline)
-            }
-            .accessibilityIdentifier("estimate-total")
         }
+        .padding(.vertical, 6)
     }
 }
 
@@ -121,17 +127,16 @@ struct LineRow: View {
     var body: some View {
         VStack(alignment: .leading) {
             Text(line.descriptionEn).font(.body)
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: "\(line.qty.formatted()) \(line.unit) × \(line.unitPrice.formatted(.currency(code: "USD")))")
-                    .font(.subheadline).foregroundStyle(.secondary)
+                    .font(.caption).fontDesign(.monospaced).foregroundStyle(Theme.muted)
                 Spacer()
-                Text(line.lineTotal, format: .currency(code: "USD")).font(.subheadline.bold())
+                MoneyText(amount: line.lineTotal, font: .subheadline.weight(.semibold))
             }
-            HStack {
+            HStack(spacing: 6) {
                 PriceBadge(line: line)
                 if line.source == .ai {
-                    Label { Text(.estimateBadgeAi) } icon: { Image(systemName: "sparkles") }
-                        .font(.caption2).foregroundStyle(.purple)
+                    Pill(title: .estimateBadgeAi, color: Theme.violet, systemImage: "sparkles")
                 }
             }
         }
@@ -144,20 +149,18 @@ struct PriceBadge: View {
 
     var body: some View {
         if line.needsQuantity {
-            badge(.estimateBadgeNeedsQuantity, "number", .red)
+            badge(.estimateBadgeNeedsQuantity, "number", Theme.danger)
         } else {
             switch line.priceSource {
-            case .contractor: badge(.estimateBadgeYourPrice, "checkmark.seal.fill", .green)
-            case .reference: badge(line.preliminary ? .estimateBadgeReferencePreliminary : .estimateBadgeReference, "book", .orange)
-            case .manual: badge(.estimateBadgeEdited, "pencil", .blue)
-            case .none: badge(.estimateBadgeNeedsPrice, "exclamationmark.circle.fill", .red)
+            case .contractor: badge(.estimateBadgeYourPrice, "checkmark.seal.fill", Theme.success)
+            case .reference: badge(line.preliminary ? .estimateBadgeReferencePreliminary : .estimateBadgeReference, "book", Theme.warning)
+            case .manual: badge(.estimateBadgeEdited, "pencil", Theme.info)
+            case .none: badge(.estimateBadgeNeedsPrice, "exclamationmark.circle.fill", Theme.danger)
             }
         }
     }
 
     private func badge(_ title: LocalizedStringResource, _ icon: String, _ color: Color) -> some View {
-        Label { Text(title) } icon: { Image(systemName: icon) }
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(color)
+        Pill(title: title, color: color)
     }
 }

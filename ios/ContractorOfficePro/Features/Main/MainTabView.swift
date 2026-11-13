@@ -52,10 +52,22 @@ struct MainTabView: View {
                 Label { Text(.tabSettings) } icon: { Image(systemName: "gearshape") }
             }
         }
+        .modifier(MinimizingTabBar())
         .environment(workspace)
         .task { await workspace.sync.run() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { workspace.sync.syncSoon(after: 0.5) }
+        }
+    }
+}
+
+/// iOS 26: the glass tab bar shrinks as you scroll down and returns when you scroll back.
+private struct MinimizingTabBar: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content.tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            content
         }
     }
 }

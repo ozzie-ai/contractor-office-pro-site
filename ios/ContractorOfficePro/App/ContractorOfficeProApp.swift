@@ -29,6 +29,7 @@ struct ContractorOfficeProApp: App {
         WindowGroup {
             RootView()
                 .environment(session)
+                .tint(Theme.accent)
         }
         .modelContainer(container)
     }

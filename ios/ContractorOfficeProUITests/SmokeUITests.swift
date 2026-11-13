@@ -59,8 +59,12 @@ final class SmokeUITests: XCTestCase {
         snap("9-draft-notes")
         app.buttons["Draft estimate"].tap()
 
-        XCTAssertTrue(app.staticTexts["Needs price"].firstMatch.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["Reference · preliminary"].firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 10))
+        snap("10a-estimate-top")
+        let needsPrice = element(in: app, labeled: "Needs price")
+        for _ in 0..<4 where !needsPrice.exists { app.swipeUp() }
+        XCTAssertTrue(needsPrice.exists)
+        XCTAssertTrue(element(in: app, labeled: "Reference · preliminary").exists)
         snap("10-estimate")
 
         let wireRow = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Wire run'")).firstMatch
@@ -85,6 +89,12 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Trabajos"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.tabBars.buttons["Clientes"].exists)
         snap("8-jobs-spanish")
+    }
+
+    /// Badges are combined accessibility elements, so match any element whose label contains the text.
+    @MainActor
+    private func element(in app: XCUIApplication, labeled text: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
     }
 
     @MainActor

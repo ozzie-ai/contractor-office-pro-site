@@ -44,6 +44,7 @@ struct OrganizationSetupView: View {
                 .disabled(!canContinue)
             }
         }
+        .themedList()
     }
 
     private func submit() {

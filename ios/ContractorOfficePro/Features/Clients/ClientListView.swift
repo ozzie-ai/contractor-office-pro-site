@@ -41,6 +41,7 @@ private struct ClientList: View {
                 ClientRow(client: client)
             }
         }
+        .themedList()
         .overlay {
             if clients.isEmpty {
                 if search.trimmed.isEmpty {
@@ -49,7 +50,7 @@ private struct ClientList: View {
                     } description: {
                         Text(.clientsEmptyMessage)
                     } actions: {
-                        Button(action: onAdd) { Text(.clientsNew) }.buttonStyle(.borderedProminent)
+                        Button(action: onAdd) { Text(.clientsNew) }.primaryActionStyle()
                     }
                 } else {
                     ContentUnavailableView.search(text: search)
@@ -65,18 +66,18 @@ struct ClientRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(client.name).font(.headline)
+                Text(client.name).font(.body.weight(.semibold)).tracking(-0.2)
                 if let phone = client.phone {
-                    Text(phone).font(.subheadline).foregroundStyle(.secondary)
+                    Text(phone).font(.subheadline).fontDesign(.monospaced).foregroundStyle(Theme.muted)
                 }
             }
             Spacer()
             if client.preferredLanguage == .es {
                 Text(verbatim: "ES")
-                    .font(.caption.bold())
+                    .font(.caption2.weight(.semibold)).fontDesign(.monospaced)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.tint.opacity(0.15), in: .capsule)
+                    .overlay(Capsule().strokeBorder(Theme.border))
                     .accessibilityLabel(Text(.languageEs))
             }
         }

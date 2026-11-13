@@ -61,7 +61,7 @@ struct JobDetailView: View {
                 ForEach(estimates) { estimate in
                     NavigationLink(value: AppRoute.estimate(estimate.id)) {
                         LabeledContent {
-                            Text(estimate.total, format: .currency(code: "USD"))
+                            MoneyText(amount: estimate.total)
                         } label: {
                             Text(.estimateRowTitle(date: estimate.createdAt.formatted(date: .abbreviated, time: .omitted)))
                         }
@@ -69,7 +69,13 @@ struct JobDetailView: View {
                 }
                 Button { draftingEstimate = true } label: {
                     Label { Text(.estimateNewWithAi) } icon: { Image(systemName: "sparkles") }
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                 }
+                .primaryActionStyle()
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
                 Button {
                     if let estimate = try? workspace.createBlankEstimate(for: job) { openedEstimate = estimate.id }
                 } label: {
@@ -99,6 +105,7 @@ struct JobDetailView: View {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
             }
         }
+        .themedList()
         .navigationTitle(job.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

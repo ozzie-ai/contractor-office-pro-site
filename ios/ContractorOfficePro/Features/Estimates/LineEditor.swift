@@ -66,6 +66,7 @@ struct LineEditor: View {
                     }
                 }
             }
+            .themedList()
             .navigationTitle(Text(request.line == nil ? .estimateAddLine : .lineEditTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

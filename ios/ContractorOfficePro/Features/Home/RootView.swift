@@ -43,7 +43,7 @@ private struct OfflineView: View {
             Text(.sessionOfflineMessage)
         } actions: {
             Button(action: retry) { Text(.sessionOfflineRetry) }
-                .buttonStyle(.borderedProminent)
+                .primaryActionStyle()
         }
     }
 }

@@ -39,6 +39,7 @@ struct JobListView: View {
         .overlay {
             if sections.isEmpty { emptyState }
         }
+        .themedList()
         .navigationTitle(Text(.jobsTitle))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -62,7 +63,7 @@ struct JobListView: View {
                 Text(.jobsEmptyMessage)
             } actions: {
                 Button { editor = JobEditorRequest() } label: { Text(.jobsNew) }
-                    .buttonStyle(.borderedProminent)
+                    .primaryActionStyle()
             }
         case .done:
             ContentUnavailableView {
@@ -78,21 +79,17 @@ struct JobRow: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text(job.title).font(.headline)
+            Text(job.title).font(.body.weight(.semibold)).tracking(-0.2)
             if let clientName {
                 Text(clientName).font(.subheadline)
             }
             if let address = job.address {
-                Text(address).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(address).font(.subheadline).foregroundStyle(Theme.muted).lineLimit(1)
             }
             if let start = job.scheduledStart {
-                Label {
-                    Text(start, format: .dateTime.weekday().month().day().hour().minute())
-                } icon: {
-                    Image(systemName: "calendar")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(start, format: .dateTime.weekday().month().day().hour().minute())
+                    .font(.caption).fontDesign(.monospaced)
+                    .foregroundStyle(Theme.muted)
             }
         }
         .padding(.vertical, 2)

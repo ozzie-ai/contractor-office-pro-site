@@ -51,20 +51,29 @@ struct EstimateDraftSheet: View {
                 Section {
                     Button(action: draft) {
                         HStack {
-                            Label { Text(.estimateDraftAction) } icon: { Image(systemName: "sparkles") }
-                            Spacer()
+                            Image(systemName: "sparkles")
+                                .symbolEffect(.variableColor.iterative, isActive: phase != nil)
                             if let phase {
-                                ProgressView()
                                 Text(phase == .reading ? .estimateDraftReading : .estimateDraftPricing)
-                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(.estimateDraftAction)
                             }
                         }
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                        .contentTransition(.opacity)
+                        .animation(.smooth, value: phase)
                     }
+                    .primaryActionStyle()
                     .disabled(!canDraft)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
                 } footer: {
                     Text(.estimateDraftReviewHint)
                 }
             }
+            .themedList()
             .navigationTitle(Text(.estimateDraftTitle))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
