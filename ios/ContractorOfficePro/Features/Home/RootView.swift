@@ -48,6 +48,7 @@ private struct OfflineView: View {
     }
 }
 
+#if DEBUG
 #Preview("First launch") {
     let (container, session) = PreviewData.firstLaunch()
     return RootView().environment(session).modelContainer(container)
@@ -63,3 +64,4 @@ private struct OfflineView: View {
     return RootView().environment(session).modelContainer(container)
         .environment(\.locale, Locale(identifier: "es"))
 }
+#endif

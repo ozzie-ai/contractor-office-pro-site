@@ -60,7 +60,9 @@ struct OrganizationSetupView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.firstLaunch()
     return RootView().environment(session).modelContainer(container)
 }
+#endif

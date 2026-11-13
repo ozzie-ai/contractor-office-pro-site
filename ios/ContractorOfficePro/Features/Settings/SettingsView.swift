@@ -172,7 +172,9 @@ struct SyncStatusView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.ready(withSamples: true)
     return RootView().environment(session).modelContainer(container)
 }
+#endif

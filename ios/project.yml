@@ -48,6 +48,8 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, es]
+        # Only standard HTTPS (exempt), so TestFlight doesn't ask the export-compliance question each upload.
+        ITSAppUsesNonExemptEncryption: false
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         SupabaseURL: $(SUPABASE_URL)

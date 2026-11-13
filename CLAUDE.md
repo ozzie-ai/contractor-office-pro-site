@@ -66,6 +66,8 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
   demo mode. Live server test: `TEST_RUNNER_LIVE_SUPABASE=1 xcodebuild ... test`.
 - Writes go through `Workspace` (stamps, saves, schedules sync). Editors edit a draft; Cancel discards.
 - Demo mode (DEBUG): launch with `-demo` for sample data on a fake server, never the real account.
+- Wrap every `#Preview` in `#if DEBUG` (fixtures are DEBUG-only); check Release still builds before uploads.
+- TestFlight: `DEVELOPMENT_TEAM=<team id> ios/scripts/testflight.sh` (archives Release, uploads).
 
 ## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and

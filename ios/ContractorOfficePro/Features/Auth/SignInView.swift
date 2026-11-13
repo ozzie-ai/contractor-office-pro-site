@@ -73,7 +73,9 @@ struct SignInView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.firstLaunch()
     return SignInView().environment(session).modelContainer(container)
 }
+#endif

@@ -58,6 +58,7 @@ struct MainTabView: View {
     }
 }
 
+#if DEBUG
 #Preview("Ready, with sample data") {
     let (container, session) = PreviewData.ready(withSamples: true)
     return RootView().environment(session).modelContainer(container)
@@ -68,3 +69,4 @@ struct MainTabView: View {
     return RootView().environment(session).modelContainer(container)
         .environment(\.locale, Locale(identifier: "es"))
 }
+#endif
