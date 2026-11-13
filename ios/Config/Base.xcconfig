@@ -2,4 +2,6 @@
 // Note: "//" starts a comment in xcconfig, so write URLs as https:/$()/xyz.supabase.co
 SUPABASE_URL =
 SUPABASE_ANON_KEY =
+// AI/pricing backend (FastAPI). Simulator → your Mac: http:/$()/127.0.0.1:8787
+BACKEND_URL =
 #include? "Config.xcconfig"

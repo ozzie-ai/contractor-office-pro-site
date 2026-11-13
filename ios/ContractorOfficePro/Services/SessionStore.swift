@@ -37,21 +37,29 @@ final class SessionStore {
 
     private let account: (any AccountClient)?
     private let transport: (any SyncTransport)?
+    private let estimateService: (any EstimateService)?
     private let context: ModelContext
     private let defaults: UserDefaults
 
-    init(account: (any AccountClient)?, transport: (any SyncTransport)?, context: ModelContext,
-         defaults: UserDefaults = .standard) {
+    init(account: (any AccountClient)?, transport: (any SyncTransport)?, estimateService: (any EstimateService)? = nil,
+         context: ModelContext, defaults: UserDefaults = .standard) {
         self.account = account
         self.transport = transport
+        self.estimateService = estimateService
         self.context = context
         self.defaults = defaults
     }
 
     static func live(context: ModelContext) -> SessionStore {
-        SessionStore(account: Backend.client.map(SupabaseAccountClient.init),
-                     transport: Backend.client.map(SupabaseSyncTransport.init),
-                     context: context)
+        let client = Backend.client
+        let estimates: (any EstimateService)? = if let client, let url = AppConfig.backendURL {
+            BackendClient(baseURL: url, accessToken: { try await client.auth.session.accessToken })
+        } else {
+            nil
+        }
+        return SessionStore(account: client.map(SupabaseAccountClient.init),
+                            transport: client.map(SupabaseSyncTransport.init),
+                            estimateService: estimates, context: context)
     }
 
     func start() async {
@@ -156,7 +164,8 @@ final class SessionStore {
         guard state != previous else { return }
         guard case .ready(let orgID, let memberID) = state, let transport else { workspace = nil; return }
         let sync = SyncEngine(transport: transport, context: context, orgID: orgID, defaults: defaults)
-        workspace = Workspace(orgID: orgID, memberID: memberID, context: context, sync: sync)
+        workspace = Workspace(orgID: orgID, memberID: memberID, context: context, sync: sync,
+                              estimateService: estimateService)
     }
 
     private static func normalize(_ email: String) -> String {

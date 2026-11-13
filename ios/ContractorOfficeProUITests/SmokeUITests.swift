@@ -44,6 +44,40 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testDraftEstimateWithAI() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let job = app.staticTexts["Bathroom remodel"]
+        XCTAssertTrue(job.waitForExistence(timeout: 10))
+        job.tap()
+        app.buttons["New estimate with AI"].tap()
+        let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 5))
+        notes.typeText("Cambiar panel de 100 a 200 amperios, transferir 20 circuitos, circuito de 40A para cargador.")
+        snap("9-draft-notes")
+        app.buttons["Draft estimate"].tap()
+
+        XCTAssertTrue(app.staticTexts["Needs price"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Reference · preliminary"].firstMatch.exists)
+        snap("10-estimate")
+
+        let wireRow = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Wire run'")).firstMatch
+        for _ in 0..<4 where !wireRow.isHittable { app.swipeUp() }
+        wireRow.tap()
+        let price = app.textFields["line-unit-price"]
+        XCTAssertTrue(price.waitForExistence(timeout: 5))
+        price.tap()
+        price.typeText("3.50")
+        snap("11-line-editor")
+        app.buttons["Save"].tap()
+        let saved = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Wire run' AND label CONTAINS 'Your price'")).firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 5), "price saved to the price book")
+        snap("12-estimate-after-edit")
+    }
+
+    @MainActor
     func testSpanish() {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-AppleLanguages", "(es)", "-AppleLocale", "es_US"]

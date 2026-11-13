@@ -15,6 +15,20 @@ struct SyncDateTests {
         #expect(SyncDate.parse(SyncDate.format(date)) == date)
     }
 
+    @Test(arguments: 0..<200) func millisecondsRoundTripExactly(seed: Int) throws {
+        // Stamps made by touch() must come back identical (to the ms) after formatting and parsing.
+        let client = Client(orgId: UUID(), name: "x")
+        client.touch(now: Date(timeIntervalSince1970: 1_794_514_530 + Double(seed) * 0.0137))
+        let parsed = try #require(SyncDate.parse(SyncDate.format(client.updatedAt)))
+        #expect(abs(parsed.timeIntervalSince(client.updatedAt)) < 0.0005)
+        #expect(SyncDate.format(parsed) == SyncDate.format(client.updatedAt))
+    }
+
+    @Test func formatsMillisecondsWithZeroPadding() throws {
+        #expect(SyncDate.format(Date(timeIntervalSince1970: 1_794_514_530.007)) == "2026-11-12T20:15:30.007Z")
+        #expect(SyncDate.format(Date(timeIntervalSince1970: 1_794_514_530.9996)) == "2026-11-12T20:15:31.000Z")
+    }
+
     @Test func dayColumnsRoundTrip() throws {
         let day = try #require(SyncDate.parseDay("2026-03-09"))
         #expect(SyncDate.formatDay(day) == "2026-03-09")
@@ -60,7 +74,7 @@ struct SyncMappingTests {
         #expect(copy.preferredLanguage == .es)
         #expect(copy.isSenior65Plus)
         #expect(copy.smsConsent == .granted)
-        #expect(abs(copy.updatedAt.timeIntervalSince(client.updatedAt)) < 0.001, "ms precision survives the wire")
+        #expect(abs(copy.updatedAt.timeIntervalSince(client.updatedAt)) < 0.0005, "ms precision survives the wire")
         #expect(!copy.needsSync)
     }
 
@@ -78,6 +92,18 @@ struct SyncMappingTests {
         #expect(copy.unitPrice == Decimal(string: "19.99"))
         #expect(copy.qty == Decimal(string: "2.5"))
         #expect(copy.source == .priceBook)
+    }
+
+    @Test func estimateMetadataTravels() throws {
+        let line = LineItem(orgId: UUID(), estimateId: UUID(), descriptionEn: "Panel")
+        line.taskCode = "ELEC.PANEL.UPGRADE"; line.priceSource = .reference; line.preliminary = true; line.priceNote = "Pilot"
+        let copy = try #require(LineItem.make(try throughJSON(line.row())))
+        #expect(copy.taskCode == "ELEC.PANEL.UPGRADE" && copy.priceSource == .reference && copy.preliminary && copy.priceNote == "Pilot")
+
+        let estimate = Estimate(orgId: UUID(), jobId: UUID())
+        estimate.internalNotes = "private"; estimate.exclusions = "Subpanel"; estimate.openQuestions = "Where?"
+        let e2 = try #require(Estimate.make(try throughJSON(estimate.row())))
+        #expect(e2.internalNotes == "private" && e2.exclusions == "Subpanel" && e2.openQuestions == "Where?")
     }
 
     @Test func mediaKeepsDeviceOnlyFileName() {

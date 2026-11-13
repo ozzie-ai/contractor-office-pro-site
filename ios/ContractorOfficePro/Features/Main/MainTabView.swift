@@ -6,6 +6,7 @@ enum AppTab: Hashable { case jobs, clients, settings }
 enum AppRoute: Hashable {
     case job(UUID)
     case client(UUID)
+    case estimate(UUID)
 }
 
 extension View {
@@ -14,6 +15,7 @@ extension View {
             switch route {
             case .job(let id): JobDetailView(jobID: id)
             case .client(let id): ClientDetailView(clientID: id)
+            case .estimate(let id): EstimateView(estimateID: id)
             }
         }
     }

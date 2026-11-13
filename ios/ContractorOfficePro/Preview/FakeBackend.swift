@@ -4,7 +4,7 @@ import Supabase
 
 /// In-memory stand-in for Supabase: accounts, the org RPC, and sync with the same last-write-wins
 /// guard as the real trigger. Used by previews and unit tests so neither touches the network.
-actor FakeBackend: AccountClient, SyncTransport {
+actor FakeBackend: AccountClient, SyncTransport, EstimateService {
     private(set) var tables: [String: [UUID: Row]] = [:]
     private var currentUser: UUID?
     private var offline: Bool
@@ -84,6 +84,63 @@ actor FakeBackend: AccountClient, SyncTransport {
             .sorted { ($0.string("server_updated_at") ?? "", $0.string("id") ?? "")
                     < ($1.string("server_updated_at") ?? "", $1.string("id") ?? "") }
         return Array(rows.dropFirst(offset).prefix(limit))
+    }
+
+    // MARK: EstimateService (canned, deterministic: modeled on the team's MIXED-002 scenario)
+
+    private(set) var interpretCalls = 0
+    var contractorPrices: [String: Decimal] = [:]
+
+    func setContractorPrice(_ price: Decimal, for code: String) { contractorPrices[code] = price }
+
+    func interpret(_ request: InterpretRequestBody) async throws -> InterpretResponseDTO {
+        if offline { throw BackendError.offline }
+        interpretCalls += 1
+        func task(_ code: String?, _ en: String, _ es: String, _ qty: Double?, _ unit: String?) -> WorkTaskDTO {
+            WorkTaskDTO(taskCode: code, category: "electrical", descriptionEn: en, descriptionEs: es, quantity: qty,
+                        unit: unit, specifications: [], status: "included_now", evidence: "stated")
+        }
+        return InterpretResponseDTO(interpretation: InterpretationDTO(
+            trade: "electrical",
+            projectSummaryEn: "Panel upgrade from 100A to 200A with an EV charger circuit.",
+            projectSummaryEs: "Cambio de panel de 100A a 200A con circuito para cargador eléctrico.",
+            tasks: [
+                task("ELEC.PANEL.UPGRADE", "Replace the existing 100A panel with a new 200A panel", "Reemplazar el panel de 100A por uno nuevo de 200A", 1, "job"),
+                task("ELEC.CIRCUIT.TRANSFER", "Transfer 20 existing circuits to the new panel", "Transferir 20 circuitos existentes al panel nuevo", 20, "each"),
+                task("ELEC.CIRCUIT.NEW", "New 40A double-pole circuit for the EV charger", "Circuito nuevo bipolar de 40A para el cargador", 1, "each"),
+                task("ELEC.WIRE.RUN", "Wire run to the EV charger location", "Tendido de cable hasta el cargador", 100, "linear ft"),
+                task("ELEC.BREAKER.ONLY", "100A double-pole breaker reserved for a future subpanel", "Breaker bipolar de 100A reservado para un subpanel futuro", 1, "each"),
+            ],
+            excludedWork: ["Subpanel and feeder installation"], futureWork: ["Feed a future subpanel from the reserved 100A breaker"],
+            unknownDetails: ["Is the EV charger supplied by the customer?", "Where is the panel located?"],
+            confidenceNotes: []))
+    }
+
+    func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO {
+        if offline { throw BackendError.offline }
+        let references: [String: (Decimal, String)] = [
+            "ELEC.PANEL.UPGRADE": (2100, "200A panel"), "ELEC.CIRCUIT.TRANSFER": (35, "Per circuit"),
+            "ELEC.BREAKER.ONLY": (220, "100A two-pole breaker")]
+        var subtotal: Decimal = 0
+        let lines = request.tasks.map { task -> PricedLineDTO in
+            let code = task.taskCode ?? ""
+            let qty = task.quantity.map { Decimal($0) }
+            let (price, source, preliminary, name, applies): (Decimal?, String, Bool, String?, String?) =
+                if let own = contractorPrices[code] { (own, "contractor", false, "Your price book", nil) }
+                else if let ref = references[code] { (ref.0, "reference", true, "Pilot LA planning allowance (illustrative)", ref.1) }
+                else { (nil, "none", true, nil, nil) }
+            let total = price.flatMap { p in qty.map { EstimateCalculator.lineTotal(qty: $0, unitPrice: p) } }
+            subtotal += total ?? 0
+            return PricedLineDTO(taskCode: task.taskCode, descriptionEn: task.descriptionEn, descriptionEs: task.descriptionEs,
+                                 quantity: qty.map(DecimalValue.init), unit: task.unit, unitPrice: price.map(DecimalValue.init),
+                                 lineTotal: total.map(DecimalValue.init), priceSource: source, preliminary: preliminary,
+                                 sourceName: name, appliesTo: applies, note: nil,
+                                 needs: (price == nil ? ["price"] : []) + (qty == nil ? ["quantity"] : []))
+        }
+        return PriceResponseDTO(regionCode: "US-CA-LA", lines: lines, subtotal: DecimalValue(subtotal),
+                                pricedLines: lines.filter { $0.lineTotal != nil }.count,
+                                unpricedLines: lines.filter { $0.lineTotal == nil }.count,
+                                preliminary: true, disclaimer: "Preliminary estimate.")
     }
 
     // MARK: Private

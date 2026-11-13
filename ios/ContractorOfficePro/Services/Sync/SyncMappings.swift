@@ -148,12 +148,13 @@ nonisolated extension PriceBookItem: SyncRecord {
     var fields: Row {
         ["kind": J.s(kindRaw), "name_en": J.s(nameEn), "name_es": J.s(nameEs), "unit": J.s(unit),
          "unit_cost": J.dec(unitCost), "unit_price": J.dec(unitPrice), "markup_pct": J.dec(markupPct),
-         "category": J.s(category)]
+         "category": J.s(category), "task_code": J.s(taskCode)]
     }
     func applyFields(_ r: Row) {
         kindRaw = r.string("kind") ?? kindRaw; nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es")
         unit = r.string("unit") ?? unit; unitCost = r.decimal("unit_cost") ?? unitCost
         unitPrice = r.decimal("unit_price") ?? unitPrice; markupPct = r.decimal("markup_pct"); category = r.string("category")
+        taskCode = r.string("task_code")
     }
     static func make(_ r: Row) -> PriceBookItem? {
         guard let b = base(r), let name = r.string("name_en") else { return nil }
@@ -166,13 +167,15 @@ nonisolated extension Estimate: SyncRecord {
     var fields: Row {
         ["job_id": J.u(jobId), "number": J.s(number), "status": J.s(statusRaw), "language": J.s(languageRaw),
          "subtotal": J.dec(subtotal), "tax": J.dec(tax), "total": J.dec(total),
-         "deposit_amount": J.dec(depositAmount), "sent_at": J.t(sentAt), "accepted_at": J.t(acceptedAt)]
+         "deposit_amount": J.dec(depositAmount), "sent_at": J.t(sentAt), "accepted_at": J.t(acceptedAt),
+         "internal_notes": J.s(internalNotes), "exclusions": J.s(exclusions), "open_questions": J.s(openQuestions)]
     }
     func applyFields(_ r: Row) {
         jobId = r.uuid("job_id") ?? jobId; number = r.string("number"); statusRaw = r.string("status") ?? statusRaw
         languageRaw = r.string("language") ?? languageRaw; subtotal = r.decimal("subtotal") ?? 0
         tax = r.decimal("tax") ?? 0; total = r.decimal("total") ?? 0; depositAmount = r.decimal("deposit_amount")
         sentAt = r.date("sent_at"); acceptedAt = r.date("accepted_at")
+        internalNotes = r.string("internal_notes"); exclusions = r.string("exclusions"); openQuestions = r.string("open_questions")
     }
     static func make(_ r: Row) -> Estimate? {
         guard let b = base(r), let job = r.uuid("job_id") else { return nil }
@@ -185,7 +188,9 @@ nonisolated extension LineItem: SyncRecord {
     var fields: Row {
         ["estimate_id": J.u(estimateId), "price_book_item_id": J.u(priceBookItemId), "position": J.i(position),
          "description_en": J.s(descriptionEn), "description_es": J.s(descriptionEs), "qty": J.dec(qty),
-         "unit": J.s(unit), "unit_price": J.dec(unitPrice), "taxable": J.b(taxable), "source": J.s(sourceRaw)]
+         "unit": J.s(unit), "unit_price": J.dec(unitPrice), "taxable": J.b(taxable), "source": J.s(sourceRaw),
+         "task_code": J.s(taskCode), "price_source": J.s(priceSourceRaw), "price_note": J.s(priceNote),
+         "preliminary": J.b(preliminary)]
     }
     func applyFields(_ r: Row) {
         estimateId = r.uuid("estimate_id") ?? estimateId; priceBookItemId = r.uuid("price_book_item_id")
@@ -193,6 +198,8 @@ nonisolated extension LineItem: SyncRecord {
         descriptionEs = r.string("description_es") ?? ""; qty = r.decimal("qty") ?? 1; unit = r.string("unit") ?? "ea"
         unitPrice = r.decimal("unit_price") ?? 0; taxable = r.bool("taxable") ?? true
         sourceRaw = r.string("source") ?? sourceRaw
+        taskCode = r.string("task_code"); priceSourceRaw = r.string("price_source") ?? priceSourceRaw
+        priceNote = r.string("price_note"); preliminary = r.bool("preliminary") ?? false
     }
     static func make(_ r: Row) -> LineItem? {
         guard let b = base(r), let est = r.uuid("estimate_id") else { return nil }

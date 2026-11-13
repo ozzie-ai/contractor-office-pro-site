@@ -6,9 +6,9 @@ FastAPI service for the AI steps. The OpenAI key and Supabase service key live o
 ```sh
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
-.venv/bin/uvicorn app.main:create_app --factory --reload --port 8000
+.venv/bin/uvicorn app.main:create_app --factory --reload --port 8787
 ```
-API docs: http://localhost:8000/docs (generated from the request/response models).
+API docs: http://localhost:8787/docs (generated from the request/response models).
 
 ## Endpoints
 All `/v1` endpoints need `Authorization: Bearer <Supabase access token>`; the server resolves your business from `members`.

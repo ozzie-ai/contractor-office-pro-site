@@ -15,6 +15,8 @@ final class PriceBookItem: Syncable {
     var unitPrice: Decimal
     var markupPct: Decimal?
     var category: String?
+    /// Catalog task this price is for (e.g. ELEC.GFCI); the pricing service uses it as "your price".
+    var taskCode: String?
     var createdAt: Date
     var updatedAt: Date
     var serverUpdatedAt: Date?
@@ -59,6 +61,12 @@ final class Estimate: Syncable {
     var depositAmount: Decimal?
     var sentAt: Date?
     var acceptedAt: Date?
+    /// Private: the contractor's dictation/notes. Never on customer documents.
+    var internalNotes: String?
+    /// Customer-facing exclusions and future work, one per line.
+    var exclusions: String?
+    /// Private: questions the AI couldn't answer from the notes.
+    var openQuestions: String?
     var createdAt: Date
     var updatedAt: Date
     var serverUpdatedAt: Date?
@@ -107,6 +115,11 @@ final class LineItem: Syncable {
     var unitPrice: Decimal
     var taxable: Bool
     var sourceRaw: String
+    var taskCode: String?
+    /// Where the unit price came from: contractor / reference / manual / none.
+    var priceSourceRaw: String = "manual"
+    var priceNote: String?
+    var preliminary: Bool = false
     var createdAt: Date
     var updatedAt: Date
     var serverUpdatedAt: Date?
@@ -117,6 +130,17 @@ final class LineItem: Syncable {
         get { Source(rawValue: sourceRaw) ?? .manual }
         set { sourceRaw = newValue.rawValue }
     }
+
+    enum PriceSource: String, Codable, CaseIterable, Sendable { case contractor, reference, manual, none }
+
+    var priceSource: PriceSource {
+        get { PriceSource(rawValue: priceSourceRaw) ?? .manual }
+        set { priceSourceRaw = newValue.rawValue }
+    }
+
+    var needsPrice: Bool { priceSource == .none }
+    var needsQuantity: Bool { qty == 0 }
+    var lineTotal: Decimal { EstimateCalculator.lineTotal(qty: qty, unitPrice: unitPrice) }
 
     init(id: UUID = UUID(), orgId: UUID, estimateId: UUID, position: Int = 0, descriptionEn: String = "",
          descriptionEs: String = "", qty: Decimal = 1, unit: String = "ea", unitPrice: Decimal = 0,

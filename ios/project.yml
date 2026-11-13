@@ -54,6 +54,9 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        BackendURL: $(BACKEND_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
   ContractorOfficeProTests:
     type: bundle.unit-test
     platform: iOS

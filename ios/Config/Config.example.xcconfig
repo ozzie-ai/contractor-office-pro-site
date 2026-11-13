@@ -2,3 +2,5 @@
 // Only the ANON key belongs here — never the service-role key.
 SUPABASE_URL = https:/$()/YOUR-PROJECT-REF.supabase.co
 SUPABASE_ANON_KEY = YOUR-ANON-KEY
+// Backend for AI drafts + pricing. Simulator talking to your Mac:
+BACKEND_URL = http:/$()/127.0.0.1:8787
