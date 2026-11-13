@@ -116,6 +116,87 @@ private struct EmptyService: EstimateService {
             tasks: [], excludedWork: [], futureWork: [], unknownDetails: [], confidenceNotes: []))
     }
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO { fatalError("not called") }
+    func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO { fatalError("not called") }
+}
+
+@Suite("Answering the AI's questions")
+struct RefinementTests {
+    let backend = FakeBackend()
+    let context: ModelContext
+    let workspace: Workspace
+    let orgID = UUID()
+    let job: Job
+
+    init() throws {
+        context = ModelContext(try AppSchema.makeContainer(inMemory: true))
+        context.insert(Organization(id: orgID, name: "Flores"))
+        let sync = SyncEngine(transport: backend, context: context, orgID: orgID, defaults: PreviewData.ephemeralDefaults())
+        workspace = Workspace(orgID: orgID, memberID: UUID(), context: context, sync: sync, estimateService: backend)
+        job = Job(orgId: orgID, title: "Panel", assignedTo: nil)
+        context.insert(job)
+    }
+
+    private func draftedEstimate() async throws -> Estimate {
+        let draft = try await EstimateDrafting.draft(notes: "Cambiar panel…", language: .es, service: backend)
+        return try workspace.createEstimate(for: job, notes: "Cambiar panel…", language: .es, draft: draft)
+    }
+
+    private func answers() -> [QuestionAnswer] {
+        [QuestionAnswer(question: "Is the EV charger supplied by the customer?", answer: "Yes, they bought it"),
+         QuestionAnswer(question: "How long is the run?", answer: "85 feet")]
+    }
+
+    @Test func proposalIsPricedButNothingChangesUntilApplied() async throws {
+        let estimate = try await draftedEstimate()
+        let lines = workspace.lines(for: estimate)
+        let before = estimate.subtotal
+
+        let proposal = try await EstimateRefining.propose(notes: "", language: .es, lines: lines, answers: answers(), service: backend)
+
+        #expect(proposal.adds.map(\.taskCode) == ["ELEC.EV.CHARGER.INSTALL"])
+        #expect(proposal.adds.first?.priceSource == "none", "uncataloged price → needs price, never invented")
+        #expect(proposal.updates.count == 1 && lines[proposal.updates[0].ref].taskCode == "ELEC.WIRE.RUN")
+        #expect(workspace.lines(for: estimate).count == 5 && estimate.subtotal == before, "nothing applied yet")
+    }
+
+    @Test func applyingAddsLinesUpdatesQuantitiesAndRecordsAnswers() async throws {
+        let estimate = try await draftedEstimate()
+        let lines = workspace.lines(for: estimate)
+        let proposal = try await EstimateRefining.propose(notes: "", language: .es, lines: lines, answers: answers(), service: backend)
+
+        try workspace.apply(proposal, to: estimate, lines: lines,
+                            addIndexes: Set(proposal.adds.indices), updateIndexes: Set(proposal.updates.indices))
+
+        let after = workspace.lines(for: estimate)
+        #expect(after.count == 6)
+        #expect(after.last?.taskCode == "ELEC.EV.CHARGER.INSTALL" && after.last?.source == .ai && after.last?.needsPrice == true)
+        #expect(after.first { $0.taskCode == "ELEC.WIRE.RUN" }?.qty == 85)
+        #expect(estimate.openQuestions == nil, "all questions answered")
+        #expect(estimate.internalNotes?.contains("A: 85 feet") == true, "answers kept privately")
+        #expect(estimate.exclusions?.contains("supplied by the customer") == true)
+        #expect(after.allSatisfy { !$0.descriptionEn.contains("Q:") }, "answers never leak into line items")
+    }
+
+    @Test func unselectedChangesAreSkipped() async throws {
+        let estimate = try await draftedEstimate()
+        let lines = workspace.lines(for: estimate)
+        let proposal = try await EstimateRefining.propose(notes: "", language: .es, lines: lines, answers: answers(), service: backend)
+
+        try workspace.apply(proposal, to: estimate, lines: lines, addIndexes: [], updateIndexes: [])
+
+        #expect(workspace.lines(for: estimate).count == 5)
+        #expect(workspace.lines(for: estimate).first { $0.taskCode == "ELEC.WIRE.RUN" }?.qty == 100)
+        #expect(estimate.internalNotes?.contains("Q: How long is the run?") == true, "answers still saved")
+    }
+
+    @Test func refineOfflineFailsClearly() async throws {
+        let estimate = try await draftedEstimate()
+        await backend.setOffline(true)
+        await #expect(throws: BackendError.offline) {
+            _ = try await EstimateRefining.propose(notes: "", language: .es, lines: self.workspace.lines(for: estimate),
+                                                   answers: self.answers(), service: self.backend)
+        }
+    }
 }
 
 @Suite("Backend client wire format")

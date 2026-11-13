@@ -64,6 +64,53 @@ class InterpretResponse(BaseModel):
     note: str = "AI draft. Review every task, quantity and specification before pricing."
 
 
+class CurrentLine(BaseModel):
+    """A line already on the draft estimate, referenced by `ref` in proposed updates."""
+    model_config = ConfigDict(extra="ignore")
+    ref: int = Field(ge=0)
+    task_code: str | None = None
+    description_en: str
+    quantity: float | None = None
+    unit: str | None = None
+
+
+class QuestionAnswer(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1, max_length=2000)
+
+
+class RefineRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    notes: str = Field(default="", max_length=10_000, description="The original notes/transcript (private).")
+    language: Language | None = None
+    current_lines: list[CurrentLine] = Field(default_factory=list, max_length=100)
+    answers: list[QuestionAnswer] = Field(min_length=1, max_length=20)
+
+
+class LineUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ref: int = Field(description="ref of the existing line to change.")
+    quantity: float | None = Field(description="New quantity if an answer states it; else null.")
+    unit: str | None = Field(description="New unit if it changes; else null.")
+    reason_en: str = Field(description="Short reason, e.g. 'Answer: run is 80 ft'.")
+
+
+class Refinement(BaseModel):
+    """Changes the contractor's answers imply. The contractor reviews and applies them."""
+    model_config = ConfigDict(extra="forbid")
+    add: list[WorkItem] = Field(description="New tasks revealed by the answers that are not already on the estimate.")
+    update: list[LineUpdate] = Field(description="Quantity/unit changes to existing lines, by ref.")
+    exclusions: list[str] = Field(description="New excluded or future work stated in the answers.")
+    remaining_questions: list[str] = Field(description="Original questions still unanswered plus any essential new ones.")
+
+
+class RefineResponse(BaseModel):
+    version: Literal[1] = 1
+    changes: Refinement
+    pricing_status: Literal["not_priced"] = "not_priced"
+
+
 class PriceTaskInput(BaseModel):
     """A work item to price (typically a task from /v1/interpret, possibly edited by the contractor)."""
     model_config = ConfigDict(extra="ignore")

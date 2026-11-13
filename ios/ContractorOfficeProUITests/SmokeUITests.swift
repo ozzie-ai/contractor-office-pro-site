@@ -86,6 +86,39 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testAnswerAIQuestionsAndApply() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        app.staticTexts["Bathroom remodel"].tap()
+        app.buttons["New estimate with AI"].tap()
+        let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 5))
+        notes.typeText("Cambiar panel de 100 a 200 amperios y circuito de 40A para cargador.")
+        app.buttons["Draft estimate"].tap()
+
+        let answerButton = app.buttons["Answer questions"]
+        XCTAssertTrue(answerButton.waitForExistence(timeout: 10))
+        answerButton.tap()
+        let first = app.textFields["answer-0"].exists ? app.textFields["answer-0"] : app.textViews["answer-0"]
+        XCTAssertTrue(first.waitForExistence(timeout: 5))
+        first.tap()
+        first.typeText("Yes, the customer bought the charger. The run is 85 feet.")
+        snap("13-answer-questions")
+        app.buttons["Update estimate"].tap()
+
+        let apply = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Apply'")).firstMatch
+        XCTAssertTrue(apply.waitForExistence(timeout: 10))
+        snap("14-proposed-changes")
+        apply.tap()
+
+        let added = element(in: app, labeled: "Install the customer-supplied EV charger")
+        for _ in 0..<5 where !added.exists { app.swipeUp() }
+        XCTAssertTrue(added.exists, "approved line was added")
+        snap("15-estimate-after-answers")
+    }
+
+    @MainActor
     func testSplashSettlesIntoTheApp() {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

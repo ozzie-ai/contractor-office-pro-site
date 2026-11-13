@@ -7,6 +7,7 @@ struct EstimateView: View {
     @Query private var estimates: [Estimate]
     @Query private var lines: [LineItem]
     @State private var editor: LineEditorRequest?
+    @State private var answeringQuestions = false
     @State private var confirmingDelete = false
     @State private var saveFailed = false
 
@@ -41,6 +42,10 @@ struct EstimateView: View {
                 Section {
                     ForEach(questions.split(separator: "\n").map(String.init), id: \.self) { question in
                         Label { Text(question) } icon: { Image(systemName: "questionmark.bubble") }
+                    }
+                    Button { answeringQuestions = true } label: {
+                        Label { Text(.answersOpen) } icon: { Image(systemName: "sparkles") }
+                            .font(.body.weight(.semibold))
                     }
                 } header: {
                     Text(.estimateQuestionsHeader)
@@ -88,6 +93,8 @@ struct EstimateView: View {
         .navigationTitle(Text(.estimateTitle))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $editor) { LineEditor(request: $0, estimate: estimate) }
+        .sheet(isPresented: $answeringQuestions) { AnswerQuestionsSheet(estimate: estimate, lines: lines) }
+        .sensoryFeedback(.success, trigger: lines.count)
         .confirmationDialog(Text(.estimateDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
                 if (try? workspace.delete(estimate)) != nil { dismiss() } else { saveFailed = true }

@@ -18,7 +18,7 @@ from .errors import ApiError, install_error_handlers
 from .ratelimit import RateLimiter
 from .schemas import ErrorResponse as ErrorModel
 from .schemas import (InterpretRequest, InterpretResponse, Member, PriceBookEntry, PriceBookResponse, PriceRequest,
-                      PriceResponse, PriceTaskInput, TranscribeResponse)
+                      PriceResponse, PriceTaskInput, RefineRequest, RefineResponse, TranscribeResponse)
 
 AUDIO_TYPES = {"audio/m4a", "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac"}
 ERRORS = {code: {"model": ErrorModel} for code in (400, 401, 403, 429, 502, 504)}
@@ -81,6 +81,12 @@ def create_app(services: Services | None = None) -> FastAPI:
         validate_images(request)
         svc.limiter.check(member.user_id)
         return InterpretResponse(interpretation=await svc.interpreter.interpret(request))
+
+    @app.post("/v1/refine", response_model=RefineResponse, responses=ERRORS, tags=["ai"],
+              summary="Turn the contractor's answers to the AI's questions into proposed estimate changes")
+    async def refine(request: RefineRequest, member: Annotated[Member, Depends(current_member)]) -> RefineResponse:
+        svc.limiter.check(member.user_id)
+        return RefineResponse(changes=await svc.interpreter.refine(request))
 
     @app.post("/v1/transcribe", response_model=TranscribeResponse, responses=ERRORS, tags=["ai"],
               summary="Transcribe a voice memo (EN/ES)")

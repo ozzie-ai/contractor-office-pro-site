@@ -15,7 +15,8 @@ from app.errors import ApiError
 from app.main import Services, create_app
 from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs
 from app.ratelimit import RateLimiter
-from app.schemas import Interpretation, InterpretRequest, Member, WorkItem
+from app.schemas import Interpretation, InterpretRequest, LineUpdate, Member, Refinement, RefineRequest, WorkItem
+from app.ai import enforce_refinement
 
 SUPABASE = "https://example.supabase.co"
 PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
@@ -62,6 +63,20 @@ class FakeInterpreter:
                             status="included_now", evidence="photo")],
             excluded_work=[], future_work=["Subpanel"], unknown_details=["Panel location?"], confidence_notes=[]))
 
+    async def refine(self, request: RefineRequest) -> Refinement:
+        self.refine_requests = getattr(self, "refine_requests", []) + [request]
+        if self.error:
+            raise self.error
+        raw = Refinement(
+            add=[WorkItem(category="ev", task_code="ELEC.EV.CHARGER.INSTALL", description_en="Install customer-supplied EV charger",
+                          description_es="Instalar cargador suministrado por el cliente", quantity=1, unit="each",
+                          specifications=["customer-supplied"], status="included_now", evidence="inferred")],
+            update=[LineUpdate(ref=1, quantity=80, unit="linear ft", reason_en="Answer: run is 80 ft"),
+                    LineUpdate(ref=99, quantity=5, unit=None, reason_en="bogus ref"),
+                    LineUpdate(ref=0, quantity=None, unit=None, reason_en="no-op")],
+            exclusions=["Charger hardware supplied by customer"], remaining_questions=["Where is the panel located?"])
+        return enforce_refinement(raw, {l.ref for l in request.current_lines})
+
 
 class FakePricing:
     def __init__(self):
@@ -76,6 +91,10 @@ class FakePricing:
             observations=[Observation("ELEC.PANEL.UPGRADE", "US-CA-LA", "Pilot LA planning allowance (illustrative)",
                                       date(2026, 11, 12), bid=Decimal("2100"), confidence="low",
                                       applies_to="200A panel")])
+
+
+class FakeRefiner:
+    """Mixed into FakeInterpreter below."""
 
 
 class FakeTranscriber:

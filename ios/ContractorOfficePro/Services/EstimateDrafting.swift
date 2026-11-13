@@ -6,6 +6,35 @@ nonisolated struct EstimateDraft: Sendable {
     let pricing: PriceResponseDTO
 }
 
+/// What the contractor's answers would change, priced and ready for review. Nothing is applied yet.
+nonisolated struct RefinementProposal: Sendable {
+    let answers: [QuestionAnswer]
+    let adds: [PricedLineDTO]
+    let updates: [LineUpdateDTO]
+    let exclusions: [String]
+    let remainingQuestions: [String]
+
+    var isEmpty: Bool { adds.isEmpty && updates.isEmpty && exclusions.isEmpty }
+}
+
+enum EstimateRefining {
+    /// `lines` order defines each line's `ref`.
+    static func propose(notes: String, language: AppLanguage, lines: [LineItem], answers: [QuestionAnswer],
+                        service: any EstimateService) async throws -> RefinementProposal {
+        let current = lines.enumerated().map { ref, line in
+            RefineRequestBody.CurrentLineBody(ref: ref, taskCode: line.taskCode, descriptionEn: line.descriptionEn,
+                                              quantity: line.qty == 0 ? nil : NSDecimalNumber(decimal: line.qty).doubleValue,
+                                              unit: line.unit)
+        }
+        let changes = try await service.refine(RefineRequestBody(notes: notes, language: language.rawValue,
+                                                                 currentLines: current, answers: answers)).changes
+        let priced = changes.add.isEmpty ? [] : try await service.price(PriceRequestBody(tasks: changes.add)).lines
+        return RefinementProposal(answers: answers, adds: priced,
+                                  updates: changes.update.filter { lines.indices.contains($0.ref) },
+                                  exclusions: changes.exclusions, remainingQuestions: changes.remainingQuestions)
+    }
+}
+
 enum EstimateDrafting {
     enum Phase: Equatable { case reading, pricing }
 

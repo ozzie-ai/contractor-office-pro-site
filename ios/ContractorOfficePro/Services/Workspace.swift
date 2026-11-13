@@ -72,24 +72,53 @@ final class Workspace {
         let i = draft.interpretation
         estimate.exclusions = (i.excludedWork + i.futureWork).joined(separator: "\n").nilIfBlank
         estimate.openQuestions = i.unknownDetails.joined(separator: "\n").nilIfBlank
-        var lines: [LineItem] = []
-        for (index, priced) in draft.pricing.lines.enumerated() {
-            let line = insert(LineItem(orgId: orgID, estimateId: estimate.id, position: index,
-                                       descriptionEn: priced.descriptionEn, descriptionEs: priced.descriptionEs,
-                                       qty: priced.quantity?.value ?? 0, unit: priced.unit ?? "ea",
-                                       unitPrice: priced.unitPrice?.value ?? 0, source: .ai))
-            line.taskCode = priced.taskCode
-            line.priceSource = LineItem.PriceSource(rawValue: priced.priceSource) ?? .none
-            line.preliminary = priced.preliminary
-            line.priceNote = [priced.sourceName, priced.appliesTo, priced.note].compactMap { $0?.nilIfBlank }
-                .joined(separator: " · ").nilIfBlank
-            lines.append(line)
+        let lines = draft.pricing.lines.enumerated().map { index, priced in
+            makeLine(from: priced, in: estimate, position: index)
         }
         if job.status == .lead { job.status = .estimating; job.touch() }
         recalculate(estimate, lines: lines)
         try context.save()
         sync.syncSoon()
         return estimate
+    }
+
+    /// Applies the contractor-approved subset of a refinement: new lines, quantity updates, exclusions,
+    /// the remaining questions, and the Q&A appended to the private notes.
+    func apply(_ proposal: RefinementProposal, to estimate: Estimate, lines: [LineItem],
+               addIndexes: Set<Int>, updateIndexes: Set<Int>) throws {
+        var position = (lines.map(\.position).max() ?? -1) + 1
+        for (index, priced) in proposal.adds.enumerated() where addIndexes.contains(index) {
+            _ = makeLine(from: priced, in: estimate, position: position)
+            position += 1
+        }
+        for (index, update) in proposal.updates.enumerated() where updateIndexes.contains(index) && lines.indices.contains(update.ref) {
+            let line = lines[update.ref]
+            if let quantity = update.quantity { line.qty = Decimal(string: String(quantity)) ?? Decimal(quantity) }
+            if let unit = update.unit?.nilIfBlank { line.unit = unit }
+            line.touch()
+        }
+        let existing = Set((estimate.exclusions ?? "").split(separator: "\n").map(String.init))
+        let newExclusions = proposal.exclusions.filter { !existing.contains($0) }
+        estimate.exclusions = ((estimate.exclusions.map { [$0] } ?? []) + newExclusions).joined(separator: "\n").nilIfBlank
+        estimate.openQuestions = proposal.remainingQuestions.joined(separator: "\n").nilIfBlank
+        let qa = proposal.answers.map { "Q: \($0.question)\nA: \($0.answer)" }.joined(separator: "\n")
+        estimate.internalNotes = [estimate.internalNotes, qa].compactMap { $0?.nilIfBlank }.joined(separator: "\n\n")
+        recalculate(estimate, lines: self.lines(for: estimate))
+        try context.save()
+        sync.syncSoon()
+    }
+
+    private func makeLine(from priced: PricedLineDTO, in estimate: Estimate, position: Int) -> LineItem {
+        let line = insert(LineItem(orgId: orgID, estimateId: estimate.id, position: position,
+                                   descriptionEn: priced.descriptionEn, descriptionEs: priced.descriptionEs,
+                                   qty: priced.quantity?.value ?? 0, unit: priced.unit ?? "ea",
+                                   unitPrice: priced.unitPrice?.value ?? 0, source: .ai))
+        line.taskCode = priced.taskCode
+        line.priceSource = LineItem.PriceSource(rawValue: priced.priceSource) ?? .none
+        line.preliminary = priced.preliminary
+        line.priceNote = [priced.sourceName, priced.appliesTo, priced.note].compactMap { $0?.nilIfBlank }
+            .joined(separator: " · ").nilIfBlank
+        return line
     }
 
     @discardableResult

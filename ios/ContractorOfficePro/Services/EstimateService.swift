@@ -4,6 +4,7 @@ import Foundation
 protocol EstimateService: Sendable {
     func interpret(_ request: InterpretRequestBody) async throws -> InterpretResponseDTO
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO
+    func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO
 }
 
 // MARK: - Wire types (snake_case on the wire; see backend/app/schemas.py)
@@ -48,6 +49,44 @@ nonisolated struct WorkTaskDTO: Codable, Sendable {
 
 nonisolated struct PriceRequestBody: Encodable, Sendable {
     var tasks: [WorkTaskDTO]
+}
+
+nonisolated struct RefineRequestBody: Encodable, Sendable {
+    var notes: String
+    var language: String?
+    var currentLines: [CurrentLineBody]
+    var answers: [QuestionAnswer]
+
+    struct CurrentLineBody: Encodable, Sendable {
+        var ref: Int
+        var taskCode: String?
+        var descriptionEn: String
+        var quantity: Double?
+        var unit: String?
+    }
+}
+
+nonisolated struct QuestionAnswer: Codable, Sendable, Equatable {
+    var question: String
+    var answer: String
+}
+
+nonisolated struct RefineResponseDTO: Decodable, Sendable {
+    var changes: RefinementDTO
+}
+
+nonisolated struct RefinementDTO: Decodable, Sendable {
+    var add: [WorkTaskDTO]
+    var update: [LineUpdateDTO]
+    var exclusions: [String]
+    var remainingQuestions: [String]
+}
+
+nonisolated struct LineUpdateDTO: Decodable, Sendable, Equatable {
+    var ref: Int
+    var quantity: Double?
+    var unit: String?
+    var reasonEn: String
 }
 
 /// Decimals arrive as JSON strings ("2100.00") so cents stay exact.
@@ -154,6 +193,10 @@ nonisolated struct BackendClient: EstimateService {
 
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO {
         try await post("v1/estimate/price", body: request)
+    }
+
+    func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO {
+        try await post("v1/refine", body: request)
     }
 
     private func post<Body: Encodable, Response: Decodable>(_ path: String, body: Body) async throws -> Response {

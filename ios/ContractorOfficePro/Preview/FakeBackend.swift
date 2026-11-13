@@ -148,6 +148,20 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
                                 preliminary: true, disclaimer: "Preliminary estimate.")
     }
 
+    func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO {
+        if offline { throw BackendError.offline }
+        if aiDelay > .zero { try await Task.sleep(for: aiDelay) }
+        let wire = request.currentLines.first { $0.taskCode == "ELEC.WIRE.RUN" }
+        return RefineResponseDTO(changes: RefinementDTO(
+            add: [WorkTaskDTO(taskCode: "ELEC.EV.CHARGER.INSTALL", category: "electrical",
+                              descriptionEn: "Install the customer-supplied EV charger",
+                              descriptionEs: "Instalar el cargador suministrado por el cliente", quantity: 1, unit: "each",
+                              specifications: ["customer-supplied"], status: "included_now", evidence: "stated")],
+            update: wire.map { [LineUpdateDTO(ref: $0.ref, quantity: 85, unit: nil, reasonEn: "Answer: the run is 85 ft")] } ?? [],
+            exclusions: ["EV charger hardware supplied by the customer"],
+            remainingQuestions: []))
+    }
+
     // MARK: Private
 
     private func checkOnline() throws {
