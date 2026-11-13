@@ -6,20 +6,23 @@ Workflow: walk the job → photos + natural dictation (EN/ES) → AI turns it in
 from regional references → contractor reviews/approves → customer PDF (English default, Spanish available) →
 approved costs feed future estimates.
 
-## Team and roles (since 2026-11-12, see docs/decisions/0002-backend-for-team-app.md)
-- **Team repo (source of truth for the product):** https://github.com/ozzie-ai/contractor-office-pro-site
-  - `mobile/` — React Native/Expo app (iOS + Android), owned by the team.
-  - `api/` — current Vercel pilot endpoints (`interpret.js`, `transcribe.js`, OpenAI, shared beta token).
-  - `database/` — pricing-catalog schema (`001_pricing_catalog.sql`) and a local SQLite price server.
-- **Derek owns the backend:** auth, AI interpretation + transcription endpoints, the multi-trade pricing service,
-  regional pricing references and their sources, API docs, and a dev environment the mobile app can test against.
-- Coordinate through GitHub Issues and Pull Requests on the team repo. Never push directly to their `main`.
-- **This local repo:** backend design work and Derek's notes until collaborator access exists; then backend code moves
-  into the team repo (proposed `backend/` + `supabase/`). The native Swift app in `ios/` is **parked**: don't extend it.
+## Team, roles and clients (see docs/decisions/0003-native-swift-client.md)
+- **The app is native Swift/SwiftUI (iOS 17+), in `ios/`.** No React Native, Expo or other cross-platform UI
+  frameworks in this project. Derek's decision, 2026-11-12.
+- **Derek also builds the backend** the team asked for: auth, AI interpretation + transcription endpoints, the
+  multi-trade pricing service, regional pricing references and their sources, API docs, and a dev environment.
+  The API is client-agnostic: the Swift app is its client, and the team's existing Expo pilot could call it too.
+- **Team repo:** https://github.com/ozzie-ai/contractor-office-pro-site (Expo pilot in `mobile/`, Vercel pilot
+  endpoints in `api/`, pricing-catalog schema in `database/`). Use it as a reference for test scenarios
+  (`tests/scenarios.json`), the interpret schema and the pricing catalog. Coordinate through Issues/PRs there.
+  Never push to their `main`.
 
 ## Current focus
-**Backend B1: one complete end-to-end workflow, electrical first** (it has the most test cases: MIXED-001/002 in the
-team repo's `tests/scenarios.json`). Then expand trades by adding catalog data, not code.
+1. **Finish Phase 0 foundations in the Swift app:** Supabase auth, sync engine, media upload queue, first screens
+   (sign in, clients, jobs, settings/sync status).
+2. **Backend B1: one complete end-to-end electrical workflow.** Swift app dictation → `/v1/transcribe` →
+   `/v1/interpret` → `/v1/estimate/price` → contractor review → PDF. Electrical first because it has test cases
+   (MIXED-001/002 in the team repo's `tests/scenarios.json`). Then add trades through catalog data, not code.
 Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
 
 ## Non-negotiable principles
@@ -30,22 +33,26 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
 3. **No invented price confidence.** Unverified or stale prices are labeled preliminary. No rate is silently filled in.
 4. **Private stays private.** Transcripts, dictation, private notes and worksite photos never appear in customer-facing
    output or in error responses/logs sent to clients.
-5. **No secrets in clients.** LLM, transcription and service-role keys live only on the server. The mobile app holds
+5. **No secrets in the app binary.** OpenAI and Supabase service-role keys live only on the server. The iOS app holds
    only the Supabase URL + anon key and the user's session token.
-6. **Spanish is first-class.** Bilingual task catalog (`title_en`/`title_es`); customer documents in the client's language.
-7. **Multi-tenant from day one.** `org_id` on tenant tables, row-level security everywhere, soft deletes.
-8. **Respect data licenses.** Every price observation has a source with license and reuse terms. Don't import
+6. **Offline-first capture.** Photos, voice, notes and estimate edits work without signal and sync later (ADR 0001).
+7. **Spanish is first-class.** No hardcoded UI strings (String Catalogs, EN + ES). Bilingual task catalog; customer documents in the client's language.
+8. **Multi-tenant from day one.** `org_id` on tenant tables, row-level security everywhere, soft deletes.
+9. **Respect data licenses.** Every price observation has a source with license and reuse terms. Don't import
    restricted catalogs (e.g. Gordian) or scrape retailer sites.
 
 ## Stack
-- **Supabase:** auth (per-user sessions replace the shared `COP_BETA_TOKEN`), Postgres, storage. Schema changes are
-  SQL migrations in `supabase/migrations/`.
+- **iOS app:** Swift 6, SwiftUI, SwiftData (offline store), iOS 17+. Project file from **XcodeGen** (`ios/project.yml`);
+  don't hand-edit `.pbxproj`. Apple Speech for on-device dictation; server transcription as a fallback/upgrade.
+  PDFs rendered on device. `supabase-swift` (SPM) for auth, data and storage.
+- **Supabase:** auth (per-user sessions), Postgres, storage. Schema changes are SQL migrations in `supabase/migrations/`.
 - **Backend service:** Python 3.12 + FastAPI in `backend/`. Pydantic models for every request/response; OpenAPI docs
-  generated from them. Hosting TBD (decide with the team; their pilot uses Vercel).
-- **LLM provider:** behind a small interface so OpenAI (the team's current key) and Claude are swappable. Structured JSON
-  output with a strict schema. Treat transcripts as data, not instructions (prompt-injection safe).
+  generated from them. Hosting TBD.
+- **LLM provider: OpenAI** (Derek's key, in `backend/.env` as `OPENAI_API_KEY`, never committed or pasted in chat).
+  Responses API with strict JSON schema; transcription via the OpenAI audio API. Keep the call behind a small
+  interface so the provider could change later. Treat transcripts as data, not instructions.
 
-## API conventions (contract with the mobile app)
+## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and
   resolves `org_id` from `members`.
 - Errors: `{"error": "<snake_case_code>", "message": "<safe human text>"}`, keeping the pilot's codes
@@ -84,4 +91,4 @@ Templates must be reviewed by a California construction attorney before real use
 - Small, reviewable commits/PRs. Explain schema changes before applying them.
 - Ask before adding a third-party dependency.
 - Write a short ADR in `docs/decisions/` for any notable architecture choice.
-- Parked iOS app (only if asked): `cd ios && xcodegen && xcodebuild -scheme ContractorOfficePro -destination 'platform=iOS Simulator,name=iPhone 17' test`
+- iOS: build/test from the CLI after every iOS change: `cd ios && xcodegen && xcodebuild -scheme ContractorOfficePro -destination 'platform=iOS Simulator,name=iPhone 17' test`

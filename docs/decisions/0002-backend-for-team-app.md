@@ -1,6 +1,6 @@
 # ADR 0002 — Derek builds the backend for the team's Expo app; native Swift app parked
 
-Date: 2026-11-12 · Status: accepted
+Date: 2026-11-12 · Status: superseded by 0003 (same day)
 
 ## Context
 The team (ozzie-ai/contractor-office-pro-site) already has a React Native/Expo mobile app, pilot AI endpoints on Vercel,

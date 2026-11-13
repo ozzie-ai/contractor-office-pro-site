@@ -2,7 +2,7 @@
 
 Nov 6, 2026 · @Derek
 
-> **Update 2026-11-12:** Derek now builds the backend for the team's Expo app (ozzie-ai/contractor-office-pro-site). The native Swift app is parked. See CLAUDE.md and docs/decisions/0002-backend-for-team-app.md. The phases below are the original solo plan, kept for reference.
+> **Update 2026-11-12:** the app stays native Swift. Derek also builds the backend the team asked for (multi-trade AI interpretation + pricing, OpenAI). See CLAUDE.md and docs/decisions/0003-native-swift-client.md.
 
 ## Vision and principles
 
