@@ -67,7 +67,7 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
 - Writes go through `Workspace` (stamps, saves, schedules sync). Editors edit a draft; Cancel discards.
 - Demo mode (DEBUG): launch with `-demo` for sample data on a fake server, never the real account.
 - Wrap every `#Preview` in `#if DEBUG` (fixtures are DEBUG-only); check Release still builds before uploads.
-- TestFlight: `DEVELOPMENT_TEAM=<team id> ios/scripts/testflight.sh` (archives Release, uploads).
+- TestFlight: `ios/scripts/testflight.sh` (team 986GMWGB5V; archives unsigned Release, export signs with Apple Distribution and uploads).
 - Local backend runs on port **8787** (8000 is used by another project on this Mac). App reads `BACKEND_URL` from
   `ios/Config/Config.xcconfig`. Live app↔backend test: start the backend, then `TEST_RUNNER_LIVE_BACKEND=1 xcodebuild ... test`.
 - SwiftData is at `SchemaV2`; `SchemaV1` holds frozen copies of changed models. Never edit a shipped schema version.

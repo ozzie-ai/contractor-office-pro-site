@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # Archive a Release build and upload it to App Store Connect / TestFlight.
 # Needs: Xcode signed in to the Apple Developer account, and the app record created in App Store Connect.
-# Usage: DEVELOPMENT_TEAM=ABCDE12345 ios/scripts/testflight.sh
+# Usage: ios/scripts/testflight.sh          (team 986GMWGB5V; override with DEVELOPMENT_TEAM=...)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-: "${DEVELOPMENT_TEAM:?Set DEVELOPMENT_TEAM to your 10-character Apple Team ID}"
+DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:-986GMWGB5V}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"   # must increase with every upload
 ARCHIVE=build/ContractorOfficePro.xcarchive
 
 xcodegen generate
 rm -rf "$ARCHIVE" build/export
 
+# Archive unsigned; the export step signs with Apple Distribution (no registered devices needed).
 xcodebuild -scheme ContractorOfficePro -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates \
-  DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CODE_SIGN_STYLE=Automatic \
+  DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" CODE_SIGNING_ALLOWED=NO \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   archive
 
