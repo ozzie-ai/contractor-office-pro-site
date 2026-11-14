@@ -3,7 +3,7 @@ import Combine
 import Foundation
 import Speech
 
-/// Explicit user-initiated speech capture; nothing uploads until Analyze is tapped.
+/// User-initiated on-device speech capture. Audio is never sent to our server.
 @MainActor
 final class JobVoiceRecorder: ObservableObject {
     @Published private(set) var transcript = ""
@@ -42,6 +42,10 @@ final class JobVoiceRecorder: ObservableObject {
             errorMessage = String(localized: "estimate.speech_unavailable")
             return
         }
+        guard recognizer.supportsOnDeviceRecognition else {
+            errorMessage = String(localized: "estimate.speech_offline_unsupported")
+            return
+        }
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -49,7 +53,7 @@ final class JobVoiceRecorder: ObservableObject {
 
             let nextRequest = SFSpeechAudioBufferRecognitionRequest()
             nextRequest.shouldReportPartialResults = true
-            nextRequest.requiresOnDeviceRecognition = recognizer.supportsOnDeviceRecognition
+            nextRequest.requiresOnDeviceRecognition = true
             let input = engine.inputNode
             let format = input.outputFormat(forBus: 0)
             input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
