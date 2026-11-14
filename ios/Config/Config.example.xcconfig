@@ -1,4 +1,6 @@
-// Copy to Config.xcconfig (gitignored) and fill in from Supabase → Project Settings → API.
-// Only the ANON key belongs here — never the service-role key.
+// Copy to Config.xcconfig (gitignored). Only public Supabase config is allowed here.
+// xcconfig treats // as comments, so use https:/$()/...
 SUPABASE_URL = https:/$()/YOUR-PROJECT-REF.supabase.co
-SUPABASE_ANON_KEY = YOUR-ANON-KEY
+SUPABASE_ANON_KEY = YOUR-PUBLISHABLE-OR-ANON-KEY
+ESTIMATING_API_URL = https:/$()/YOUR-SECURE-FASTAPI-HOST.example.com
+// Never put OPENAI_API_KEY or a Supabase service-role key in iPhone config.

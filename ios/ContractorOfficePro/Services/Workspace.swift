@@ -53,6 +53,76 @@ final class Workspace {
         try commit(job, touch: false)
     }
 
+    // MARK: Estimates
+
+    enum EstimateSaveError: Error {
+        case notApproved, wrongBusiness, roundingMismatch
+    }
+
+    /// Saves an explicitly approved preliminary estimate under the existing job.
+    /// Only customer-reviewed descriptions, quantities and selling prices persist.
+    /// Raw dictation, internal labor, material costs and markups do not become line items.
+    @discardableResult
+    func saveApprovedEstimate(
+        _ result: EstimatingAPIClient.PriceResponse,
+        for job: Job,
+        approved: Bool
+    ) throws -> Estimate {
+        guard approved, result.status == "ready_for_contractor_review",
+              result.missing.isEmpty, let totalText = result.sellingTotal,
+              let expected = Decimal(string: totalText) else {
+            throw EstimateSaveError.notApproved
+        }
+        guard job.orgId == orgID, job.deletedAt == nil else {
+            throw EstimateSaveError.wrongBusiness
+        }
+        let estimate = Estimate(orgId: orgID, jobId: job.id,
+                                language: result.customerLanguage == "es" ? .es : .en)
+        var lines: [LineItem] = []
+        for entry in result.lines {
+            guard let quantityText = entry.quantity,
+                  let qty = Decimal(string: quantityText), qty > 0,
+                  let amountText = entry.sellingTotal,
+                  let amount = Decimal(string: amountText) else {
+                throw EstimateSaveError.notApproved
+            }
+            // Supabase line_items.unit_price is numeric(12,2). Never store
+            // silent fractional-cent prices that would alter totals on sync.
+            let rate = EstimateCalculator.roundCents(amount / qty)
+            guard EstimateCalculator.lineTotal(qty: qty, unitPrice: rate) == amount else {
+                throw EstimateSaveError.roundingMismatch
+            }
+            let row = LineItem(orgId: orgID, estimateId: estimate.id, position: lines.count,
+                               descriptionEn: entry.descriptionEn,
+                               descriptionEs: entry.descriptionEs ?? "",
+                               qty: qty, unit: entry.unit, unitPrice: rate,
+                               taxable: false,
+                               source: entry.source == "contractor_selling_price_override" ? .priceBook : .manual)
+            lines.append(row)
+        }
+        if let tripText = result.mobilizationSellingTotal,
+           let trip = Decimal(string: tripText), trip > 0 {
+            lines.append(LineItem(orgId: orgID, estimateId: estimate.id, position: lines.count,
+                                  descriptionEn: "Mobilization",
+                                  descriptionEs: "Movilización",
+                                  qty: 1, unit: "job", unitPrice: trip,
+                                  taxable: false, source: .manual))
+        }
+        let computed = EstimateCalculator.totals(
+            lines: lines.map { .init(qty: $0.qty, unitPrice: $0.unitPrice, taxable: false) },
+            taxRate: 0
+        )
+        guard computed.total == expected else { throw EstimateSaveError.roundingMismatch }
+        estimate.subtotal = computed.subtotal
+        estimate.tax = 0
+        estimate.total = computed.total
+        context.insert(estimate)
+        for row in lines { context.insert(row) }
+        try context.save()
+        sync.syncSoon()
+        return estimate
+    }
+
     // MARK: Business
 
     func save(_ draft: OrganizationDraft, to organization: Organization) throws {

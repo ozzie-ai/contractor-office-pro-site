@@ -52,6 +52,9 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        EstimatingAPIURL: $(ESTIMATING_API_URL)
+        NSSpeechRecognitionUsageDescription: "Convert spoken job notes into a private estimate draft."
+        NSMicrophoneUsageDescription: "Record job descriptions for estimating."
   ContractorOfficeProTests:
     type: bundle.unit-test
     platform: iOS

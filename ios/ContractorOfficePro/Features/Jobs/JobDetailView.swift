@@ -7,13 +7,19 @@ struct JobDetailView: View {
     @Environment(\.openURL) private var openURL
     @Query private var jobs: [Job]
     @Query private var clients: [Client]
+    @Query private var estimates: [Estimate]
     @State private var editor: JobEditorRequest?
+    @State private var showEstimator = false
     @State private var confirmingDelete = false
     @State private var saveFailed = false
 
     init(jobID: UUID) {
         _jobs = Query(filter: #Predicate<Job> { $0.id == jobID && $0.deletedAt == nil })
         _clients = Query()
+        _estimates = Query(
+            filter: #Predicate<Estimate> { $0.jobId == jobID && $0.deletedAt == nil },
+            sort: \Estimate.updatedAt, order: .reverse
+        )
     }
 
     private var job: Job? { jobs.first }
@@ -70,6 +76,24 @@ struct JobDetailView: View {
                 Section { Text(notes) } header: { Text(.jobSectionNotes) }
             }
             Section {
+                Button {
+                    showEstimator = true
+                } label: {
+                    Label("estimate.start", systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+                ForEach(estimates) { estimate in
+                    HStack {
+                        Text("estimate.saved_draft")
+                        Spacer()
+                        Text("$\(estimate.total)")
+                            .fontWeight(.medium)
+                    }
+                }
+            } header: {
+                Text("estimate.saved_section")
+            }
+            Section {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
             }
         }
@@ -79,9 +103,15 @@ struct JobDetailView: View {
             Button { editor = JobEditorRequest(job: job) } label: { Text(.commonEdit) }
         }
         .sheet(item: $editor) { JobEditor(request: $0) }
+        .sheet(isPresented: $showEstimator) { EstimateBuilderView(job: job) }
         .confirmationDialog(Text(.jobDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
-                if (try? workspace.delete(job)) != nil { dismiss() } else { saveFailed = true }
+                if (try? workspace.delete(job)) != nil {
+                    PrivateJobDraftStore.clear(jobID: job.id)
+                    dismiss()
+                } else {
+                    saveFailed = true
+                }
             } label: { Text(.commonDelete) }
         }
         .alert(Text(.errorSaveFailed), isPresented: $saveFailed) {}
