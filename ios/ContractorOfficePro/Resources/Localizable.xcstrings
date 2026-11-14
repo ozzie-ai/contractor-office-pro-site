@@ -2897,6 +2897,23 @@
           }
         }
       }
+    },
+    "estimate.clear_notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete private draft from this phone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar borrador privado de este teléfono"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
