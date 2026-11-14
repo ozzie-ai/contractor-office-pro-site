@@ -1,0 +1,38 @@
+name: Native iOS build and privacy checks
+
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/native-ios.yml'
+
+jobs:
+  ios-build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build for generic iOS Simulator
+        run: |
+          xcodebuild -project ios/ContractorOfficePro.xcodeproj \
+            -scheme ContractorOfficePro \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build -quiet
+      - name: Run iOS unit tests when simulator available
+        run: |
+          DEVICE="$(xcrun simctl list devices available | grep -m1 -E 'iPhone (16|17) ' | sed -E 's/.*\(([0-9A-F-]{36})\).*/\1/' || true)"
+          if [[ -z "$DEVICE" ]]; then
+            echo "No available iPhone simulator; build is checked, tests require simulator."
+            exit 0
+          fi
+          xcodebuild -project ios/ContractorOfficePro.xcodeproj \
+            -scheme ContractorOfficePro \
+            -destination "platform=iOS Simulator,id=$DEVICE" \
+            CODE_SIGNING_ALLOWED=NO test -quiet
