@@ -5,10 +5,11 @@ import os
 from dataclasses import dataclass
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from .pricing import EstimateRequest, EstimateResult, price_estimate
 from .interpret import InterpretRequest, InterpretResponse, interpret_description
+from .pricebook import PriceBookCreate, PriceBookEntry, list_pricebook, create_pricebook_entry
 
 app = FastAPI(title="Contractor Office Pro API", version="0.1.0")
 
@@ -74,3 +75,20 @@ def estimate_price(request: EstimateRequest, principal: Principal = Depends(requ
 @app.post("/v1/interpret", response_model=InterpretResponse)
 async def interpret_job(request: InterpretRequest, principal: Principal = Depends(require_principal)) -> InterpretResponse:
     return await interpret_description(request.description)
+
+@app.get("/v1/pricebook", response_model=list[PriceBookEntry])
+async def get_pricebook(
+    limit: int = Query(default=50, ge=1, le=200),
+    authorization: str = Header(),
+    principal: Principal = Depends(require_principal),
+) -> list[PriceBookEntry]:
+    return await list_pricebook(principal.org_id, authorization, limit)
+
+
+@app.post("/v1/pricebook", response_model=PriceBookEntry, status_code=201)
+async def add_pricebook_entry(
+    entry: PriceBookCreate,
+    authorization: str = Header(),
+    principal: Principal = Depends(require_principal),
+) -> PriceBookEntry:
+    return await create_pricebook_entry(principal.org_id, authorization, entry)
