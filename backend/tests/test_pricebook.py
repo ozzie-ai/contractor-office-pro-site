@@ -92,3 +92,49 @@ def test_ratebook_error_does_not_leak_remote_sql_or_customer_data(monkeypatch):
         asyncio.run(pb.create_pricebook_entry("our-org", "Bearer jwt", entry))
     assert err.value.status_code == 403
     assert "sql policy secret" not in str(err.value.detail)
+
+
+def test_pricing_endpoint_uses_only_selected_stored_contractor_rate(monkeypatch):
+    import app.main as m
+    from app.pricebook import PriceBookEntry
+    import uuid
+    rate_id = str(uuid.uuid4())
+    async def fake_rates(org_id, token, ids):
+        assert org_id == "our-org" and token == "Bearer access"
+        assert ids == [rate_id]
+        return {rate_id: PriceBookEntry(id=rate_id, kind="material", name_en="GFCI installed", unit="ea",
+                                      unit_cost=17, unit_price=125)}
+    monkeypatch.setattr(m, "resolve_ratebook_ids", fake_rates)
+    app.dependency_overrides[m.require_principal] = lambda: m.Principal(user_id="user", org_id="our-org")
+    try:
+        resp = TestClient(app).post("/v1/estimate/price", headers={"Authorization": "Bearer access"}, json={
+            "items": [{"task_code": "ELEC.GFCI", "description_en": "GFCI installed", "quantity": 2,
+                       "unit": "each", "price_book_item_id": rate_id}],
+            "overhead_pct": 10, "profit_pct": 20,
+        })
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["selling_total"] == "250.00"
+        assert resp.json()["direct_total"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_ratebook_unit_mismatch_blocks_selling_total(monkeypatch):
+    import app.main as m
+    from app.pricebook import PriceBookEntry
+    import uuid
+    rate_id = str(uuid.uuid4())
+    async def fake_rates(*args):
+        return {rate_id: PriceBookEntry(id=rate_id, kind="material", name_en="Paint", unit="sq ft",
+                                      unit_cost=1, unit_price=2)}
+    monkeypatch.setattr(m, "resolve_ratebook_ids", fake_rates)
+    app.dependency_overrides[m.require_principal] = lambda: m.Principal(user_id="user", org_id="our-org")
+    try:
+        resp = TestClient(app).post("/v1/estimate/price", headers={"Authorization": "Bearer access"}, json={
+            "items": [{"task_code": "PAINT.INTERIOR.SF", "description_en": "Paint", "quantity": 100,
+                       "unit": "each", "price_book_item_id": rate_id}],
+        })
+        assert resp.status_code == 422
+        assert "pricebook_unit_mismatch" in resp.text
+    finally:
+        app.dependency_overrides.clear()
