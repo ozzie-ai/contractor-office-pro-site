@@ -59,6 +59,13 @@ struct EstimateBuilderView: View {
                     } label: {
                         Label("estimate.analyze", systemImage: "sparkles")
                     }
+                    Button(role: .destructive) {
+                        voice.stop()
+                        notes = ""
+                        PrivateJobDraftStore.clear(jobID: job.id)
+                    } label: {
+                        Text("estimate.clear_notes")
+                    }
                     .disabled(notes.trimmingCharacters(in: .whitespacesAndNewlines).count < 10 || busy)
                 } header: {
                     Text("estimate.voice_notes")
@@ -231,7 +238,9 @@ struct EstimateBuilderView: View {
             .onChange(of: voice.transcript) { _, text in
                 if !text.isEmpty { notes = text }
             }
-            .onChange(of: notes) { _, _ in
+            .onChange(of: notes) { _, newText in
+                // Keep voice notes available on this device even without a server.
+                PrivateJobDraftStore.save(newText, jobID: job.id)
                 // Private dictation changed: do not share stale interpreted scope.
                 items = []
                 unknowns = []
@@ -243,7 +252,10 @@ struct EstimateBuilderView: View {
             .onChange(of: profit) { _, _ in invalidatePrice() }
             .onChange(of: tripCost) { _, _ in invalidatePrice() }
             .onChange(of: customerLanguage) { _, _ in invalidatePrice() }
-            .task { await refreshRates() }
+            .task {
+                notes = PrivateJobDraftStore.load(jobID: job.id)
+                await refreshRates()
+            }
             .onDisappear { voice.stop() }
         }
     }
