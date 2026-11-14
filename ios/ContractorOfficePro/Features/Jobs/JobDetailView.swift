@@ -91,7 +91,12 @@ struct JobDetailView: View {
         .sheet(isPresented: $showEstimator) { EstimateBuilderView(job: job) }
         .confirmationDialog(Text(.jobDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
-                if (try? workspace.delete(job)) != nil { dismiss() } else { saveFailed = true }
+                if (try? workspace.delete(job)) != nil {
+                    PrivateJobDraftStore.clear(jobID: job.id)
+                    dismiss()
+                } else {
+                    saveFailed = true
+                }
             } label: { Text(.commonDelete) }
         }
         .alert(Text(.errorSaveFailed), isPresented: $saveFailed) {}
