@@ -91,6 +91,12 @@ INSTRUCTIONS = "\n".join([
 
 
 async def interpret_description(description: str) -> InterpretResponse:
+    # Safe deterministic fast path for the well-specified small outlet job.
+    # All other requests continue through the general bilingual AI interpreter.
+    from .quick_electrical import parse_outlet_job
+    quick = parse_outlet_job(description)
+    if quick is not None:
+        return InterpretResponse(interpretation=quick)
     key = os.getenv("OPENAI_API_KEY", "")
     if not key:
         raise HTTPException(status_code=503, detail={"error": "ai_service_not_configured"})
