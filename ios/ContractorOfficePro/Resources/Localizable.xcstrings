@@ -2982,6 +2982,23 @@
           }
         }
       }
+    },
+    "estimate.speech_offline_unsupported": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On-device recognition is unavailable for this language. Type or use the keyboard microphone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El reconocimiento de voz en el dispositivo no está disponible para este idioma. Escribe o usa el micrófono del teclado."
+          }
+        }
+      }
     }
   },
   "version": "1.1"
