@@ -23,7 +23,7 @@ final class JobVoiceRecorder: ObservableObject {
             }
         }
         guard speechAuthorized else {
-            errorMessage = "Speech access was not granted. You can type or use keyboard dictation."
+            errorMessage = String(localized: "estimate.speech_denied")
             return
         }
         let microphoneAuthorized = await withCheckedContinuation { continuation in
@@ -32,13 +32,13 @@ final class JobVoiceRecorder: ObservableObject {
             }
         }
         guard microphoneAuthorized else {
-            errorMessage = "Microphone access was not granted."
+            errorMessage = String(localized: "estimate.mic_denied")
             return
         }
 
         guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: language == "es" ? "es-MX" : "en-US")),
               recognizer.isAvailable else {
-            errorMessage = "Speech recognition is unavailable. You can type the description."
+            errorMessage = String(localized: "estimate.speech_unavailable")
             return
         }
         do {
@@ -68,7 +68,7 @@ final class JobVoiceRecorder: ObservableObject {
                 }
             }
         } catch {
-            errorMessage = "Could not start microphone recording."
+            errorMessage = String(localized: "estimate.microphone_error")
             stop()
         }
     }
