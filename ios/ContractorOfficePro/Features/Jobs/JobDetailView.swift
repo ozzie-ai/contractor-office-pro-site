@@ -7,6 +7,7 @@ struct JobDetailView: View {
     @Environment(\.openURL) private var openURL
     @Query private var jobs: [Job]
     @Query private var clients: [Client]
+    @Query private var estimates: [Estimate]
     @State private var editor: JobEditorRequest?
     @State private var showEstimator = false
     @State private var confirmingDelete = false
@@ -15,6 +16,10 @@ struct JobDetailView: View {
     init(jobID: UUID) {
         _jobs = Query(filter: #Predicate<Job> { $0.id == jobID && $0.deletedAt == nil })
         _clients = Query()
+        _estimates = Query(
+            filter: #Predicate<Estimate> { $0.jobId == jobID && $0.deletedAt == nil },
+            sort: \Estimate.updatedAt, order: .reverse
+        )
     }
 
     private var job: Job? { jobs.first }
@@ -77,6 +82,16 @@ struct JobDetailView: View {
                     Label("estimate.start", systemImage: "doc.badge.plus")
                 }
                 .buttonStyle(.borderedProminent)
+                ForEach(estimates) { estimate in
+                    HStack {
+                        Text("estimate.saved_draft")
+                        Spacer()
+                        Text("$\(estimate.total)")
+                            .fontWeight(.medium)
+                    }
+                }
+            } header: {
+                Text("estimate.saved_section")
             }
             Section {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
