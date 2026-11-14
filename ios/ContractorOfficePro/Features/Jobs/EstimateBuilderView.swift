@@ -276,6 +276,12 @@ struct EstimateBuilderView: View {
     }
 
     private func api() throws -> EstimatingAPIClient {
+        #if DEBUG
+        // Sample-data mode must never contact a real customer account.
+        if ProcessInfo.processInfo.arguments.contains("-demo") {
+            throw BuilderFailure.apiNotConfigured
+        }
+        #endif
         guard let baseURL = AppConfig.estimatingAPIURL, Backend.client != nil else {
             throw BuilderFailure.apiNotConfigured
         }
