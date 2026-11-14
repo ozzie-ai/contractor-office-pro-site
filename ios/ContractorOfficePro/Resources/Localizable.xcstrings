@@ -2914,6 +2914,74 @@
           }
         }
       }
+    },
+    "estimate.save_rates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save approved unit rates"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar precios unitarios aprobados"
+          }
+        }
+      }
+    },
+    "estimate.saved_rates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Approved contractor prices saved privately for future jobs."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se guardaron los precios aprobados del contratista para futuros trabajos."
+          }
+        }
+      }
+    },
+    "estimate.no_confirmed_rates": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No new contractor-confirmed rates to save."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay precios nuevos confirmados para guardar."
+          }
+        }
+      }
+    },
+    "estimate.save_rates_error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not save all rates. Check connection and verify your pricebook before trying again."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudieron guardar todos los precios. Verifica la conexión y la lista de precios antes de intentar de nuevo."
+          }
+        }
+      }
     }
   },
   "version": "1.1"
