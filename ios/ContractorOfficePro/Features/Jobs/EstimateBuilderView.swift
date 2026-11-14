@@ -7,6 +7,7 @@ struct EstimateBuilderView: View {
     let job: Job
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(Workspace.self) private var workspace
     @StateObject private var voice = JobVoiceRecorder()
 
     @State private var notes = ""
@@ -213,7 +214,15 @@ struct EstimateBuilderView: View {
                             } else {
                                 Button {
                                     do {
-                                        pdfURL = try CustomerEstimatePDF.create(from: calculated, approved: approved)
+                                        let generated = try CustomerEstimatePDF.create(
+                                            from: calculated, approved: approved
+                                        )
+                                        // Save to this job before presenting a share action.
+                                        // Neither private notes nor internal costs are persisted as customer lines.
+                                        try workspace.saveApprovedEstimate(
+                                            calculated, for: job, approved: approved
+                                        )
+                                        pdfURL = generated
                                     } catch {
                                         message = String(localized: "estimate.pdf_failed")
                                     }
