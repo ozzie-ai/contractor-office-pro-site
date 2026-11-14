@@ -290,12 +290,12 @@ struct EstimateBuilderView: View {
             throw BuilderFailure.apiNotConfigured
         }
         #endif
-        guard let baseURL = AppConfig.estimatingAPIURL, Backend.client != nil else {
+        guard let baseURL = AppConfig.estimatingAPIURL, let supabase = Backend.client else {
             throw BuilderFailure.apiNotConfigured
         }
+        // Capture the main-actor initialized client before entering Sendable callback.
         return EstimatingAPIClient(baseURL: baseURL, accessToken: {
-            guard let supabase = Backend.client else { throw BuilderFailure.apiNotConfigured }
-            return try await supabase.auth.session.accessToken
+            try await supabase.auth.session.accessToken
         })
     }
 
