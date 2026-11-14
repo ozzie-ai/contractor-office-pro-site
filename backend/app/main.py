@@ -9,7 +9,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 
 from .pricing import EstimateRequest, EstimateResult, price_estimate
 from .interpret import InterpretRequest, InterpretResponse, interpret_description
-from .pricebook import PriceBookCreate, PriceBookEntry, list_pricebook, create_pricebook_entry
+from .pricebook import (PriceBookCreate, PriceBookEntry, list_pricebook,
+                        create_pricebook_entry, resolve_ratebook_ids, normalized_unit)
 
 app = FastAPI(title="Contractor Office Pro API", version="0.1.0")
 
@@ -67,8 +68,33 @@ def health() -> dict[str, str]:
 
 
 @app.post("/v1/estimate/price", response_model=EstimateResult)
-def estimate_price(request: EstimateRequest, principal: Principal = Depends(require_principal)) -> EstimateResult:
-    # Principal is required even for an otherwise self-contained calculation.
+async def estimate_price(
+    request: EstimateRequest,
+    authorization: str | None = Header(default=None),
+    principal: Principal = Depends(require_principal),
+) -> EstimateResult:
+    # Resolve only explicitly selected pricebook IDs in the authenticated org.
+    ids = list({str(item.price_book_item_id) for item in request.items if item.price_book_item_id})
+    if ids:
+        if not authorization:
+            raise HTTPException(status_code=401, detail={"error": "access_denied"})
+        rates = await resolve_ratebook_ids(principal.org_id, authorization, ids)
+        adjusted = []
+        for item in request.items:
+            if item.price_book_item_id is None:
+                adjusted.append(item)
+                continue
+            rate = rates.get(str(item.price_book_item_id))
+            if rate is None:
+                raise HTTPException(status_code=404, detail={"error": "pricebook_item_not_found"})
+            if normalized_unit(rate.unit) != normalized_unit(item.unit):
+                raise HTTPException(status_code=422, detail={"error": "pricebook_unit_mismatch"})
+            # Stored unit_price is already a contractor SELLING price.
+            adjusted.append(item.model_copy(update={
+                "unit_selling_price_override": rate.unit_price,
+                "price_book_item_id": None,
+            }))
+        request = request.model_copy(update={"items": adjusted})
     return price_estimate(request)
 
 
