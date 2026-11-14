@@ -45,8 +45,11 @@ struct EstimateBuilderView: View {
                             Task { await voice.start(language: dictationLanguage) }
                         }
                     } label: {
-                        Label(voice.isRecording ? "Stop microphone" : "Record job description",
-                              systemImage: voice.isRecording ? "stop.circle.fill" : "mic")
+                        if voice.isRecording {
+                            Label("estimate.stop_record", systemImage: "stop.circle.fill")
+                        } else {
+                            Label("estimate.record", systemImage: "mic")
+                        }
                     }
                     if let recorderMessage = voice.errorMessage {
                         Text(recorderMessage).font(.caption).foregroundStyle(.secondary)
@@ -166,7 +169,8 @@ struct EstimateBuilderView: View {
 
                 if let calculated = calculation {
                     Section {
-                        ForEach(calculated.lines, id: \.taskCode) { item in
+                        ForEach(calculated.lines.indices, id: \.self) { index in
+                            let item = calculated.lines[index]
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.descriptionEn)
                                 if let total = item.sellingTotal {
@@ -226,6 +230,13 @@ struct EstimateBuilderView: View {
             }
             .onChange(of: voice.transcript) { _, text in
                 if !text.isEmpty { notes = text }
+            }
+            .onChange(of: notes) { _, _ in
+                // Private dictation changed: do not share stale interpreted scope.
+                items = []
+                unknowns = []
+                exclusions = []
+                invalidatePrice()
             }
             .onChange(of: items) { _, _ in invalidatePrice() }
             .onChange(of: overhead) { _, _ in invalidatePrice() }
@@ -305,7 +316,7 @@ struct EstimateBuilderView: View {
                     source: item.priceSource
                 ) : nil
                 return EstimatingAPIClient.WorkItem(
-                    taskCode: item.taskCode, scopeId: item.id.uuidString,
+                    taskCode: item.taskCode, scopeId: nil,
                     descriptionEn: item.descriptionEn,
                     descriptionEs: item.descriptionEs.isEmpty ? nil : item.descriptionEs,
                     quantity: Self.decimal(item.quantity),
