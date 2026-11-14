@@ -91,3 +91,32 @@ async def create_pricebook_entry(org_id: str, token: str, entry: PriceBookCreate
         return allowed_entry(rows[0])
     except (ValueError, TypeError):
         raise HTTPException(status_code=503, detail={"error": "ratebook_invalid_response"}) from None
+
+
+async def resolve_ratebook_ids(org_id: str, token: str, ids: list[str]) -> dict[str, PriceBookEntry]:
+    """Resolve only explicitly selected contractor rate IDs, through user RLS."""
+    if not ids:
+        return {}
+    url, headers = config_headers(token)
+    try:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
+            resp = await client.get(
+                f"{url}/rest/v1/price_book_items", headers=headers,
+                params={"select": "id,kind,name_en,name_es,unit,unit_cost,unit_price,category",
+                        "org_id": f"eq.{org_id}", "deleted_at": "is.null",
+                        "id": "in.(" + ",".join(ids) + ")", "limit": str(len(ids))},
+            )
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail={"error": "ratebook_unavailable"}) from None
+    if resp.status_code != 200:
+        raise HTTPException(status_code=503, detail={"error": "ratebook_unavailable"})
+    try:
+        rows = [allowed_entry(row) for row in resp.json()]
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=503, detail={"error": "ratebook_invalid_response"}) from None
+    return {row.id: row for row in rows}
+
+
+def normalized_unit(unit: str) -> str:
+    return {"ea": "each", "each": "each", "sf": "sq ft", "sqft": "sq ft",
+            "sq ft": "sq ft", "lf": "linear ft", "linear ft": "linear ft"}.get(unit.lower(), unit.lower())
