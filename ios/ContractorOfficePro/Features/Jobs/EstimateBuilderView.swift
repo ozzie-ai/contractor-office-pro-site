@@ -85,6 +85,7 @@ struct EstimateBuilderView: View {
                         Section {
                             TextField("estimate.description_en", text: $item.descriptionEn, axis: .vertical)
                             TextField("estimate.description_es", text: $item.descriptionEs, axis: .vertical)
+                            TextField("estimate.location_optional", text: $item.scopeID)
                             HStack {
                                 TextField("estimate.quantity", text: $item.quantity)
                                     .keyboardType(.decimalPad)
@@ -342,7 +343,9 @@ struct EstimateBuilderView: View {
                     source: item.priceSource
                 ) : nil
                 return EstimatingAPIClient.WorkItem(
-                    taskCode: item.taskCode, scopeId: nil,
+                    taskCode: item.taskCode,
+                    scopeId: item.scopeID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? nil : item.scopeID,
                     descriptionEn: item.descriptionEn,
                     descriptionEs: item.descriptionEs.isEmpty ? nil : item.descriptionEs,
                     quantity: Self.decimal(item.quantity),
@@ -422,6 +425,7 @@ private struct EditableEstimateTask: Identifiable, Equatable {
     let taskCode: String
     var descriptionEn: String
     var descriptionEs: String
+    var scopeID = ""  // contractor-entered room/location, never invented
     var quantity: String
     var unit: String
     var laborHours = ""
