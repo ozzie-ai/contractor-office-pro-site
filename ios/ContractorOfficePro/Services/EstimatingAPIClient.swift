@@ -109,6 +109,16 @@ struct EstimatingAPIClient {
         let warning: String
     }
 
+    struct PriceBookCreate: Encodable, Sendable {
+        let kind: String
+        let nameEn: String
+        let nameEs: String?
+        let unit: String
+        let unitCost: Decimal
+        let unitPrice: Decimal
+        let category: String?
+    }
+
     struct PriceBookEntry: Decodable, Sendable {
         let id: String
         let kind: String
@@ -131,6 +141,10 @@ struct EstimatingAPIClient {
 
     func pricebook() async throws -> [PriceBookEntry] {
         try await request("v1/pricebook", method: "GET", body: nil)
+    }
+
+    func saveRate(_ item: PriceBookCreate) async throws -> PriceBookEntry {
+        try await post("v1/pricebook", body: item)
     }
 
     private func post<Input: Encodable, Output: Decodable>(_ path: String, body: Input) async throws -> Output {
