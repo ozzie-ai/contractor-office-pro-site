@@ -197,6 +197,14 @@ struct EstimateBuilderView: View {
                                 .font(.headline)
                             Text("estimate.preliminary").font(.caption).foregroundStyle(.secondary)
                             Toggle("estimate.approve", isOn: $approved)
+                            Button {
+                                Task { await saveApprovedRates() }
+                            } label: {
+                                Label("estimate.save_rates", systemImage: "square.and.arrow.down")
+                            }
+                            .disabled(busy || !items.contains {
+                                $0.selectedRateID.isEmpty && $0.priceSource == "contractor_entered"
+                            })
                             if let pdfURL {
                                 ShareLink(item: pdfURL) {
                                     Label("estimate.share_pdf", systemImage: "square.and.arrow.up")
@@ -354,6 +362,44 @@ struct EstimateBuilderView: View {
             calculation = try await api().price(request)
         } catch {
             message = String(localized: "estimate.price_error")
+        }
+    }
+
+    private func saveApprovedRates() async {
+        guard approved, let calculation,
+              calculation.status == "ready_for_contractor_review",
+              calculation.missing.isEmpty, calculation.lines.count == items.count else {
+            return
+        }
+        busy = true
+        message = nil
+        defer { busy = false }
+        do {
+            let service = try api()
+            var saved = 0
+            for (index, item) in items.enumerated() {
+                guard item.selectedRateID.isEmpty, item.priceSource == "contractor_entered",
+                      let qty = Self.decimal(item.quantity), qty > 0,
+                      let directText = calculation.lines[index].directTotal,
+                      let totalText = calculation.lines[index].sellingTotal,
+                      let direct = Decimal(string: directText),
+                      let total = Decimal(string: totalText) else { continue }
+                let rate = EstimatingAPIClient.PriceBookCreate(
+                    kind: "other", nameEn: item.descriptionEn,
+                    nameEs: item.descriptionEs.isEmpty ? nil : item.descriptionEs,
+                    unit: item.unit,
+                    unitCost: direct / qty, unitPrice: total / qty,
+                    category: "installed_work"
+                )
+                _ = try await service.saveRate(rate)
+                saved += 1
+            }
+            book = try await service.pricebook()
+            message = saved > 0
+                ? String(localized: "estimate.saved_rates")
+                : String(localized: "estimate.no_confirmed_rates")
+        } catch {
+            message = String(localized: "estimate.save_rates_error")
         }
     }
 
