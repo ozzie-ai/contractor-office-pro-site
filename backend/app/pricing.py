@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
+from uuid import UUID
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -37,6 +38,7 @@ class DirectCost(StrictModel):
 class WorkItem(StrictModel):
     task_code: str = Field(min_length=3, max_length=100)
     scope_id: str | None = Field(default=None, max_length=100)  # distinguish rooms/locations
+    price_book_item_id: UUID | None = None  # server-resolved own-org rate
     description_en: str = Field(min_length=3, max_length=400)
     description_es: str | None = Field(default=None, max_length=400)
     quantity: Decimal | None = Field(default=None, gt=0)
@@ -47,8 +49,8 @@ class WorkItem(StrictModel):
 
     @model_validator(mode="after")
     def exclusive_pricing_modes(self) -> WorkItem:
-        if self.direct_cost is not None and self.unit_selling_price_override is not None:
-            raise ValueError("Choose direct costs OR a selling-price override, not both")
+        if sum(x is not None for x in (self.direct_cost, self.unit_selling_price_override, self.price_book_item_id)) > 1:
+            raise ValueError("Choose direct cost, selling-price override, OR pricebook ID")
         return self
 
 
