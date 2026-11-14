@@ -54,6 +54,24 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testNativeEstimatorOpensWithoutContactingRealBackend() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+
+        let panel = app.staticTexts["Panel upgrade 100A → 200A"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 10))
+        panel.tap()
+        let prepare = app.buttons["Prepare estimate"]
+        XCTAssertTrue(prepare.waitForExistence(timeout: 5))
+        prepare.tap()
+        XCTAssertTrue(app.staticTexts["Job description (private)"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Analyze job"].exists)
+        XCTAssertFalse(app.buttons["Share customer PDF"].exists, "no unapproved PDF")
+        snap("9-estimate-capture")
+    }
+
+    @MainActor
     private func snap(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
