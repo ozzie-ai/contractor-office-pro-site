@@ -2999,6 +2999,23 @@
           }
         }
       }
+    },
+    "estimate.location_optional": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Room or location (only if the same task repeats)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuarto o ubicación (si se repite la misma partida)"
+          }
+        }
+      }
     }
   },
   "version": "1.1"
