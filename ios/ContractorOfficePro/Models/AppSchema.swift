@@ -15,7 +15,7 @@ enum AppSchema {
 
 /// swiftdata skill: version the schema before real data exists, so later changes get a migration stage.
 nonisolated enum SchemaV1: VersionedSchema {
-    static let versionIdentifier = Schema.Version(1, 0, 0)
+    static var versionIdentifier: Schema.Version { Schema.Version(1, 0, 0) }
     static var models: [any PersistentModel.Type] {
         [Organization.self, Member.self, Client.self, Job.self, TimeEntry.self, PriceBookItem.self,
          Estimate.self, LineItem.self, Receipt.self, ReceiptLineItem.self, Expense.self, Media.self]
