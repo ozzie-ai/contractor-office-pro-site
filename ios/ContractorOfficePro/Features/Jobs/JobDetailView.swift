@@ -8,6 +8,7 @@ struct JobDetailView: View {
     @Query private var jobs: [Job]
     @Query private var clients: [Client]
     @State private var editor: JobEditorRequest?
+    @State private var showEstimator = false
     @State private var confirmingDelete = false
     @State private var saveFailed = false
 
@@ -70,6 +71,14 @@ struct JobDetailView: View {
                 Section { Text(notes) } header: { Text(.jobSectionNotes) }
             }
             Section {
+                Button {
+                    showEstimator = true
+                } label: {
+                    Label("estimate.start", systemImage: "doc.badge.plus")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            Section {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
             }
         }
@@ -79,6 +88,7 @@ struct JobDetailView: View {
             Button { editor = JobEditorRequest(job: job) } label: { Text(.commonEdit) }
         }
         .sheet(item: $editor) { JobEditor(request: $0) }
+        .sheet(isPresented: $showEstimator) { EstimateBuilderView(job: job) }
         .confirmationDialog(Text(.jobDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
                 if (try? workspace.delete(job)) != nil { dismiss() } else { saveFailed = true }
