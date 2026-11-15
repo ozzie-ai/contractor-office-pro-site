@@ -21,11 +21,63 @@ const near=(s:string,all:Dim[],re:RegExp):Dim|undefined=>{
 };
 const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuarto)\b/;
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
+/**
+ * Outlet-only quantity guard for the existing Expo iPhone app.
+ * It is intentionally narrow: we ask for review on mixed/ambiguous jobs and
+ * NEVER invent per-unit installed rates from a spoken count.
+ */
+function quickOutletCount(s:string):LocalDraft|null{
+ const words:Record<string,number>={
+  one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+  un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10
+ };
+ const countWord='(?:\\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)';
+ const outlet='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
+ if(!new RegExp('\\b'+outlet+'\\b').test(s)||!/\b(?:gfci|gfi)\b/.test(s))return null;
+ // Do not strip unrelated work from a multi-trade description.
+ if(/\b(panel|tablero|breaker|circuit|circuito|light|lights|luz|luces|dimmer|shower|bathroom|bano|kitchen|cocina|charger|evse|permit|permiso|wire|cable|painting|pintura)\b/.test(s))return null;
+ const total=s.match(new RegExp('\\b('+countWord+')\\s+(?:existing\\s+|old\\s+|viejos?\\s+)?'+outlet+'\\b'));
+ const gfci=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:son|are)\\s+|(?:of\\s+them\\s+are)\\s+)?(?:gfci|gfi)\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+(?:gfci|gfi)\\s+'+outlet+'\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+'+outlet+'\\s+(?:gfci|gfi)\\b'));
+ if(!total||!gfci)return null;
+ const toNum=(value:string)=>words[value]??Number(value);
+ const all=toNum(total[1]),protectedCount=toNum(gfci[1]);
+ if(!Number.isInteger(all)||!Number.isInteger(protectedCount)||all<1||all>100||protectedCount<1||protectedCount>all)return null;
+ if(/\b(?:plus|additional|more|extra|mas|adicionales|otros)\b/.test(s)){
+  return {lines:[line('outlets-count-unclear','Confirm outlet count: are GFCI included or additional?',
+    'Confirmar cantidad: ¿los GFCI están incluidos o son adicionales?',0,'each',0)],
+    unknowns:['Clarify whether GFCI receptacles are part of the total or additional.'],recognized:false};
+ }
+ const standard=all-protectedCount;
+ const replace=/\b(?:replace|replacing|swap|change|cambiar|cambiando|reemplazar|reemplazando|sustituir)\b/.test(s);
+ const newInstall=/\b(?:install|instalar|instalacion|new|nuevo|nueva)\b/.test(s);
+ const action=replace&&!newInstall?'Replace':newInstall&&!replace?'Install':'Install or replace (confirm)';
+ const actionEs=replace&&!newInstall?'Reemplazar':newInstall&&!replace?'Instalar':'Instalar o reemplazar (confirmar)';
+ const work:EstimateLine[]=[];
+ if(standard>0)work.push(line('outlets-standard',action+' '+standard+' standard receptacles (verify existing wiring)',
+  actionEs+' '+standard+' tomacorrientes estandar (verificar cableado)',standard,'each',0));
+ work.push(line('outlets-gfci',action+' '+protectedCount+' GFCI receptacles (verify protection and circuit)',
+  actionEs+' '+protectedCount+' tomacorrientes GFCI (verificar circuito y proteccion)',protectedCount,'each',0));
+ return {
+  lines:work,
+  unknowns:[
+   'Confirm replacement versus new installation, wiring, box/plate conditions and permit requirements.',
+   'Enter contractor-verified unit labor/material pricing. All new line rates start at $0.'
+  ],
+  recognized:true
+ };
+}
+
 export function localEstimate(description:string,_trade:Trade,paintingMeasurements:PaintingMeasurements={}):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
  if(_trade==='painting'){
   const painting=mobilePaintingEstimate(description,paintingMeasurements);
   if(painting)return painting;
+ }
+ if(_trade==='electrical'){
+  const outlets=quickOutletCount(s);
+  if(outlets)return outlets;
  }
 
  // Electrical scope has its own parser: no bathroom defaults or unrelated fixtures.
