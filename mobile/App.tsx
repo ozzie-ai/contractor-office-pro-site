@@ -14,7 +14,8 @@ import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
-import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,interpretWithDerek,verifyWithDerek} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -89,6 +90,13 @@ export default function App(){
  const [propertyMessage,setPropertyMessage]=useState('');
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
+ const [sharedEmail,setSharedEmail]=useState('');
+ const [sharedCode,setSharedCode]=useState('');
+ const [sharedSession,setSharedSession]=useState<BetaSession|null>(null);
+ const [sharedBusy,setSharedBusy]=useState(false);
+ const [sharedMessage,setSharedMessage]=useState('');
+ const sharedEnabled=isSharedConfigured();
+
  useEffect(()=>{
   const profile=readProfile();
   setBusinessProfile(profile);
@@ -333,6 +341,63 @@ export default function App(){
   setInfo(suggested.suggested?tr('Preliminary LA prices added automatically for '+suggested.suggested+' work items. These are planning assumptions, not confirmed quotes. Review before sending.','Se agregaron precios preliminares de LA automáticamente para '+suggested.suggested+' partidas. Son supuestos de planificación, no cotizaciones confirmadas. Revísalos antes de enviar.'):tr('The notes do not identify enough recognized priced tasks. Add or dictate the missing work scope for a complete estimate.','Las notas no identifican suficientes partidas con precio. Describe el trabajo que falta para un estimado completo.'));
   setStage(2);
  };
+
+ const sendSharedCode=async()=>{
+  setSharedBusy(true);setSharedMessage('');
+  try{await sendEmailCode(sharedConfig,sharedEmail);
+   setSharedMessage(tr('Sign-in code sent. Check your Derek app email.','Código enviado. Revisa el correo usado con la aplicación de Derek.'));}
+  catch(e){setSharedMessage(e instanceof Error?e.message:'Code request failed.');}
+  finally{setSharedBusy(false);}
+ };
+ const connectShared=async()=>{
+  setSharedBusy(true);setSharedMessage('');
+  try{const session=await verifyEmailCode(sharedConfig,sharedEmail,sharedCode);
+   setSharedSession(session);setSharedCode('');
+   setSharedMessage(tr('Connected. You can request AI scope.','Conectado. Puedes solicitar el alcance con IA.'));}
+  catch(e){setSharedMessage(e instanceof Error?e.message:'Could not connect.');}
+  finally{setSharedBusy(false);}
+ };
+ const analyzeShared=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const result=await interpretWithDerek(sharedConfig,session,project.description);
+   const draft=mapInterpretation(result);
+   if(!draft.lines.length)throw new Error('AI found no work items; current job unchanged.');
+   const apply=()=>{
+    patch({lines:draft.lines,unknowns:draft.unknowns,
+     exclusions:draft.exclusions,futureWork:draft.futureWork,customerScope:undefined});
+    setAiConnected(true);setInfo(tr('AI scope drafted. Confirm every quantity and price.','Alcance preparado con IA. Confirma todas las cantidades y precios.'));
+    setStage(2);
+   };
+   if(project.lines.length)Alert.alert(
+    tr('Replace existing work items?','¿Reemplazar las partidas existentes?'),
+    tr('This replaces current items and their rates. Your existing saved job remains available.','Esto reemplaza partidas y tarifas. El trabajo guardado queda disponible.'),
+    [{text:tr('Cancel','Cancelar'),style:'cancel'},
+     {text:tr('Use AI scope','Usar alcance de IA'),onPress:apply}]);
+   else apply();
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'AI unavailable; use local estimate.');}
+  finally{setSharedBusy(false);}
+ };
+ const crossCheckShared=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const result=await verifyWithDerek(sharedConfig,session,project);
+   if(result.status!=='ready_for_contractor_review'||result.selling_total===null)
+    setSharedMessage(tr('Missing pricing: ','Faltan precios: ')+result.missing.join('; '));
+   else{
+    const local=totals(project).total,remote=Number(result.selling_total);
+    const cents=Math.abs(Math.round(local*100)-Math.round(remote*100));
+    setSharedMessage(cents<=1?tr('Shared engine confirms total: ','Motor compartido confirma total: ')+money(remote):
+     tr('Compare totals — Expo: ','Compara totales — Expo: ')+money(local)+' · '+tr('Shared: ','Compartido: ')+money(remote));
+   }
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'Shared pricing unavailable; local prices unchanged.');}
+  finally{setSharedBusy(false);}
+ };
+
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote=currentCleaningProject(project);
   if(quote.trade==='cleaning'&&quote.cleaning&&(!quote.cleaning.areaSqFt||quote.cleaning.bedrooms+quote.cleaning.bathrooms+quote.cleaning.livingRooms<=0||(quote.cleaning.type==='post_construction'&&!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length))){
@@ -542,10 +607,26 @@ export default function App(){
     <Text style={styles.hint}>{project.trade==='cleaning'?tr('First cleaning and recurring visits are priced separately.','La primera limpieza y las visitas periódicas se calculan por separado.'):tr('Turn your job notes into an editable estimate.','Convierte tus notas en un estimado editable.')}</Text>
     <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
+    {sharedEnabled&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Derek AI — optional','IA de Derek — opcional')}</Text>
+     <Text style={styles.hint}>{tr('The Expo estimate and PDF work even if this service is offline.','El estimado y PDF de Expo funcionan aunque este servicio no esté disponible.')}</Text>
+     {!sharedSession&&<>
+      <Input label={tr('Business account email','Correo de la cuenta')} value={sharedEmail} onChangeText={setSharedEmail} placeholder="email@example.com"/>
+      <Action title={tr('Send email code','Enviar código por correo')} onPress={sendSharedCode} disabled={sharedBusy}/>
+      <Input label={tr('Verification code','Código de verificación')} value={sharedCode} onChangeText={setSharedCode} placeholder="123456" number secure/>
+      <Action title={tr('Connect Derek AI','Conectar IA de Derek')} onPress={connectShared} disabled={sharedBusy}/>
+     </>}
+     {!!sharedSession&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
+     {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
+    </View>}
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
+    {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&<View style={styles.lineCard}>
+     <Action title={tr('Cross-check total with Derek engine','Comparar total con motor de Derek')} secondary disabled={sharedBusy} onPress={crossCheckShared}/>
+     {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
+    </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}
     {project.lines.some(x=>x.quantity>0&&x.rate>0)&&<View style={styles.lineCard}>
