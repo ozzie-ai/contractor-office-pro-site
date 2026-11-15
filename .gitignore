@@ -1,0 +1,18 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcodeproj
+# Swift Package Manager
+.build/
+# Python
+__pycache__/
+.venv/
+.env
+# macOS
+.DS_Store
+# Supabase local
+supabase/.temp/
+# Local secrets for the iOS app
+ios/Config/Config.xcconfig
+ios/build/
