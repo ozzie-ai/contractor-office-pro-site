@@ -140,3 +140,41 @@ test('Concrete and plumbing descriptions cannot silently become bathroom items',
  assert.equal(find(c,'shower'),undefined);
  assert.equal(find(p,'shower'),undefined);
 });
+
+
+test('Expo iPhone: five total outlets including two GFCI means three standard + two GFCI',()=>{
+ const r=localEstimate('Replace five outlets, two are GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.equal(r.lines.length,2);
+ assert.ok(r.lines.every(x=>x.rate===0),'missing contractor price must not be invented');
+ assert.ok(r.unknowns.some(x=>x.includes('wiring')));
+});
+
+test('Expo iPhone: Spanish five-outlet voice example counts all five correctly',()=>{
+ const r=localEstimate('Cambiar cinco tomacorrientes, dos son GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.match(find(r,'outlets-gfci').description_es,/Reemplazar/);
+});
+
+test('Expo iPhone: bare shorthand 5 outlets 2 GFCI retains uncertainty about install versus replace',()=>{
+ const r=localEstimate('5 outlets, 2 GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.match(find(r,'outlets-standard').description_en,/confirm/);
+ assert.equal(r.lines.reduce((sum,x)=>sum+x.quantity,0),5);
+});
+
+test('Expo iPhone: additional GFCI is never secretly interpreted as included count',()=>{
+ const r=localEstimate('Replace five outlets plus two GFCI','electrical');
+ assert.equal(r.recognized,false);
+ assert.equal(find(r,'outlets-count-unclear').quantity,0);
+ assert.ok(r.unknowns.some(x=>x.includes('additional')));
+});
+
+test('Expo iPhone: existing panel and circuit dictation is not handled as a simple outlet job',()=>{
+ const r=localEstimate('Upgrade electrical panel 100A to 200A and replace 5 outlets, two GFCI.','electrical');
+ assert.equal(find(r,'outlets-standard'),undefined);
+ assert.ok(find(r,'panel-upgrade'));
+});
