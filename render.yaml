@@ -1,0 +1,20 @@
+# Optional Render Blueprint for the unified Expo + FastAPI repo.
+# Creating/deploying a service requires the owner's explicit Render account action.
+# No environment secrets belong in source control.
+services:
+  - type: web
+    name: contractor-office-pro-api-staging
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini

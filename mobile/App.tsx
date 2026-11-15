@@ -457,7 +457,7 @@ export default function App(){
      </Pressable>
     </View>
     <View style={styles.heroBottom}>
-     <Text style={styles.heroVersion}>UI 27 · PILOT</Text>
+     <Text style={styles.heroVersion}>{'Contractor Office Pro v'+(Constants.expoConfig?.version||'0.1.0')+' · '+(sharedEnabled?'AI settings present (not verified)':'Offline · AI not configured')}</Text>
      <View style={styles.languageSwitch}>
       {(['en','es'] as const).map(lang=><Pressable key={lang} accessibilityRole="button" accessibilityLabel={lang==='en'?'English':'Español'} accessibilityState={{selected:businessProfile.language===lang}} onPress={()=>chooseLanguage(lang)} style={[styles.languageOption,businessProfile.language===lang&&styles.languageSelected]}>
        <Text style={[styles.languageText,businessProfile.language===lang&&styles.languageTextSelected]}>{lang.toUpperCase()}</Text>

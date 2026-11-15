@@ -67,6 +67,22 @@ def health() -> dict[str, str]:
     return {"status": "ok", "component": "pricing_api"}
 
 
+@app.get("/ready")
+def readiness() -> dict[str, str]:
+    """Configuration readiness, not a claim that external accounts work.
+
+    Liveness (/health) stays available during deployment; never reveal key values.
+    """
+    configured = (
+        os.getenv("SUPABASE_URL", "").startswith("https://")
+        and bool(os.getenv("SUPABASE_ANON_KEY", "").strip())
+        and bool(os.getenv("OPENAI_API_KEY", "").strip())
+    )
+    if not configured:
+        raise HTTPException(status_code=503, detail={"error": "backend_configuration_missing"})
+    return {"status": "configured", "component": "pricing_api"}
+
+
 @app.post("/v1/estimate/price", response_model=EstimateResult)
 async def estimate_price(
     request: EstimateRequest,
