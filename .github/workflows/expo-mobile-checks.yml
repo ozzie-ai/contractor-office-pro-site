@@ -1,0 +1,31 @@
+name: Expo iPhone estimating checks
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/expo-mobile-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/expo-mobile-checks.yml'
+
+jobs:
+  unit-and-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Local estimating regressions
+        run: npm test
+      - name: TypeScript check
+        run: npm run check
