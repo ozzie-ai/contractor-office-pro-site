@@ -1,5 +1,17 @@
 # Contractor Office Pro: one app, one shared engine — integration status
 
+## Confirmed Supabase development connection — 2026-11-16
+
+- Created development project **Contractor Office Pro Dev** in `us-west-1` with a quoted **$0/month** project-creation cost.
+- Live project dashboard: https://supabase.com/dashboard/project/xhbbshryjdcotvwuslxd
+- Project URL: `https://xhbbshryjdcotvwuslxd.supabase.co`.
+- Applied and verified `contractor_office_pro_phase0_schema`, followed by `contractor_office_pro_security_hardening`. Verified **12 app tables all have RLS enabled**, and that signed-in users can query members and create job records under the policy model. No contractor users or tenant records have been provisioned yet.
+- Added the **public** Supabase URL and publishable key to `mobile/.env.example`, and the public credentials to `backend/.env.example`. These contain **no OpenAI, service-role or secret API keys**. Expo will only load them after `mobile/.env.example` is copied into the Mac's untracked `mobile/.env`. The backend URL must remain unset until HTTPS hosting actually exists.
+- Implemented email OTP first-time sign-up and server-verified business onboarding using the project's `create_org_for_user` RPC. This is unit tested; **no real email was sent and no real login was tested yet**. Check the production sign-in email template for a numeric `{{ .Token }}` before claiming the OTP screen works.
+- Security advisor warnings for mutable trigger search paths and anonymous access to definer functions were resolved. Four advisor warnings remain for intentionally callable authenticated `SECURITY DEFINER` functions (three RLS helpers plus business bootstrap); audit these before public release. Do not enable unrestricted launch until authorization and rate limiting are tested.
+- The **FastAPI service is still not deployed**. Connect Render (or another HTTPS host), configure server `SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable key), and `OPENAI_API_KEY`, then set `EXPO_PUBLIC_COP_BACKEND_URL` in Expo and run real device tests.
+- Master residential pricing data and cloud job/photo synchronization are **not yet integrated**. Existing local estimates are preserved.
+
 ## Architecture and what has really been done
 
 - **Expo React Native remains the only user-facing app**. Preserve Job → Scope → Price → Send → Follow-up, local job drafts, photos, editable estimates, and private-versus-customer PDF separation. No new SwiftUI interface is being substituted.
