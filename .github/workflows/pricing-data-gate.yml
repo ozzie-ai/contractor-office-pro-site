@@ -3,14 +3,12 @@ on:
   pull_request:
     paths:
       - 'database/export_reviewed_pricing.py'
-      - 'database/export_research_catalog.py'
       - 'database/tests/**'
       - '.github/workflows/pricing-data-gate.yml'
   push:
     branches: [main]
     paths:
       - 'database/export_reviewed_pricing.py'
-      - 'database/export_research_catalog.py'
       - 'database/tests/**'
       - '.github/workflows/pricing-data-gate.yml'
 
