@@ -345,7 +345,7 @@ export default function App(){
  const sendSharedCode=async()=>{
   setSharedBusy(true);setSharedMessage('');
   try{await sendEmailCode(sharedConfig,sharedEmail);
-   setSharedMessage(tr('Sign-in code sent. Check your Derek app email.','Código enviado. Revisa el correo usado con la aplicación de Derek.'));}
+   setSharedMessage(tr('Sign-in code sent. Check your business account email.','Código enviado. Revisa el correo de tu cuenta comercial.'));}
   catch(e){setSharedMessage(e instanceof Error?e.message:'Code request failed.');}
   finally{setSharedBusy(false);}
  };
@@ -609,13 +609,13 @@ export default function App(){
     <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {sharedEnabled&&<View style={styles.lineCard}>
-     <Text style={styles.h2}>{tr('Derek AI — optional','IA de Derek — opcional')}</Text>
+     <Text style={styles.h2}>{tr('AI estimating — optional','Estimación con IA — opcional')}</Text>
      <Text style={styles.hint}>{tr('The Expo estimate and PDF work even if this service is offline.','El estimado y PDF de Expo funcionan aunque este servicio no esté disponible.')}</Text>
      {!sharedSession&&<>
       <Input label={tr('Business account email','Correo de la cuenta')} value={sharedEmail} onChangeText={setSharedEmail} placeholder="email@example.com"/>
       <Action title={tr('Send email code','Enviar código por correo')} onPress={sendSharedCode} disabled={sharedBusy}/>
       <Input label={tr('Verification code','Código de verificación')} value={sharedCode} onChangeText={setSharedCode} placeholder="123456" number secure/>
-      <Action title={tr('Connect Derek AI','Conectar IA de Derek')} onPress={connectShared} disabled={sharedBusy}/>
+      <Action title={tr('Connect AI estimating','Conectar estimación con IA')} onPress={connectShared} disabled={sharedBusy}/>
      </>}
      {!!sharedSession&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
@@ -625,7 +625,7 @@ export default function App(){
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
     {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&<View style={styles.lineCard}>
-     <Action title={tr('Cross-check total with Derek engine','Comparar total con motor de Derek')} secondary disabled={sharedBusy} onPress={crossCheckShared}/>
+     <Action title={tr('Verify total with shared pricing engine','Verificar total con motor de precios compartido')} secondary disabled={sharedBusy} onPress={crossCheckShared}/>
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
     </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
