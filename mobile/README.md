@@ -1,79 +1,65 @@
-# Contractor Office Pro — Mobile App (iOS and Android)
+# Contractor Office Pro — iPhone app (source of truth)
 
-**Status:** first Expo/React Native pilot committed; not yet an installed or App Store–published build.
+**Current as of Nov 16, 2026:** We are developing and testing the **Expo / React Native app installed on a physical iPhone using Xcode on the user's Mac**. We are NOT testing the old GitHub Pages website, and must not replace the Expo UI with a separate Swift UI. The phone app has already been built and installed.
 
-This lives under `/mobile` in the existing `ozzie-ai/contractor-office-pro-site` repository. The current GitHub Pages estimator and Level 2 browser pilot are deliberately left intact.
+## What code is authoritative?
 
-## Implemented in the first mobile codebase
-- Six trade choices: electrician, plumber, painter, concrete, handyman and remodeling.
-- Contractor/customer details; natural-language text job description; example mixed electrical job.
-- Camera/library photo selection, with photos kept local and not included in customer PDFs.
-- Configurable call to the Level 2 AI backend `/api/interpret` using a **private beta tester token**, not an AI key.
-- AI results converted to editable bilingual work items. **All uncertain or allowance items are retained**, with missing quantities/rates at zero pending review.
-- Editable quantities, units, labor/material line rates, overhead and profit.
-- Customer estimate in professional English or Spanish, generated to PDF through `expo-print` and shared through `expo-sharing`.
-- Customer document does **not** include the private dictated notes, access token, or private worksite photos.
+- **Current working integration branch:** `integration/expo-fastapi-supabase-unified-20261115`, draft PR #46. It includes the existing Expo app plus backend/auth integration. **It is not merged to `main`**, and GitHub commits will NOT appear on the iPhone until the Mac pulls the branch and loads/builds the app.
+- **The actual phone app:** `mobile/App.tsx`. Existing five-stage flow: Job → Scope → Price → Send → Follow-up.
+- **Voice description:** `mobile/src/SpeechInput.tsx` currently uses the iPhone **keyboard microphone** for dictated English/Spanish text; direct native speech capture was replaced during investigation of a crash.
+- **Existing local features:** saved draft jobs and photos (`mobile/src/jobDrafts.ts`), local scope/estimating, editing quantities/line prices, preliminary cost assumptions, private cost/overhead/profit review, customer PDF export (`expo-print`, `expo-sharing`), and bilingual UI.
+- **Trade choices in app:** electrical, plumbing, painting, concrete, handyman, remodeling, cleaning. These are categories and examples, NOT a ceiling on planned residential services or proof all jobs have verified automatic prices.
+- **Not current:** the public GitHub Pages web pilot v44 or older `main` code. That website is not a preview of the latest iPhone build.
+- **Backend connection:** `mobile/src/sharedEngine.ts`; cloud OTP, first-business bootstrap, shared pricing check and optional AI scope exist in branch #46, but live-device end-to-end testing is pending.
 
-## Important limits (not implemented yet)
-- **Voice recording is implemented in the mobile interface.** Users can record on-device and then request transcription through the secure `/api/transcribe` endpoint. Live transcription requires Derek to deploy/configure the backend. Audio stays local until the user explicitly taps Transcribe.
-- No live Home Depot/supplier pricing feed, payment processing, account management, cloud projects, automatic draft persistence, app-store submission, or full test-device validation.
-- AI can structure scope but the user must verify work, quantities and prices. Zero rates are intentionally not silently replaced with invented prices.
-- `COP_BETA_TOKEN` is a temporary shared pilot access mechanism; replace with authenticated per-user access and usage quotas before public launch.
-- The OpenAI API key is held **only by a protected server** (the root `/api/interpret.js`), never inside this mobile package.
+## Cloud implementation and version gap
 
-## Run for developers
+- **Supabase:** `Contractor Office Pro Dev`, 12 RLS-protected app tables, migrated and running.
+- **Render Free:** FastAPI was deployed at `https://contractor-office-pro-api-staging.onrender.com` on Nov 16, 2026. **The deployed commit was `173238e`**, before the branch added first-time contractor business bootstrap. **Manually redeploy the latest commit from the integration branch before testing new contractor signup.** Live hosting is not the same as a successful iPhone-to-cloud test.
+- **AI:** The OpenAI API key has deliberately not been set because of cost concerns. The non-AI local estimates still operate; AI backend interpretation will need separately funded API use.
+- **Pricing:** master SQLite pricing data is not auto-synced to Supabase or iPhone; preliminary reference numbers are not guaranteed verified final selling rates. No blanket all-trades pricebook approval.
+- **No cloud job/photo sync yet:** existing drafts/photos live in iPhone app documents. **Do not uninstall the existing app or erase its storage without protecting this data first.**
 
-Use Node.js >=22.13 and current npm.
+## How to test the CURRENT version on the iPhone
 
-```sh
-git clone https://github.com/ozzie-ai/contractor-office-pro-site.git
-cd contractor-office-pro-site/mobile
-npm install
-npx expo install --fix
-npm run check
-npm start
-```
-
-Connect Expo Go or a development build and test iPhone/Android. Expo SDK 58 requires compatible Expo Go/device support; if your device's Expo Go version is incompatible, create an EAS development build or align the SDK with your device.
-
-The API backend must be deployed separately to Vercel with `OPENAI_API_KEY` and `COP_BETA_TOKEN` environment variables (see root `LEVEL2_SETUP.md`). Never paste `OPENAI_API_KEY` in the app. A tester inputs only the backend URL and temporary beta access code.
-
-## Suggested integration milestones
-1. Run the mobile app on two real devices; verify photos and PDF sharing.
-2. Derek connects the existing secure AI interpreter backend and validates `MIXED-001` / `MIXED-002` on devices.
-3. Test the newly implemented microphone recording and server-side speech transcription on iPhone and Android; verify permissions and transcript accuracy.
-4. Add validated, editable trade rate books by location; no invented price confidence.
-5. Add local drafts, then optional cloud sync, accounts, rate limits, subscriptions and store distribution.
-
-## Collaboration
-Derek can work on `mobile/` and `api/` in the same repository once the owner invites his GitHub account as a collaborator. We can split responsibilities with branches and pull requests. Do not add any API secrets to pull requests or commits.
-
-## References
-- https://docs.expo.dev/get-started/create-a-project/
-- https://docs.expo.dev/versions/latest/sdk/imagepicker/
-- https://docs.expo.dev/versions/latest/sdk/print/
-- https://docs.expo.dev/versions/latest/sdk/sharing/
-
-## Native dictation — no OpenAI key needed
-
-Mobile speech-to-text is now separated from the AI estimator. It uses `expo-speech-recognition` (Apple SFSpeechRecognizer on iPhone, Android SpeechRecognizer on Android) and writes directly into the editable customer job notes.
-
-**Expo Go does not bundle this third-party native module.** The Expo Go screen retains a clear, usable fallback: tap the transcript text box and use the microphone on the native iPhone keyboard. For the app's large one-tap direct speech-to-text control, install a custom development build.
-
-On the developer's Mac:
+In the Mac Terminal first check for local changes; preserve them before switching branches:
 
 ```sh
-cd ~/contractor-office-pro-site/mobile
-git pull --ff-only origin main
-npm install
-npx expo install --fix
-npm run check
-npx expo install expo-dev-client
-npx expo run:ios --device
+cd ~/contractor-office-pro-site
+git status --short
+git branch --show-current
+git fetch origin
 ```
 
-The last command requires Xcode, iOS signing, and a connected device. It compiles/installs a Contractor Office Pro development build, not Expo Go. Alternatively, use `eas build --platform ios --profile development` with Apple signing and the appropriate Expo/EAS account. After installation, run `npx expo start --dev-client` to send JS updates. A **new native build** is required whenever adding/removing native modules or permissions.
+When `git status --short` is clean, choose ONE of these paths:
 
-On iPhone, grant Microphone + Speech Recognition permissions and choose **Español** or **English** before starting. Recognized interim/final text appears immediately in the editable box and may be corrected by the contractor. Device support and network usage depend on locale and OS settings: this is independent of OpenAI, but it does **not** guarantee offline-only processing.
+```sh
+# If the integration branch already exists locally:
+git switch integration/expo-fastapi-supabase-unified-20261115
 
-The AI interpretation step remains separate and optional. Its endpoint/token are unrelated to iOS/Android voice transcription.
+# OR if it does not exist locally:
+git switch --track origin/integration/expo-fastapi-supabase-unified-20261115
+```
+
+Then `git pull --ff-only`, and:
+
+```sh
+cd mobile
+cp -n .env.example .env
+npm install
+npm run ios:device
+```
+
+`npm run ios:device` uses the existing Xcode device build process (`expo run:ios --device`, plus the Xcode compatibility patch). Connect the physical iPhone and select it when asked. The bundled `mobile/.env.example` contains only the **public** Supabase and Render URLs/keys; private OpenAI or database secret keys must never go in `mobile/.env`.
+
+For JS-only edits with an existing compatible native dev build, the Mac can also run `npx expo start --dev-client --lan --clear` and reload the installed iPhone app. Do not use `npx expo start --web`, GitHub Pages or Expo Go as substitutes for the Xcode-built phone app. **Never run `git reset --hard`, `git clean`, delete saved jobs or uninstall the app merely to update it.**
+
+## Real iPhone acceptance checklist
+
+1. Existing saved jobs, photos, business profile, full five-step flow and bilingual keyboard dictation still work.
+2. Estimate creation/editing and customer PDF work, and internal costs/private notes do not leak into the PDF.
+3. Local app still works without Wi-Fi.
+4. After latest backend deployment, a numeric Supabase OTP email signs in a new contractor, creates/verifies its own business membership, and permits authorized backend price checks.
+5. Validation covers painting, concrete, plumbing, electrical and remodeling—not just isolated demo trades; distinguish preliminary rates from verified prices.
+
+Passing GitHub Actions CI is **not** proof that the installed iPhone app passed these real-device checks. Do not refer to the outdated static website when reporting progress.
