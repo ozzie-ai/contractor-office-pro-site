@@ -1,5 +1,7 @@
 # Contractor Office Pro: one app, one shared engine — integration status
 
+> **iPhone-first source of truth (Nov 16, 2026):** This user already has the Expo/React Native app installed and is testing it on a physical iPhone through Xcode on a Mac. See the [current mobile runbook](../mobile/README.md). The public GitHub Pages v44 web prototype is outdated and must not be presented as the latest mobile UI. PR #46 is not yet merged into `main` or necessarily installed on the iPhone. Render is Live at commit `173238e`, older than subsequent first-contractor bootstrap changes; redeploy the latest branch commit before real mobile sign-in testing. Preserve all existing device-local jobs and photos.
+
 ## Render Free backend successfully deployed — 2026-11-16
 
 - Render service: https://dashboard.render.com/web/srv-dbtnoj3m8hqs73d0vvcg
