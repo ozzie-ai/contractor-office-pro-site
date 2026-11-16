@@ -1,5 +1,9 @@
 # Contractor Office Pro: shared product, existing mobile and native work — integration status
 
+## Private residential master database — integrated Nov 16
+
+Research staging is now live in Supabase: 1,674 reference records, of which 517 are preliminarily budget-usable, with **zero automatic final selling prices**. Protected database access and read-only service endpoint exist in this branch; Expo's review UI can display references after a real business login. The master SQLite and its 106,636 usage-decision records stay intact. See [residential reference integration](../database/RESIDENTIAL_REFERENCE_INTEGRATION.md) and migration `20261116225500_residential_reference_catalog.sql`. **Render is still on earlier commit `173238e`; the new endpoint cannot be called live until redeployed.**
+
 > **iPhone-first source of truth (Nov 16, 2026):** This user already has the Expo/React Native app installed and is testing it on a physical iPhone through Xcode on a Mac. See the [current mobile runbook](../mobile/README.md). The public GitHub Pages v44 web prototype is outdated and must not be presented as the latest mobile UI. PR #46 is not yet merged into `main` or necessarily installed on the iPhone. Render is Live at commit `173238e`, older than subsequent first-contractor bootstrap changes; redeploy the latest branch commit before real mobile sign-in testing. Preserve all existing device-local jobs and photos.
 
 ## Render Free backend successfully deployed — 2026-11-16
