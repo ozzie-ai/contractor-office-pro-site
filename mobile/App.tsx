@@ -15,7 +15,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,interpretWithDerek,verifyWithDerek} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,interpretWithDerek,verifyWithDerek} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -352,8 +352,9 @@ export default function App(){
  const connectShared=async()=>{
   setSharedBusy(true);setSharedMessage('');
   try{const session=await verifyEmailCode(sharedConfig,sharedEmail,sharedCode);
+   await verifyBackendAccess(sharedConfig,session);
    setSharedSession(session);setSharedCode('');
-   setSharedMessage(tr('Connected. You can request AI scope.','Conectado. Puedes solicitar el alcance con IA.'));}
+   setSharedMessage(tr('Backend connection and contractor membership verified. You can request AI scope.','Conexión al servidor y acceso del contratista verificados. Puedes solicitar el alcance con IA.'));}
   catch(e){setSharedMessage(e instanceof Error?e.message:'Could not connect.');}
   finally{setSharedBusy(false);}
  };

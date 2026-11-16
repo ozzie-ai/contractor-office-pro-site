@@ -34,7 +34,8 @@ async function jsonRequest<T>(url:string,init:RequestInit, http:Http):Promise<T>
  catch{throw new Error('Network unavailable. Existing offline estimating still works.');}
  if(!response.ok) {
   // Do not display raw server errors, transcripts, membership details or credentials.
-  if(response.status===401||response.status===403)throw new Error('Sign in with your Contractor Office Pro business account.');
+  if(response.status===401)throw new Error('The business session was rejected. Sign in again.');
+  if(response.status===403)throw new Error('Your business account has no active organization membership.');
   if(response.status===429)throw new Error('AI service limit reached. Try the local estimate.');
   throw new Error('The shared service is unavailable (HTTP '+response.status+').');
  }
@@ -66,6 +67,14 @@ export async function verifyEmailCode(c:SharedConfig,email:string,code:string,ht
   expiresAt:typeof response.expires_in==='number'?Date.now()+response.expires_in*1000:undefined
  };
 }
+export async function verifyBackendAccess(c:SharedConfig,session:BetaSession,http:Http=fetch):Promise<void>{
+ const base=secureBase(c.apiUrl);
+ const status=await jsonRequest<{status?:string}>(base+'/v1/account/status',{
+  method:'GET',headers:{Authorization:'Bearer '+session.accessToken}
+ },http);
+ if(status?.status!=='authorized')throw new Error('Backend did not confirm contractor access.');
+}
+
 export async function refreshSession(c:SharedConfig,session:BetaSession,http:Http=fetch):Promise<BetaSession>{
  if(!session.refreshToken)throw new Error('Session expired. Request a new sign-in code.');
  if(!session.expiresAt||session.expiresAt>Date.now()+60000)return session;
@@ -129,17 +138,29 @@ export function toSharedPriceRequest(project:Pick<Project,'lines'|'overheadPct'|
   if(!unit)throw new Error('Unsupported unit on item '+(i+1)+'. Review the unit before pricing.');
   if(!Number.isFinite(l.quantity)||l.quantity<=0||!Number.isFinite(l.rate)||l.rate<=0)
    throw new Error('Enter quantities and direct-cost rates before shared pricing.');
-  // Existing Expo line.rate is a DIRECT unit rate: the current Expo totals()
-  // adds overhead/profit later. Encode it as other direct cost, never as an
-  // already-marked-up selling price and never as material-only cost.
+  // Preserve detailed contractor cost components ONLY when they reconcile to
+  // the approved direct unit rate. If prices were edited independently, avoid
+  // applying stale components or double counting: retain the known total.
+  const parts=[l.costHoursPerUnit,l.costHourlyWage,l.costLaborBurdenMultiplier,
+   l.costMaterialsPerUnit,l.costEquipmentPerUnit];
+  const breakdownOk=parts.every(x=>typeof x==='number'&&Number.isFinite(x)&&x>=0)&&
+   (l.costLaborBurdenMultiplier||0)>=1;
+  const loadedLaborRate=breakdownOk?l.costHourlyWage!*l.costLaborBurdenMultiplier!:0;
+  const partsRate=breakdownOk?l.costHoursPerUnit!*loadedLaborRate+
+   l.costMaterialsPerUnit!+l.costEquipmentPerUnit!:0;
+  const detailed=breakdownOk&&Math.abs(Math.round(partsRate*100)-Math.round(l.rate*100))===0;
+  // Expo rate is a DIRECT cost: overhead and profit are added by the server.
   return {
    task_code:'expo.item.'+(i+1),
    description_en:l.description_en,
    description_es:l.description_es,
    quantity:l.quantity,unit,
    direct_cost:{
-    labor_hours_per_unit:0,loaded_labor_rate:0,material_cost_per_unit:0,
-    other_cost_per_unit:l.rate,
+    labor_hours_per_unit:detailed?l.costHoursPerUnit:0,
+    loaded_labor_rate:detailed?loadedLaborRate:0,
+    material_cost_per_unit:detailed?l.costMaterialsPerUnit:0,
+    equipment_cost_per_unit:detailed?l.costEquipmentPerUnit:0,
+    other_cost_per_unit:detailed?0:l.rate,
     source:l.priceEvidence?.kind==='contractor_entered'?'contractor_entered':'planning_allowance'
    }
   };

@@ -67,6 +67,12 @@ def health() -> dict[str, str]:
     return {"status": "ok", "component": "pricing_api"}
 
 
+@app.get("/v1/account/status")
+async def authenticated_business_status(principal: Principal = Depends(require_principal)) -> dict[str, str]:
+    """Report success only after Supabase JWT and active business membership pass."""
+    return {"status": "authorized"}
+
+
 @app.get("/ready")
 def readiness() -> dict[str, str]:
     """Configuration readiness, not a claim that external accounts work.
