@@ -418,7 +418,7 @@ export default function App(){
   }catch(e){setSharedMessage(e instanceof Error?e.message:'Reference catalog unavailable.');}
   finally{setSharedBusy(false);}
  };
- const const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
+ const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote=currentCleaningProject(project);
   if(quote.trade==='cleaning'&&quote.cleaning&&(!quote.cleaning.areaSqFt||quote.cleaning.bedrooms+quote.cleaning.bathrooms+quote.cleaning.livingRooms<=0||(quote.cleaning.type==='post_construction'&&!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length))){
    Alert.alert('Missing cleaning details','Confirm square footage, room counts and included work before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
