@@ -1,4 +1,4 @@
-# Contractor Office Pro: one app, one shared engine — integration status
+# Contractor Office Pro: shared product, existing mobile and native work — integration status
 
 > **iPhone-first source of truth (Nov 16, 2026):** This user already has the Expo/React Native app installed and is testing it on a physical iPhone through Xcode on a Mac. See the [current mobile runbook](../mobile/README.md). The public GitHub Pages v44 web prototype is outdated and must not be presented as the latest mobile UI. PR #46 is not yet merged into `main` or necessarily installed on the iPhone. Render is Live at commit `173238e`, older than subsequent first-contractor bootstrap changes; redeploy the latest branch commit before real mobile sign-in testing. Preserve all existing device-local jobs and photos.
 
@@ -27,7 +27,7 @@
 
 ## Architecture and what has really been done
 
-- **Expo React Native remains the only user-facing app**. Preserve Job → Scope → Price → Send → Follow-up, local job drafts, photos, editable estimates, and private-versus-customer PDF separation. No new SwiftUI interface is being substituted.
+- **Expo React Native remains the currently user-tested app. Derek's native Swift client also exists under `ios/` as a preserved source to evaluate, rather than being discarded or automatically substituted.** Preserve Job → Scope → Price → Send → Follow-up, local job drafts, photos, editable estimates, and private-versus-customer PDF separation. See the [capability audit](ONE_PRODUCT_INTEGRATION_AUDIT.md).
 - The **FastAPI backend** is now included in this same integration branch under `backend/`, with auth-scoped interpret, deterministic price, contractor-owned pricebook routes, and unit tests.
 - The **Supabase SQL schema** is in `supabase/migrations/`; it is **source code**, not evidence that a cloud database has been created or migrated.
 - The **Expo bridge** is in `mobile/src/sharedEngine.ts`; AI draft and remote price cross-check only appear when all public runtime settings are present.

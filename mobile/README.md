@@ -1,6 +1,6 @@
 # Contractor Office Pro — iPhone app (source of truth)
 
-**Current as of Nov 16, 2026:** We are developing and testing the **Expo / React Native app installed on a physical iPhone using Xcode on the user's Mac**. We are NOT testing the old GitHub Pages website, and must not replace the Expo UI with a separate Swift UI. The phone app has already been built and installed.
+**Current as of Nov 16, 2026:** We are developing and testing the **Expo / React Native app installed on a physical iPhone using Xcode on the user's Mac**. Derek's separate native Swift source is also preserved under [ios/](../ios/INTEGRATION_README.md) for future reuse; do not treat this as a unilateral iPhone-only or Expo-only platform decision. The phone app has already been built and installed.
 
 ## What code is authoritative?
 
