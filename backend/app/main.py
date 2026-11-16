@@ -15,6 +15,7 @@ from .pricing import EstimateRequest, EstimateResult, price_estimate
 from .interpret import InterpretRequest, InterpretResponse, interpret_description
 from .pricebook import (PriceBookCreate, PriceBookEntry, list_pricebook,
                         create_pricebook_entry, resolve_ratebook_ids, normalized_unit)
+from .research import ResearchReference, list_research_references
 
 app = FastAPI(title="Contractor Office Pro API", version="0.1.0")
 
@@ -174,6 +175,18 @@ async def estimate_price(
 @app.post("/v1/interpret", response_model=InterpretResponse)
 async def interpret_job(request: InterpretRequest, principal: Principal = Depends(require_principal)) -> InterpretResponse:
     return await interpret_description(request.description)
+
+@app.get("/v1/research-references", response_model=list[ResearchReference])
+async def get_research_references(
+    limit: int = Query(default=30, ge=1, le=100),
+    budget_only: bool = Query(default=True),
+    trade: str | None = Query(default=None, min_length=2, max_length=70, pattern=r"^[a-zA-Z][a-zA-Z /&-]*$"),
+    authorization: str = Header(),
+    principal: Principal = Depends(require_principal),
+) -> list[ResearchReference]:
+    """Review-only market references; never final customer selling prices."""
+    return await list_research_references(authorization, limit, budget_only, trade)
+
 
 @app.get("/v1/pricebook", response_model=list[PriceBookEntry])
 async def get_pricebook(
