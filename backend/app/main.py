@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from uuid import uuid4
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -70,6 +74,53 @@ def health() -> dict[str, str]:
 @app.get("/v1/account/status")
 async def authenticated_business_status(principal: Principal = Depends(require_principal)) -> dict[str, str]:
     """Report success only after Supabase JWT and active business membership pass."""
+    return {"status": "authorized"}
+
+
+class BusinessBootstrap(BaseModel):
+    business_name: str = Field(min_length=2, max_length=100)
+    display_name: str = Field(min_length=2, max_length=100)
+    language: Literal["en", "es"] = "en"
+
+
+@app.post("/v1/account/bootstrap")
+async def bootstrap_business(
+    request: BusinessBootstrap,
+    authorization: str | None = Header(default=None),
+) -> dict[str, str]:
+    """Create only the currently signed-in user's own business via RLS-scoped RPC.
+
+    Do not use a service-role key or client-selected tenant identifiers.
+    PostgreSQL RPC checks auth.uid() and is idempotent for existing members.
+    """
+    if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise HTTPException(status_code=401, detail={"error": "access_denied"})
+    url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    key = os.getenv("SUPABASE_ANON_KEY", "")
+    if not url.startswith("https://") or not key:
+        raise HTTPException(status_code=503, detail={"error": "auth_not_configured"})
+    headers = {"apikey": key, "Authorization": authorization}
+    try:
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+            identity = await client.get(f"{url}/auth/v1/user", headers=headers)
+            if identity.status_code != 200 or not identity.json().get("id"):
+                raise HTTPException(status_code=401, detail={"error": "access_denied"})
+            result = await client.post(
+                f"{url}/rest/v1/rpc/create_org_for_user",
+                headers={**headers, "Content-Type": "application/json"},
+                json={
+                    "p_org_id": str(uuid4()), "p_member_id": str(uuid4()),
+                    "p_org_name": request.business_name.strip(),
+                    "p_display_name": request.display_name.strip(),
+                    "p_language": request.language,
+                },
+            )
+    except httpx.RequestError:
+        raise HTTPException(status_code=503, detail={"error": "auth_unavailable"}) from None
+    if result.status_code not in (200, 201):
+        # Do not expose raw database, account or organization errors.
+        raise HTTPException(status_code=503, detail={"error": "business_setup_failed"})
+    await require_principal(authorization)
     return {"status": "authorized"}
 
 

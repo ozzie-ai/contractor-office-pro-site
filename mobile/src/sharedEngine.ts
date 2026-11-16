@@ -46,10 +46,10 @@ const supaHeaders=(c:SharedConfig)=>({'apikey':c.supabasePublishableKey});
 
 export async function sendEmailCode(c:SharedConfig,email:string,http:Http=fetch):Promise<void>{
  const base=secureBase(c.supabaseUrl);
- if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Enter the email used for Derek’s contractor account.');
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Enter a valid business account email.');
  await jsonRequest<unknown>(base+'/auth/v1/otp',{
   method:'POST',headers:supaHeaders(c),
-  body:JSON.stringify({email:email.trim(),create_user:false})
+  body:JSON.stringify({email:email.trim(),create_user:true})
  },http);
 }
 export async function verifyEmailCode(c:SharedConfig,email:string,code:string,http:Http=fetch):Promise<BetaSession>{
@@ -67,6 +67,18 @@ export async function verifyEmailCode(c:SharedConfig,email:string,code:string,ht
   expiresAt:typeof response.expires_in==='number'?Date.now()+response.expires_in*1000:undefined
  };
 }
+export async function bootstrapBusiness(c:SharedConfig,session:BetaSession,
+ businessName:string,displayName:string,language:'en'|'es',http:Http=fetch):Promise<void>{
+ const base=secureBase(c.apiUrl);
+ const name=businessName.trim()||'My Construction Business';
+ const display=displayName.trim()||'Contractor';
+ const result=await jsonRequest<{status?:string}>(base+'/v1/account/bootstrap',{
+  method:'POST',headers:{Authorization:'Bearer '+session.accessToken},
+  body:JSON.stringify({business_name:name,display_name:display,language})
+ },http);
+ if(result?.status!=='authorized')throw new Error('Business account was not confirmed.');
+}
+
 export async function verifyBackendAccess(c:SharedConfig,session:BetaSession,http:Http=fetch):Promise<void>{
  const base=secureBase(c.apiUrl);
  const status=await jsonRequest<{status?:string}>(base+'/v1/account/status',{

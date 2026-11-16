@@ -28,7 +28,7 @@ test('email OTP uses Supabase public key and never sends our server OpenAI secre
   called=true;
   assert.equal(url,'https://project.supabase.co/auth/v1/otp');
   assert.equal(init.headers.apikey,'public-key');
-  assert.equal(JSON.parse(init.body).create_user,false);
+  assert.equal(JSON.parse(init.body).create_user,true);
   assert.equal(JSON.parse(init.body).email,'contractor@example.com');
   return {ok:true,status:200,json:async()=>({})};
  });
@@ -147,4 +147,21 @@ test('edited unit selling amounts do not reuse obsolete component breakdowns',()
  assert.equal(cost.material_cost_per_unit,0);
  assert.equal(cost.equipment_cost_per_unit,0);
  assert.equal(cost.other_cost_per_unit,155);
+});
+
+
+test('new verified contractor can bootstrap only own organization via bearer token',async()=>{
+ let called=false;
+ await bridge.bootstrapBusiness(config,session,'Contractor Office Pro','Builder','en',async(url,init)=>{
+  called=true;
+  assert.equal(url,'https://api.example.test/v1/account/bootstrap');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  assert.deepEqual(JSON.parse(JSON.stringify(JSON.parse(init.body))),{
+   business_name:'Contractor Office Pro',display_name:'Builder',language:'en'
+  });
+  return {ok:true,status:200,json:async()=>({status:'authorized'})};
+ });
+ assert.equal(called,true);
+ await assert.rejects(bridge.bootstrapBusiness(config,session,'Contractor Office Pro','Builder','en',
+  async()=>({ok:true,status:200,json:async()=>({status:'unverified'})})));
 });
