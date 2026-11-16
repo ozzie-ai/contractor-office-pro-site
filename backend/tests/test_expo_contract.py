@@ -21,3 +21,14 @@ def test_expo_bridge_targets_backend_routes_and_environment_contract():
     # Protect the server secret boundary.
     assert "OPENAI_API_KEY" not in bridge
     assert "SUPABASE_SERVICE_ROLE_KEY" not in bridge
+
+
+def test_swift_native_client_can_read_the_same_review_only_reference_route():
+    swift = (ROOT / "ios" / "ContractorOfficePro" / "Services" / "EstimatingAPIClient.swift").read_text()
+    routes = {route.path for route in app.routes}
+    assert "/v1/research-references" in routes
+    assert '"v1/research-references"' in swift
+    assert "automaticFinalQuote" in swift
+    assert "allSatisfy" in swift
+    assert "OPENAI_API_KEY" not in swift
+    assert "SUPABASE_SERVICE_ROLE_KEY" not in swift

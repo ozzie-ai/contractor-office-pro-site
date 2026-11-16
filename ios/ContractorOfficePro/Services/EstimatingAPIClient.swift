@@ -131,6 +131,36 @@ struct EstimatingAPIClient {
         let source: String
     }
 
+    /// Preliminary research is distinct from the contractor's own approved pricebook.
+    /// No reference is permitted to become an automatic final customer selling rate.
+    struct ResearchReference: Decodable, Sendable {
+        let referenceId: String
+        let referenceKind: String
+        let trade: String
+        let service: String
+        let unit: String
+        let locality: String
+        let lowUsd: String?
+        let highUsd: String?
+        let planningRateUsd: String?
+        let scope: String?
+        let exclusions: String?
+        let reviewStatus: String
+        let budgetUsable: Bool
+        let automaticFinalQuote: Bool
+    }
+
+    /// The same JWT-protected read-only endpoint consumed by the Expo client.
+    /// Does not mutate local drafts, stored rates or customer-facing PDFs.
+    func researchReferences() async throws -> [ResearchReference] {
+        let rows: [ResearchReference] = try await request(
+            "v1/research-references", method: "GET", body: nil)
+        guard rows.allSatisfy({ !$0.automaticFinalQuote }) else {
+            throw Failure.unexpectedResponse
+        }
+        return rows
+    }
+
     func interpret(_ description: String) async throws -> InterpretationResponse {
         try await post("v1/interpret", body: InterpretationRequest(description: description))
     }
