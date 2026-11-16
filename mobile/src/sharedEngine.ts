@@ -134,6 +134,29 @@ const units:Record<string,string>={
  'linear ft':'linear ft','lf':'linear ft','ft':'linear ft','cu yd':'cu yd','cy':'cu yd',
  'hr':'hr','hour':'hr','hours':'hr','day':'day','days':'day'
 };
+export type ResearchReference={
+ reference_id:string;reference_kind:'reviewed_budget'|'service_market'|'supplier_market';
+ trade:string;service:string;unit:string;locality:string;
+ low_usd:string|null;high_usd:string|null;planning_rate_usd:string|null;
+ scope:string|null;exclusions:string|null;review_status:string;
+ budget_usable:boolean;automatic_final_quote:false;
+};
+export async function listResearchReferences(c:SharedConfig,session:BetaSession,
+ opts:{budgetOnly?:boolean;limit?:number}={},http:Http=fetch):Promise<ResearchReference[]>{
+ const base=secureBase(c.apiUrl);
+ const limit=Math.max(1,Math.min(100,Math.floor(opts.limit??30)));
+ const only=opts.budgetOnly!==false;
+ const result=await jsonRequest<ResearchReference[]>(base+
+  '/v1/research-references?budget_only='+(only?'true':'false')+'&limit='+limit,{
+   method:'GET',headers:{Authorization:'Bearer '+session.accessToken}
+ },http);
+ if(!Array.isArray(result)||result.length>limit||result.some(r=>!r||
+  r.automatic_final_quote!==false||typeof r.service!=='string'||
+  typeof r.trade!=='string'||typeof r.budget_usable!=='boolean'))
+  throw new Error('Reference catalog returned invalid data. Existing estimate unchanged.');
+ return result;
+}
+
 export type SharedPriceCheck={
  status:'incomplete'|'ready_for_contractor_review';
  selling_total:string|null;

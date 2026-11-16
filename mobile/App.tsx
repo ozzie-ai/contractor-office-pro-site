@@ -15,7 +15,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,verifyWithDerek} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -95,6 +95,8 @@ export default function App(){
  const [sharedSession,setSharedSession]=useState<BetaSession|null>(null);
  const [sharedBusy,setSharedBusy]=useState(false);
  const [sharedMessage,setSharedMessage]=useState('');
+ const [researchRefs,setResearchRefs]=useState<ResearchReference[]>([]);
+ const [showResearchRefs,setShowResearchRefs]=useState(false);
  const sharedEnabled=isSharedConfigured();
 
  useEffect(()=>{
@@ -404,7 +406,19 @@ export default function App(){
   finally{setSharedBusy(false);}
  };
 
- const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
+ const loadResearchRefs=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  if(showResearchRefs){setShowResearchRefs(false);return;}
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const data=await listResearchReferences(sharedConfig,session,{budgetOnly:true,limit:50});
+   setResearchRefs(data);setShowResearchRefs(true);
+   if(!data.length)setSharedMessage(tr('No preliminary residential references available.','No hay referencias residenciales preliminares disponibles.'));
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'Reference catalog unavailable.');}
+  finally{setSharedBusy(false);}
+ };
+ const const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote=currentCleaningProject(project);
   if(quote.trade==='cleaning'&&quote.cleaning&&(!quote.cleaning.areaSqFt||quote.cleaning.bedrooms+quote.cleaning.bathrooms+quote.cleaning.livingRooms<=0||(quote.cleaning.type==='post_construction'&&!(quote.cleaning.postConstructionTasks||DEFAULT_POST_CONSTRUCTION_TASKS).length))){
    Alert.alert('Missing cleaning details','Confirm square footage, room counts and included work before sharing.',[{text:'Review job',onPress:()=>setStage(0)}]);
@@ -631,6 +645,19 @@ export default function App(){
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
     {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&<View style={styles.lineCard}>
      <Action title={tr('Verify total with shared pricing engine','Verificar total con motor de precios compartido')} secondary disabled={sharedBusy} onPress={crossCheckShared}/>
+     <Action title={showResearchRefs?tr('Hide residential references','Ocultar referencias residenciales'):tr('View preliminary residential references','Ver referencias residenciales preliminares')} secondary disabled={sharedBusy} onPress={loadResearchRefs}/>
+     {showResearchRefs&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr('Preliminary research only — not approved selling rates','Solo investigación preliminar — no son tarifas de venta aprobadas')}</Text>
+      {researchRefs.map(ref=><View key={ref.reference_id} style={{marginTop:10}}>
+       <Text style={styles.label}>{ref.trade+' · '+ref.service}</Text>
+       <Text style={styles.hint}>{ref.locality+' · '+ref.unit+' · '+(
+        ref.low_usd!==null&&ref.high_usd!==null?money(Number(ref.low_usd))+'–'+money(Number(ref.high_usd)):
+         ref.planning_rate_usd!==null?money(Number(ref.planning_rate_usd)):tr('No rate','Sin tarifa'))}</Text>
+       {!!ref.scope&&<Text style={styles.hint}>{ref.scope}</Text>}
+       {!!ref.exclusions&&<Text style={styles.hint}>{tr('Excludes: ','No incluye: ')+ref.exclusions}</Text>}
+      </View>)}
+      <Text style={styles.notice}>{tr('For research only. Does not change the estimate or customer PDF.','Solo para investigar. No cambia el estimado ni el PDF del cliente.')}</Text>
+     </View>}
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
     </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>

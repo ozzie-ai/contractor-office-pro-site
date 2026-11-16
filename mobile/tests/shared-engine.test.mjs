@@ -165,3 +165,22 @@ test('new verified contractor can bootstrap only own organization via bearer tok
  await assert.rejects(bridge.bootstrapBusiness(config,session,'Contractor Office Pro','Builder','en',
   async()=>({ok:true,status:200,json:async()=>({status:'unverified'})})));
 });
+
+
+test('residential research references require JWT and cannot be final selling rates',async()=>{
+ const approved={reference_id:'COP-PL-001',reference_kind:'reviewed_budget',trade:'Plumbing',
+  service:'Replace toilet',unit:'each',locality:'US national',
+  low_usd:'200.00',high_usd:'500.00',planning_rate_usd:null,
+  scope:'Existing installation',exclusions:'Toilet purchase',
+  review_status:'reviewed_preliminary_budget',budget_usable:true,automatic_final_quote:false};
+ const rows=await bridge.listResearchReferences(config,session,{budgetOnly:true,limit:50},async(url,init)=>{
+  assert.equal(url,'https://api.example.test/v1/research-references?budget_only=true&limit=50');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  return {ok:true,status:200,json:async()=>[approved]};
+ });
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].automatic_final_quote,false);
+ await assert.rejects(bridge.listResearchReferences(config,session,{},async()=>({
+  ok:true,status:200,json:async()=>[{...approved,automatic_final_quote:true}]
+ })));
+});
