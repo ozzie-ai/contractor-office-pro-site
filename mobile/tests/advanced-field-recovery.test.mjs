@@ -57,7 +57,7 @@ test('kitchen 10x10: preserve unknown cabinet LF and quartz area, but measure fl
  assert.equal(find(r,'kitchen-cabinets-review').quantity,0);
  assert.equal(find(r,'kitchen-quartz-review').quantity,0);
  assert.equal(find(r,'kitchen-floor-prep').quantity,100);
- assert.equal(find(r,'kitchen-tile-material').quantity,111);
+ assert.equal(find(r,'kitchen-tile-material').quantity,110);
  assert.equal(find(r,'kitchen-tile-labor').quantity,100);
  assert.equal(find(r,'kitchen-breakfast-bar').quantity,0);
  assert.equal(estimateReadiness(project(r,speech,'remodel')).ready,false);
@@ -87,4 +87,18 @@ test('restored kitchen or EV workflows never respond to unrelated painting or ba
  assert.equal(legacyFieldEstimate('Paint living room 10 x 15 two coats.','remodel'),null);
  assert.equal(legacyFieldEstimate('Replace vanity mirror in bathroom 5 x 7.','remodel'),null);
  assert.equal(legacyFieldEstimate('Replace panel 100A to 200A; 20 circuits.','electrical'),null);
+});
+
+test('EV with route, breaker and permit but missing charger current or voltage stays incomplete',()=>{
+ const phrase='Install EV charger with 65 ft run and 50 amp breaker. Permit $500. Owner supplies charger.';
+ const r=legacyFieldEstimate(phrase,'electrical');
+ assert.equal(find(r,'ev-current-review').quantity,0);
+ assert.equal(find(r,'ev-voltage-review').quantity,0);
+ assert.equal(estimateReadiness(project(r,phrase,'electrical')).ready,false);
+});
+test('undersized EV breaker cannot be approved without resolving circuit sizing',()=>{
+ const phrase='Install EV charger at 40 amps 240 volts, 40 ft run with 40 amp breaker. Owner supplies charger. Permit $500.';
+ const r=legacyFieldEstimate(phrase,'electrical');
+ assert.ok(find(r,'ev-sizing-review'));
+ assert.equal(estimateReadiness(project(r,phrase,'electrical')).ready,false);
 });

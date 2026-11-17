@@ -69,9 +69,21 @@ export function legacyFieldEstimate(description:string,trade:Trade):FieldDraft|n
     'Confirmar modelo y costo del equipo cargador EV',0,'each',0));
    unknowns.push('Confirm who supplies the EV charger and its equipment price.');
   }
-  if(!chargeCurrent)unknowns.push('Confirm charger continuous current rating; it is not the breaker rating.');
-  if(!volts)unknowns.push('Confirm nominal installation voltage.');
-  if(chargeCurrent&&amps&&amps<Math.ceil(chargeCurrent*1.25))unknowns.push('Check continuous-load circuit and breaker sizing with a qualified electrician; current rating may be inadequate.');
+  if(!chargeCurrent){
+   lines.push(item('ev-current-review','Confirm maximum EV charger continuous current (A)',
+    'Confirmar corriente máxima continua del cargador EV (A)',0,'amps',0));
+   unknowns.push('Confirm charger continuous current rating; it is not the breaker rating.');
+  }
+  if(!volts){
+   lines.push(item('ev-voltage-review','Confirm EV charger circuit voltage (V)',
+    'Confirmar voltaje del circuito del cargador EV (V)',0,'volts',0));
+   unknowns.push('Confirm nominal installation voltage.');
+  }
+  if(chargeCurrent&&amps&&amps<Math.ceil(chargeCurrent*1.25)){
+   lines.push(item('ev-sizing-review','Verify circuit breaker rating vs continuous EV charger current',
+    'Verificar breaker frente a corriente continua del cargador',0,'job',0));
+   unknowns.push('Check continuous-load circuit and breaker sizing with a qualified electrician; current rating may be inadequate.');
+  }
   if(/\b(panel upgrade|upgrade (?:the )?panel|reemplazar tablero|cambiar panel|nuevo panel)\b/.test(s)){
    lines.push(item('ev-panel-review','Panel upgrade mentioned with EV work — separate scope and price needed',
     'Se menciona actualizar panel con EV — desglosar y cotizar',0,'job',0));
@@ -104,7 +116,7 @@ export function legacyFieldEstimate(description:string,trade:Trade):FieldDraft|n
   const quartzSf=s.match(/\b(\d+(?:[.,]\d+)?)\s*(?:sq\.?\s*ft|square\s+feet|ft2|ft²|pies?\s+cuadrados)\s*(?:of\s+|de\s+)?(?:quartz|cuarzo|countertops?|encimeras?|granito)\b/)||
    s.match(/\b(?:quartz|cuarzo|countertops?|encimeras?|granito)\s*(?:area\s+of\s+|de\s+)?(\d+(?:[.,]\d+)?)\s*(?:sq\.?\s*ft|square\s+feet|ft2|ft²|pies?\s+cuadrados)\b/);
   const lf=cabinetLf?value(cabinetLf[1]):0,sf=quartzSf?value(quartzSf[1]):0;
-  const demol=/\b(demol|remove existing|tear out|rip out|quitar|retirar)\b/.test(s);
+  const demol=/\b(?:demol\w*|remove existing|tear out|rip out|quitar|retirar)\b/.test(s);
   const sink=/\b(sink|fregadero|lavaplatos|lavabo)\b/.test(s);
   const bar=/\b(breakfast bar|barra desayunadora|barra de desayuno|island|isla)\b/.test(s);
   if(demol)lines.push(item('kitchen-demo','Demolish and remove specified existing kitchen fixtures/finishes',
@@ -136,7 +148,7 @@ export function legacyFieldEstimate(description:string,trade:Trade):FieldDraft|n
     lines.push(item('kitchen-floor-prep','Prepare existing kitchen floor substrate',
      'Preparar base de piso de cocina',floor,'sq ft',4));
     lines.push(item('kitchen-tile-material','Kitchen floor tile materials (10% waste)',
-     'Material de loseta de cocina (10% desperdicio)',Math.ceil(floor*1.1),'sq ft',4.5));
+     'Material de loseta de cocina (10% desperdicio)',Math.ceil(floor*11/10),'sq ft',4.5));
     lines.push(item('kitchen-tile-labor','Kitchen floor tile installation',
      'Mano de obra instalación de loseta en cocina',floor,'sq ft',7.5));
    }else{lines.push(item('kitchen-floor-review','Confirm room dimensions and measured flooring area',
