@@ -12,7 +12,8 @@ function load(path,required){
  return mod.exports;
 }
 const painting=load('src/paintingEstimate.ts');
-const local=load('src/localEstimate.ts',id=>id==='./paintingEstimate'?painting:createRequire(import.meta.url)(id));
+const legacyField=load('src/legacyFieldParity.ts');
+const local=load('src/localEstimate.ts',id=>id==='./paintingEstimate'?painting:id==='./legacyFieldParity'?legacyField:createRequire(import.meta.url)(id));
 const prices=load('src/preliminaryPricing.ts');
 const quote=load('src/estimate.ts');
 

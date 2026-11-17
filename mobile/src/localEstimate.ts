@@ -1,5 +1,6 @@
 import {EstimateLine,Trade} from './estimate';
 import {mobilePaintingEstimate} from './paintingEstimate';
+import {legacyFieldEstimate} from './legacyFieldParity';
 import type {PaintingMeasurements} from './paintingEstimate';
 type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;customerScope?:{en:string[];es:string[]}};
 type Dim={a:number;b:number;index:number;end:number};
@@ -95,6 +96,9 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   const outlets=quickOutletCount(s);
   if(outlets)return outlets;
  }
+ // Restore measured concrete and faucet jobs from earlier browser estimator.
+ const recovered=legacyFieldEstimate(description,_trade);
+ if(recovered)return recovered;
 
  // Electrical scope has its own parser: no bathroom defaults or unrelated fixtures.
  if(_trade==='electrical'){

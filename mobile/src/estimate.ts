@@ -76,8 +76,9 @@ export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues
   const name=x.description_en.trim()||x.description_es.trim()||'Untitled item';
   if(!Number.isFinite(x.quantity)||x.quantity<=0)issues.push(name+': enter a measured quantity.');
   if(!Number.isFinite(x.rate)||x.rate<=0)issues.push(name+': enter a positive rate.');
-   if((x.rateSource||'').startsWith('Illustrative outlet-device replacement example'))
-    issues.push(name+': contractor must review and approve the illustrative outlet price before exporting.');
+   if((x.rateSource||'').startsWith('Illustrative outlet-device replacement example')||
+      (x.rateSource||'').startsWith('Illustrative legacy field estimate'))
+    issues.push(name+': contractor must review and approve the illustrative price before exporting.');
   if(!x.description_en.trim()||!x.description_es.trim())issues.push(name+': complete both customer descriptions.');
  }
  return {ready:issues.length===0,issues};

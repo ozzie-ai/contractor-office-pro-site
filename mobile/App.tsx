@@ -669,6 +669,13 @@ export default function App(){
       patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative outlet-device replacement example')?{...item,rateSource:'Contractor-reviewed outlet example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor accepted historical example; not a verified supplier quotation'}}:item)});
      }}/>
     </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative legacy field estimate'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Review restored field estimate','Revisar estimado recuperado')}</Text>
+     <Text style={styles.notice}>{tr('Concrete and faucet prices are historical editable planning examples—not live supplier quotes. Confirm site access, scope and prices before sending.','Los precios de concreto y grifos son ejemplos anteriores editables, no cotizaciones actuales. Confirma acceso, alcance y tarifas antes de enviar.')}</Text>
+     <Action title={tr('Approve reviewed field allowances','Aprobar precios preliminares revisados')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative legacy field estimate')?{...item,rateSource:'Contractor-reviewed legacy field example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor reviewed historical planning estimate; no live supplier quote'}}:item)});
+     }}/>
+    </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}
     {project.lines.some(x=>x.quantity>0&&x.rate>0)&&<View style={styles.lineCard}>
