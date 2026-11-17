@@ -28,7 +28,7 @@ test('email OTP uses Supabase public key and never sends our server OpenAI secre
   called=true;
   assert.equal(url,'https://project.supabase.co/auth/v1/otp');
   assert.equal(init.headers.apikey,'public-key');
-  assert.equal(JSON.parse(init.body).create_user,false);
+  assert.equal(JSON.parse(init.body).create_user,true);
   assert.equal(JSON.parse(init.body).email,'contractor@example.com');
   return {ok:true,status:200,json:async()=>({})};
  });
@@ -102,4 +102,85 @@ test('price verification returns only private draft and preserves local data',as
  });
  assert.equal(result.selling_total,'264.00');
  assert.equal(JSON.stringify(project),old);
+});
+
+
+test('email sign-in alone is not a confirmed backend connection',async()=>{
+ let checked=false;
+ await bridge.verifyBackendAccess(config,session,async(url,init)=>{
+  checked=true;
+  assert.equal(url,'https://api.example.test/v1/account/status');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  return {ok:true,status:200,json:async()=>({status:'authorized'})};
+ });
+ assert.equal(checked,true);
+ await assert.rejects(bridge.verifyBackendAccess(config,session,mock(403,{})),
+  e=>String(e.message).includes('organization membership'));
+ await assert.rejects(bridge.verifyBackendAccess(config,session,mock(200,{status:'unverified'})));
+});
+
+test('verified labor and material cost details stay separate without double markup',()=>{
+ const request=bridge.toSharedPriceRequest({
+  lines:[{id:'l1',description_en:'Install GFCI',description_es:'Instalar GFCI',quantity:2,unit:'each',
+   rate:130,costHoursPerUnit:1,costHourlyWage:50,costLaborBurdenMultiplier:1.5,
+   costMaterialsPerUnit:45,costEquipmentPerUnit:10}],
+  overheadPct:10,profitPct:20,language:'en'
+ });
+ const cost=request.items[0].direct_cost;
+ assert.equal(cost.labor_hours_per_unit,1);
+ assert.equal(cost.loaded_labor_rate,75);
+ assert.equal(cost.material_cost_per_unit,45);
+ assert.equal(cost.equipment_cost_per_unit,10);
+ assert.equal(cost.other_cost_per_unit,0);
+ assert.equal(request.items[0].unit_selling_price_override,undefined);
+});
+
+test('edited unit selling amounts do not reuse obsolete component breakdowns',()=>{
+ const request=bridge.toSharedPriceRequest({
+  lines:[{id:'l2',description_en:'Install outlet',description_es:'Instalar tomacorriente',quantity:1,unit:'each',
+   rate:155,costHoursPerUnit:1,costHourlyWage:50,costLaborBurdenMultiplier:1.5,
+   costMaterialsPerUnit:45,costEquipmentPerUnit:10}],
+  overheadPct:10,profitPct:20,language:'en'
+ });
+ const cost=request.items[0].direct_cost;
+ assert.equal(cost.labor_hours_per_unit,0);
+ assert.equal(cost.material_cost_per_unit,0);
+ assert.equal(cost.equipment_cost_per_unit,0);
+ assert.equal(cost.other_cost_per_unit,155);
+});
+
+
+test('new verified contractor can bootstrap only own organization via bearer token',async()=>{
+ let called=false;
+ await bridge.bootstrapBusiness(config,session,'Contractor Office Pro','Builder','en',async(url,init)=>{
+  called=true;
+  assert.equal(url,'https://api.example.test/v1/account/bootstrap');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  assert.deepEqual(JSON.parse(JSON.stringify(JSON.parse(init.body))),{
+   business_name:'Contractor Office Pro',display_name:'Builder',language:'en'
+  });
+  return {ok:true,status:200,json:async()=>({status:'authorized'})};
+ });
+ assert.equal(called,true);
+ await assert.rejects(bridge.bootstrapBusiness(config,session,'Contractor Office Pro','Builder','en',
+  async()=>({ok:true,status:200,json:async()=>({status:'unverified'})})));
+});
+
+
+test('residential research references require JWT and cannot be final selling rates',async()=>{
+ const approved={reference_id:'COP-PL-001',reference_kind:'reviewed_budget',trade:'Plumbing',
+  service:'Replace toilet',unit:'each',locality:'US national',
+  low_usd:'200.00',high_usd:'500.00',planning_rate_usd:null,
+  scope:'Existing installation',exclusions:'Toilet purchase',
+  review_status:'reviewed_preliminary_budget',budget_usable:true,automatic_final_quote:false};
+ const rows=await bridge.listResearchReferences(config,session,{budgetOnly:true,limit:50},async(url,init)=>{
+  assert.equal(url,'https://api.example.test/v1/research-references?budget_only=true&limit=50');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  return {ok:true,status:200,json:async()=>[approved]};
+ });
+ assert.equal(rows.length,1);
+ assert.equal(rows[0].automatic_final_quote,false);
+ await assert.rejects(bridge.listResearchReferences(config,session,{},async()=>({
+  ok:true,status:200,json:async()=>[{...approved,automatic_final_quote:true}]
+ })));
 });

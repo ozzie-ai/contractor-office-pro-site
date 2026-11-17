@@ -111,3 +111,34 @@ test('Customer document includes a professional detailed scope but never contrac
  assert.ok(spanish.includes('Pintura de 3 habitaciones'));
  assert.ok(!spanish.includes('$37.98'));
 });
+
+test('a positive illustrative outlet allowance still blocks PDF until contractor approval',()=>{
+ const p={...sample,trade:'electrical',lines:[
+  {...item(3,140),id:'local-outlets-standard',rateSource:'Illustrative outlet-device replacement example — contractor sample, not verified'},
+  {...item(2,199.5),id:'local-outlets-gfci',rateSource:'Illustrative outlet-device replacement example — contractor sample, not verified'}
+ ]};
+ const before=estimateReadiness(p);
+ assert.equal(before.ready,false);
+ assert.ok(before.issues.some(x=>x.includes('approve')));
+ const reviewed={...p,lines:p.lines.map(x=>({...x,rateSource:'Contractor-reviewed outlet example'}))};
+ assert.equal(estimateReadiness(reviewed).ready,true);
+});
+
+test('customer PDF does not erase legitimate circuit protection or equipment scope as private cost',()=>{
+ const lines=[
+  {id:'gfci',description_en:'Replace GFCI devices and verify circuit protection',description_es:'Reemplazar tomacorrientes GFCI y verificar protección',quantity:2,unit:'each',rate:195,status:'included_now'},
+  {id:'prepare',description_en:'Surface preparation and protective floor coverings',description_es:'Preparación de superficies y protección de pisos',quantity:1,unit:'job',rate:150,status:'included_now'},
+  {id:'device',description_en:'Install approved charging equipment',description_es:'Instalar equipo de carga aprobado',quantity:1,unit:'job',rate:350,status:'included_now'},
+  {id:'labor',description_en:'Painting labor total crew hours',description_es:'Mano de obra de pintura',quantity:12,unit:'hr',rate:60,status:'included_now'},
+  {id:'travel',description_en:'Travel and purchasing — once for entire job',description_es:'Viajes y compras',quantity:1,unit:'job',rate:75,status:'included_now'},
+ ];
+ const html=proposalHtml({...sample,trade:'electrical',lines});
+ assert.ok(html.includes('Replace GFCI devices and verify circuit protection'));
+ assert.ok(html.includes('Surface preparation and protective floor coverings'));
+ assert.ok(html.includes('Install approved charging equipment'));
+ assert.equal(html.includes('Painting labor total crew hours'),false);
+ assert.equal(html.includes('Travel and purchasing'),false);
+ assert.equal(html.includes('$195.00'),false);
+ assert.equal(html.includes('$60.00'),false);
+});
+

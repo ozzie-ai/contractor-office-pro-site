@@ -1,5 +1,6 @@
 import {EstimateLine,Trade} from './estimate';
 import {mobilePaintingEstimate} from './paintingEstimate';
+import {legacyFieldEstimate} from './legacyFieldParity';
 import type {PaintingMeasurements} from './paintingEstimate';
 type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;customerScope?:{en:string[];es:string[]}};
 type Dim={a:number;b:number;index:number;end:number};
@@ -36,14 +37,26 @@ function quickOutletCount(s:string):LocalDraft|null{
  if(!new RegExp('\\b'+outlet+'\\b').test(s)||!/\b(?:gfci|gfi)\b/.test(s))return null;
  // Do not strip unrelated work from a multi-trade description.
  if(/\b(panel|tablero|breaker|circuit|circuito|light|lights|luz|luces|dimmer|shower|bathroom|bano|kitchen|cocina|charger|evse|permit|permiso|wire|cable|painting|pintura)\b/.test(s))return null;
- const total=s.match(new RegExp('\\b('+countWord+')\\s+(?:existing\\s+|old\\s+|viejos?\\s+)?'+outlet+'\\b'));
+ // Speech frequently includes adjectives and itemized groups.
+ // Ex: "five NEW ELECTRICAL outlets total, three standard and two GFCI".
+ const adjective='(?:existing|old|new|newly|nuevo|nueva|nuevos|nuevas|viejos?|electrical|electricos?|electricas?|standard|regular|normal(?:es)?|comun(?:es)?)';
+ const totals=Array.from(s.matchAll(new RegExp('\\b('+countWord+')\\s+(?:'+adjective+'\\s+){0,4}'+outlet+'\\b','g')));
+ const total=totals.find(m=>!/\b(?:standard|regular|normal(?:es)?|comun(?:es)?)\b/.test(m[0]));
+ const standardMatch=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:are|son)\\s+)?(?:standard|regular|normal(?:es)?|comun(?:es)?)\\b'));
  const gfci=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:son|are)\\s+|(?:of\\s+them\\s+are)\\s+)?(?:gfci|gfi)\\b'))
   ||s.match(new RegExp('\\b('+countWord+')\\s+(?:gfci|gfi)\\s+'+outlet+'\\b'))
   ||s.match(new RegExp('\\b('+countWord+')\\s+'+outlet+'\\s+(?:gfci|gfi)\\b'));
- if(!total||!gfci)return null;
+ if((!total&&!standardMatch)||!gfci)return null;
  const toNum=(value:string)=>words[value]??Number(value);
- const all=toNum(total[1]),protectedCount=toNum(gfci[1]);
+ const protectedCount=toNum(gfci[1]);
+ const standardExplicit=standardMatch?toNum(standardMatch[1]):null;
+ const all=total?toNum(total[1]):standardExplicit!==null?standardExplicit+protectedCount:0;
  if(!Number.isInteger(all)||!Number.isInteger(protectedCount)||all<1||all>100||protectedCount<1||protectedCount>all)return null;
+ if(standardExplicit!==null&&standardExplicit+protectedCount!==all){
+  return {lines:[line('outlets-count-unclear','Confirm count: standard and GFCI quantities conflict',
+    'Confirmar cantidad: no coinciden tomacorrientes normales y GFCI',0,'each',0)],
+   unknowns:['Confirm standard and GFCI quantities: the dictated counts conflict.'],recognized:false};
+ }
  if(/\b(?:plus|additional|more|extra|mas|adicionales|otros)\b/.test(s)){
   return {lines:[line('outlets-count-unclear','Confirm outlet count: are GFCI included or additional?',
     'Confirmar cantidad: ¿los GFCI están incluidos o son adicionales?',0,'each',0)],
@@ -52,8 +65,12 @@ function quickOutletCount(s:string):LocalDraft|null{
  const standard=all-protectedCount;
  const replace=/\b(?:replace|replacing|swap|change|cambiar|cambiando|reemplazar|reemplazando|sustituir)\b/.test(s);
  const newInstall=/\b(?:install|instalar|instalacion|new|nuevo|nueva)\b/.test(s);
- const action=replace&&!newInstall?'Replace':newInstall&&!replace?'Install':'Install or replace (confirm)';
- const actionEs=replace&&!newInstall?'Reemplazar':newInstall&&!replace?'Instalar':'Instalar o reemplazar (confirmar)';
+ // A clarified device-only replacement takes precedence over earlier "install new".
+ const replaceDevicesOnly=/\b(?:replace|replacing|cambiar|reemplazar)\b[^.!?\n]{0,45}\b(?:existing|old|existentes?)\s+(?:devices?|outlets?|receptacles?|tomacorrientes?)\s+only\b/.test(s);
+ const replaceAction=replace&&(!newInstall||replaceDevicesOnly);
+ const installAction=newInstall&&!replace;
+ const action=replaceAction?'Replace':installAction?'Install':'Install or replace (confirm)';
+ const actionEs=replaceAction?'Reemplazar':installAction?'Instalar':'Instalar o reemplazar (confirmar)';
  const work:EstimateLine[]=[];
  if(standard>0)work.push(line('outlets-standard',action+' '+standard+' standard receptacles (verify existing wiring)',
   actionEs+' '+standard+' tomacorrientes estandar (verificar cableado)',standard,'each',0));
@@ -62,8 +79,8 @@ function quickOutletCount(s:string):LocalDraft|null{
  return {
   lines:work,
   unknowns:[
-   'Confirm replacement versus new installation, wiring, box/plate conditions and permit requirements.',
-   'Enter contractor-verified unit labor/material pricing. All new line rates start at $0.'
+   action.includes('confirm')?'Confirm replacement versus installation, existing wiring, box/plate conditions and permits.':'Verify existing wiring, box/plate conditions and permit requirements.',
+   'Unit rates must be reviewed. $0 means missing pricing, not free work.'
   ],
   recognized:true
  };
@@ -79,6 +96,9 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   const outlets=quickOutletCount(s);
   if(outlets)return outlets;
  }
+ // Restore measured concrete and faucet jobs from earlier browser estimator.
+ const recovered=legacyFieldEstimate(description,_trade);
+ if(recovered)return recovered;
 
  // Electrical scope has its own parser: no bathroom defaults or unrelated fixtures.
  if(_trade==='electrical'){

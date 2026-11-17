@@ -76,6 +76,9 @@ export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues
   const name=x.description_en.trim()||x.description_es.trim()||'Untitled item';
   if(!Number.isFinite(x.quantity)||x.quantity<=0)issues.push(name+': enter a measured quantity.');
   if(!Number.isFinite(x.rate)||x.rate<=0)issues.push(name+': enter a positive rate.');
+   if((x.rateSource||'').startsWith('Illustrative outlet-device replacement example')||
+      (x.rateSource||'').startsWith('Illustrative legacy field estimate'))
+    issues.push(name+': contractor must review and approve the illustrative price before exporting.');
   if(!x.description_en.trim()||!x.description_es.trim())issues.push(name+': complete both customer descriptions.');
  }
  return {ready:issues.length===0,issues};
@@ -113,12 +116,20 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const recurring=cleaning&&cleaning.frequency!=='once'?cleaning:undefined;
  const dustLabel=(level:NonNullable<CleaningDetails['dustLevel']>)=>({light:es?'Ligero':'Light',moderate:es?'Moderado':'Moderate',heavy:es?'Abundante':'Heavy'}[level]);
  const frequencyLabel=(value:CleaningFrequency)=>({once:es?'Una sola vez':'One-time service',weekly:es?'Semanal':'Weekly',biweekly:es?'Cada dos semanas':'Every two weeks',twice_monthly:es?'Dos veces al mes':'Twice monthly',monthly:es?'Mensual':'Monthly'}[value]);
- const incomplete=p.lines.length===0||p.lines.some(x=>!x.description_en||!x.description_es||x.quantity<=0||x.rate<=0)||estimationScopeIssues(p).length>0;
+ const incomplete=!estimateReadiness(p).ready||estimationScopeIssues(p).length>0;
  const list=(title:string,items:string[])=>items.length?'<h3>'+esc(title)+'</h3><ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'';
  const isCleaning=p.trade==='cleaning';
  // Cleaning is quoted as one bundled service, even when the owner adds extra tasks.
  // Never repeat the grand total on each line, and never disclose internal cost categories.
- const customerTasks=p.lines.filter(x=>x.quantity>0&&!/\b(?:labor|mano de obra|mobilization|movilizacion|purchasing|compras|preparation|preparacion|masking|proteccion|equipment|suministros)\b/i.test(x.description_en+' '+x.description_es));
+ // Do not omit legitimate scope mentioning circuit protection, surface
+ // preparation, protective coverings, or installed equipment.
+ // Suppress cost-only bookkeeping lines by their STARTING description.
+ const internalCostOnly=(x:EstimateLine)=>{
+  const en=x.description_en.trim(),es=x.description_es.trim();
+  return /^(?:(?:painting\s+)?labor(?:\s+|$)|mobilization\b|travel and purchasing\b|purchasing costs?\b|equipment (?:rental|costs?)\b|materials? purchase costs?\b)/i.test(en)
+   || /^(?:mano de obra\b|movilizaci[oó]n\b|costos? de materiales\b|costos? de equipo\b)/i.test(es);
+ };
+ const customerTasks=p.lines.filter(x=>x.quantity>0&&!internalCostOnly(x));
  const curatedScope=p.customerScope?.[p.language]?.filter(Boolean)||[];
  const scopeList=curatedScope.length?
   '<ol class="work-scope">'+curatedScope.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>':
