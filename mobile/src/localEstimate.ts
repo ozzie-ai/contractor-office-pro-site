@@ -92,10 +92,11 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   const receptacleWord='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
   const quantityWord='(\\d{1,3}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten|veinte|twenty)';
   const standardMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?(?:standard|regular|normales?|regulares?)\\s+'+receptacleWord+'\\b'));
+  const standardAfterMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+'+receptacleWord+'\\s+(?:standard|regular|normales?|regulares?)\\b'));
   const totalOutletMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?'+receptacleWord+'\\b'));
   const gfciMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:gfcis?|gfis?|ground.fault)\\s+'+receptacleWord+'|(?:gfcis?|gfis?|ground.fault))\\b'));
   const hasGfci=/\b(?:gfcis?|gfis?|ground.fault)\b/.test(s);
-  const standardCount=standardMatch?parseCount(standardMatch[1]):0;
+  const standardCount=standardMatch?parseCount(standardMatch[1]):standardAfterMatch?parseCount(standardAfterMatch[1]):0;
   const totalOutlets=totalOutletMatch?parseCount(totalOutletMatch[1]):0;
   const gfciCount=gfciMatch?parseCount(gfciMatch[1]):0;
   const addStandard=(qty:number)=>lines.push(line('standard-outlets','Replace '+qty+' standard receptacles (existing wiring to verify)',
