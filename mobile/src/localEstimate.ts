@@ -88,10 +88,36 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
    lines.push(line('dimmer',replace?'Replace existing wall switch with LED-compatible dimmer':'Install LED-compatible dimmer (verify location)',
     replace?'Reemplazar interruptor existente con dimmer compatible con LED':'Instalar dimmer compatible con LED (confirmar lugar)',1,'each',0));
   }
-  const gfci=/\b(gfci|gfi|ground.fault)\b/.test(s);
-  if(gfci){
-   lines.push(line('gfci','Install or replace GFCI receptacle (confirm existing wiring)',
-    'Instalar o reemplazar tomacorriente GFCI (verificar cableado)',1,'each',0));
+  // Total receptacle count includes GFCIs. Never charge for the same outlet twice.
+  const receptacleWord='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
+  const quantityWord='(\\d{1,3}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten|veinte|twenty)';
+  const totalOutletMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?'+receptacleWord+'\\b'));
+  const gfciMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:gfci|gfi|ground.fault)\\b'));
+  const hasGfci=/\b(?:gfci|gfi|ground.fault)\b/.test(s);
+  const totalOutlets=totalOutletMatch?parseCount(totalOutletMatch[1]):0;
+  const gfciCount=gfciMatch?parseCount(gfciMatch[1]):0;
+  if(totalOutletMatch && (totalOutlets<1||totalOutlets>200)){
+   unknowns.push('Confirm total outlet count; dictated quantity is outside the supported range.');
+  }else if(totalOutlets>0){
+   if(hasGfci&&!gfciMatch){
+    unknowns.push('Confirm how many of the '+totalOutlets+' outlets are GFCI; the transcript did not specify a quantity.');
+   }else if(gfciCount>totalOutlets){
+    unknowns.push('GFCI quantity exceeds the total outlet count; confirm counts before pricing.');
+   }else{
+    const regular=totalOutlets-gfciCount;
+    if(regular>0)lines.push(line('standard-outlets','Install or replace '+regular+' standard receptacles (verify wiring)',
+     'Instalar o reemplazar '+regular+' tomacorrientes normales (verificar cableado)',regular,'each',0));
+    if(gfciCount>0)lines.push(line('gfci','Install or replace '+gfciCount+' GFCI receptacles (verify wiring)',
+     'Instalar o reemplazar '+gfciCount+' tomacorrientes GFCI (verificar cableado)',gfciCount,'each',0));
+   }
+  }else if(hasGfci){
+   if(gfciCount>0 && gfciCount<=200){
+    lines.push(line('gfci','Install or replace '+gfciCount+' GFCI receptacles (verify wiring)',
+     'Instalar o reemplazar '+gfciCount+' tomacorrientes GFCI (verificar cableado)',gfciCount,'each',0));
+   }else unknowns.push('Confirm GFCI count; no quantity was recognized.');
+  }
+  if(totalOutlets>0||hasGfci){
+   unknowns.push('Confirm whether receptacles are replacements or new locations, and verify circuits and code requirements.');
   }
   if(!lines.length){
    lines.push(line('unclassified','Review dictated electrical scope and define work items','Revisar descripcion electrica y definir partidas',1,'job',0));
