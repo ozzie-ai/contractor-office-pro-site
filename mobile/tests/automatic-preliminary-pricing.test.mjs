@@ -57,3 +57,27 @@ test('the native app actually calls automatic pricing during Create Work Items',
  assert.match(app,/const suggested=suggestPreliminaryPrices\(project\.trade,lines\)/);
  assert.match(app,/lines:\[\.\.\.suggested\.lines,\.\.\.manual\]/);
 });
+
+test('two switches, two regular outlets and three GFCIs produce five receptacles plus two switches with provisional prices',()=>{
+ const dictated='Need to replace two switches, two regular outlets, wiring is already in place, and three GFCIs.';
+ const parsed=localEstimate(dictated,'electrical');
+ const find=id=>parsed.lines.find(x=>x.id==='local-'+id);
+ assert.equal(find('standard-switches').quantity,2);
+ assert.equal(find('standard-outlets').quantity,2);
+ assert.equal(find('gfci').quantity,3);
+ assert.equal(parsed.lines.length,3);
+ const pricing=suggestPreliminaryPrices('electrical',parsed.lines);
+ assert.deepEqual(Array.from(pricing.lines.map(x=>x.rate)),[95,145,105]);
+ assert.equal(pricing.suggested,3);
+ assert.ok(pricing.notes.some(x=>x.includes('NOT verified')));
+ const result=estimate.totals({lines:pricing.lines,overheadPct:10,profitPct:20});
+ assert.equal(result.subtotal,835);
+ assert.equal(result.total,1102.2);
+ assert.equal(estimate.estimateReadiness({lines:pricing.lines}).ready,true);
+});
+test('Spanish and plural GFCIs preserve separate device quantities',()=>{
+ const parsed=localEstimate('Cambiar dos switches, dos outlets regulares y tres GFCIs. El cableado ya existe.','electrical');
+ assert.equal(parsed.lines.find(x=>x.id==='local-standard-switches').quantity,2);
+ assert.equal(parsed.lines.find(x=>x.id==='local-standard-outlets').quantity,2);
+ assert.equal(parsed.lines.find(x=>x.id==='local-gfci').quantity,3);
+});

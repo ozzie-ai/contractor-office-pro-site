@@ -140,3 +140,31 @@ test('Concrete and plumbing descriptions cannot silently become bathroom items',
  assert.equal(find(c,'shower'),undefined);
  assert.equal(find(p,'shower'),undefined);
 });
+
+test('Electrical: five total outlets with two GFCIs means three standard plus two GFCI',()=>{
+ const r=localEstimate('Replace 5 outlets, 2 GFCI.','electrical');
+ assert.equal(find(r,'standard-outlets').quantity,3);
+ assert.equal(find(r,'gfci').quantity,2);
+ assert.equal(r.lines.reduce((sum,x)=>sum+x.quantity,0),5);
+ assert.equal(find(r,'standard-outlets').rate,0);
+ assert.equal(find(r,'gfci').rate,0);
+});
+test('Electrical: Spanish outlet subset is not added twice',()=>{
+ const r=localEstimate('Cambiar cinco tomacorrientes, dos GFCI.','electrical');
+ assert.equal(find(r,'standard-outlets').quantity,3);
+ assert.equal(find(r,'gfci').quantity,2);
+});
+test('Electrical: missing GFCI count blocks guessing quantity',()=>{
+ const r=localEstimate('Replace 5 outlets, some GFCI.','electrical');
+ assert.equal(find(r,'gfci'),undefined);
+ assert.ok(r.unknowns.some(x=>x.includes('Confirm how many')));
+});
+test('Electrical: GFCI count exceeding all outlets requires review',()=>{
+ const r=localEstimate('Replace 3 outlets, 5 GFCI.','electrical');
+ assert.equal(find(r,'gfci'),undefined);
+ assert.ok(r.unknowns.some(x=>x.includes('exceeds')));
+});
+test('Electrical: explicit GFCI-only count is preserved',()=>{
+ const r=localEstimate('Replace 2 GFCI receptacles.','electrical');
+ assert.equal(find(r,'gfci').quantity,2);
+});
