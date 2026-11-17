@@ -91,33 +91,44 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   // Total receptacle count includes GFCIs. Never charge for the same outlet twice.
   const receptacleWord='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
   const quantityWord='(\\d{1,3}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten|veinte|twenty)';
+  const standardMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?(?:standard|regular|normales?|regulares?)\\s+'+receptacleWord+'\\b'));
   const totalOutletMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?'+receptacleWord+'\\b'));
-  const gfciMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:gfci|gfi|ground.fault)\\b'));
+  const gfciMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:gfci|gfi|ground.fault)\\s+'+receptacleWord+'|(?:gfci|gfi|ground.fault))\\b'));
   const hasGfci=/\b(?:gfci|gfi|ground.fault)\b/.test(s);
+  const standardCount=standardMatch?parseCount(standardMatch[1]):0;
   const totalOutlets=totalOutletMatch?parseCount(totalOutletMatch[1]):0;
   const gfciCount=gfciMatch?parseCount(gfciMatch[1]):0;
-  if(totalOutletMatch && (totalOutlets<1||totalOutlets>200)){
+  const addStandard=(qty:number)=>lines.push(line('standard-outlets','Replace '+qty+' standard receptacles (existing wiring to verify)',
+    'Reemplazar '+qty+' tomacorrientes normales (verificar cableado existente)',qty,'each',0));
+  const addGfci=(qty:number)=>lines.push(line('gfci','Replace '+qty+' GFCI receptacles (existing wiring to verify)',
+    'Reemplazar '+qty+' tomacorrientes GFCI (verificar cableado existente)',qty,'each',0));
+  if(standardCount>0 && standardCount<=200){
+   // "2 regular outlets and 3 GFCIs" names independent quantities.
+   addStandard(standardCount);
+   if(gfciCount>0&&gfciCount<=200)addGfci(gfciCount);
+   else if(hasGfci)unknowns.push('Confirm the GFCI quantity; none was recognized.');
+  }else if(totalOutletMatch && (totalOutlets<1||totalOutlets>200)){
    unknowns.push('Confirm total outlet count; dictated quantity is outside the supported range.');
   }else if(totalOutlets>0){
-   if(hasGfci&&!gfciMatch){
-    unknowns.push('Confirm how many of the '+totalOutlets+' outlets are GFCI; the transcript did not specify a quantity.');
-   }else if(gfciCount>totalOutlets){
-    unknowns.push('GFCI quantity exceeds the total outlet count; confirm counts before pricing.');
-   }else{
-    const regular=totalOutlets-gfciCount;
-    if(regular>0)lines.push(line('standard-outlets','Install or replace '+regular+' standard receptacles (verify wiring)',
-     'Instalar o reemplazar '+regular+' tomacorrientes normales (verificar cableado)',regular,'each',0));
-    if(gfciCount>0)lines.push(line('gfci','Install or replace '+gfciCount+' GFCI receptacles (verify wiring)',
-     'Instalar o reemplazar '+gfciCount+' tomacorrientes GFCI (verificar cableado)',gfciCount,'each',0));
+   // "5 outlets, 2 GFCI" means GFCIs are part of the five.
+   if(hasGfci&&!gfciMatch)unknowns.push('Confirm how many of the '+totalOutlets+' outlets are GFCI; the transcript did not specify a quantity.');
+   else if(gfciCount>totalOutlets)unknowns.push('GFCI quantity exceeds the total outlet count; confirm counts before pricing.');
+   else{
+    if(totalOutlets-gfciCount>0)addStandard(totalOutlets-gfciCount);
+    if(gfciCount>0)addGfci(gfciCount);
    }
   }else if(hasGfci){
-   if(gfciCount>0 && gfciCount<=200){
-    lines.push(line('gfci','Install or replace '+gfciCount+' GFCI receptacles (verify wiring)',
-     'Instalar o reemplazar '+gfciCount+' tomacorrientes GFCI (verificar cableado)',gfciCount,'each',0));
-   }else unknowns.push('Confirm GFCI count; no quantity was recognized.');
+   if(gfciCount>0&&gfciCount<=200)addGfci(gfciCount);
+   else unknowns.push('Confirm GFCI count; no quantity was recognized.');
   }
-  if(totalOutlets>0||hasGfci){
-   unknowns.push('Confirm whether receptacles are replacements or new locations, and verify circuits and code requirements.');
+  // A regular switch is not a dimmer. Recognize it as a separate replacement.
+  const switchMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|regular|standard|normales?|regulares?)\\s+)?(?:switches|switch|interruptores|interruptor|apagadores|apagador)\\b'));
+  const switchQty=switchMatch?parseCount(switchMatch[1]):0;
+  if(switchQty>0&&switchQty<=200&&!dimmer)lines.push(line('standard-switches',
+   'Replace '+switchQty+' standard wall switches (existing wiring to verify)',
+   'Reemplazar '+switchQty+' interruptores de pared normales (verificar cableado existente)',switchQty,'each',0));
+  if(standardCount>0||totalOutlets>0||hasGfci||switchQty>0){
+   unknowns.push('Confirm these are device replacements using existing wiring; no new circuits, boxes, or drywall repairs are included.');
   }
   if(!lines.length){
    lines.push(line('unclassified','Review dictated electrical scope and define work items','Revisar descripcion electrica y definir partidas',1,'job',0));
