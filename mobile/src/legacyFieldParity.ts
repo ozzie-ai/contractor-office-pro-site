@@ -8,7 +8,7 @@ import type {EstimateLine,Trade} from './estimate';
  */
 export const LEGACY_FIELD_SOURCE='Illustrative legacy field estimate — historic editable planning cost, contractor review required';
 
-export type FieldDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean};
+export type FieldDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;customerScope?:{en:string[];es:string[]}};
 const cleaned=(s:string)=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const round=(n:number)=>Math.round(n*100)/100;
 const item=(id:string,en:string,es:string,q:number,unit:string,rate:number):EstimateLine=>({
@@ -24,6 +24,151 @@ const quantity=(s:string)=>value(s);
 
 export function legacyFieldEstimate(description:string,trade:Trade):FieldDraft|null{
  const s=cleaned(description);
+
+ // EV charger field takeoff — recovered from the earlier web-based electrician
+ // estimator. Component amounts are the older editable sample costs; they are
+ // NOT live supplier quotes or code-compliance design approvals.
+ if(trade==='electrical'&&/\b(ev|electric[- ]?vehicle|vehiculo electrico|carro electrico|tesla)\b/.test(s)
+   &&/\b(chargers?|cargadores?|cargador|charging|carga)\b/.test(s)){
+  const lines:EstimateLine[]=[],unknowns:string[]=[];
+  const route=s.match(/\b(\d+(?:[.,]\d+)?)\s*(?:ft|feet|pies?)\s*(?:of\s+|de\s+)?(?:run|route|cable|wire|conduit|recorrido|tuberia|circuito)\b/)||
+   s.match(/\b(?:run|route|recorrido|tirada|cableado)\s*(?:of\s+|de\s+)?(\d+(?:[.,]\d+)?)\s*(?:ft|feet|pies?)\b/);
+  const ft=route?value(route[1]):0;
+  const breaker=s.match(/\b(\d{2,3})\s*(?:a\b|amps?|amperes?|amperios?)\s*(?:circuit\s+)?(?:breaker|interruptor)\b/)||
+    s.match(/\b(?:breaker|interruptor)\s*(?:of|de|for|para)?\s*(\d{2,3})\s*(?:a\b|amps?|amperes?|amperios?)\b/);
+  const amps=breaker?Number(breaker[1]):0;
+  const current=s.match(/\b(?:charger|cargador)\s*(?:at|de|of|para)?\s*(\d{2,3})\s*(?:a\b|amps?|amperios?)\b/)||
+    s.match(/\b(\d{2,3})\s*(?:a\b|amps?|amperios?)\s*(?:ev\s+)?(?:charger|cargador)\b/);
+  const chargeCurrent=current?Number(current[1]):0;
+  const volts=s.match(/\b(\d{3})\s*(?:volts?|v)\b/);
+  const permit=s.match(/\b(?:permit|permiso)\b[^.!?\n$]{0,30}\$\s*(\d+(?:[.,]\d+)?)/)||
+    s.match(/\$\s*(\d+(?:[.,]\d+)?)\s*(?:for\s+the\s+|de\s+)?(?:permit|permiso)\b/);
+  const suppliedByOwner=/\b(?:homeowner|owner|client|customer|dueno|propietario)\b[^.!?\n]{0,65}\b(?:supplies?|provides?|suministra|compra|pone)\b|\b(?:charger|cargador)\b[^.!?\n]{0,55}\b(?:provided by|supplied by)\s+(?:the\s+)?(?:owner|client|homeowner)\b/.test(s);
+  if(ft>0&&ft<=500){
+   if(!/\b(?:owner supplies|homeowner supplies|owner provided|homeowner provided)\s+(?:all\s+)?(?:materials?|wire|wiring|conduit)\b/.test(s)){
+    lines.push(item('ev-wire','EV feeder conductors — route material','Conductores del circuito EV — material de recorrido',ft,'linear ft',8));
+    lines.push(item('ev-conduit','EV conduit and fittings','Tubería, conectores y soportes para EV',ft,'linear ft',4));
+   }
+   lines.push(item('ev-run-labor','EV circuit installation — route labor','Instalación de circuito EV — mano de obra de recorrido',ft,'linear ft',8));
+  }else{
+   lines.push(item('ev-route-review','Confirm EV circuit route length in feet','Confirmar longitud del recorrido EV en pies',0,'linear ft',0));
+   unknowns.push('Confirm total route length before costing conductors, conduit and labor.');
+  }
+  if(amps>=15&&amps<=200)lines.push(item('ev-breaker','New EV circuit breaker — verify device and panel compatibility',
+    'Breaker de circuito EV — verificar compatibilidad',1,'each',110));
+  else{lines.push(item('ev-breaker-review','Confirm dedicated EV circuit breaker rating (A)',
+    'Confirmar amperaje del breaker dedicado EV',0,'each',0));unknowns.push('Confirm breaker rating, type, panel capacity and circuit sizing.');}
+  lines.push(item('ev-terminations','EV charging circuit terminations and testing',
+    'Conexiones y pruebas del circuito de carga EV',1,'job',350));
+  if(permit)lines.push(item('ev-permit','Electrical permit fee (contractor-stated)',
+     'Permiso eléctrico (importe indicado)',1,'job',value(permit[1])));
+  else {lines.push(item('ev-permit-review','Confirm EV charger permit requirements and cost',
+   'Confirmar costo y requisitos del permiso EV',0,'job',0));unknowns.push('Permit cost and jurisdiction requirements need confirmation.');}
+  if(!suppliedByOwner){
+   lines.push(item('ev-charger-supply','Confirm EV charger equipment model and supply cost',
+    'Confirmar modelo y costo del equipo cargador EV',0,'each',0));
+   unknowns.push('Confirm who supplies the EV charger and its equipment price.');
+  }
+  if(!chargeCurrent)unknowns.push('Confirm charger continuous current rating; it is not the breaker rating.');
+  if(!volts)unknowns.push('Confirm nominal installation voltage.');
+  if(chargeCurrent&&amps&&amps<Math.ceil(chargeCurrent*1.25))unknowns.push('Check continuous-load circuit and breaker sizing with a qualified electrician; current rating may be inadequate.');
+  if(/\b(panel upgrade|upgrade (?:the )?panel|reemplazar tablero|cambiar panel|nuevo panel)\b/.test(s)){
+   lines.push(item('ev-panel-review','Panel upgrade mentioned with EV work — separate scope and price needed',
+    'Se menciona actualizar panel con EV — desglosar y cotizar',0,'job',0));
+   unknowns.push('EV work and panel upgrade must both be included; confirm panel service, circuits and costs separately.');
+  }
+  unknowns.push('Verify conduit type, feeder conductor sizing, voltage drop, load calculation, access, utility and inspection.');
+  return {lines,unknowns,recognized:true,customerScope:{
+   en:['Install a dedicated EV charging circuit with the customer-confirmed route and breaker specifications.',
+    'Provide route conduits and conductors and complete wiring terminations and safety testing.',
+    ...(suppliedByOwner?['Owner supplies the EV charging equipment; unit purchase is excluded.']:[]),
+    'Verify local permit, electrical panel capacity and inspections before installation.'],
+   es:['Instalar un circuito dedicado para cargador de vehículo eléctrico con recorrido y breaker por confirmar.',
+    'Instalar tubería, conductores, conexiones y realizar pruebas de seguridad.',
+    ...(suppliedByOwner?['El propietario proporciona el cargador; su compra está excluida.']:[]),
+    'Verificar permiso, capacidad del panel e inspección antes de instalar.']
+  }};
+ }
+ // Kitchen assembly takeoff, not room-size guesswork: room area alone does NOT
+ // establish linear feet of cabinets or quartz countertop square footage.
+ if(trade==='remodel'&&/\b(kitchen|cocina)\b/.test(s)
+   &&/\b(remodel|renovat|reforma|demol|cabinets?|gabinetes?|shaker|quartz|cuarzo|countertops?|encimeras?|granito)\b/.test(s)){
+  const lines:EstimateLine[]=[],unknowns:string[]=[];
+  const room=s.match(/\b(?:kitchen|cocina)\b[^.!?\n]{0,40}?\b(\d{1,3}(?:[.,]\d+)?)\s*(?:ft|feet|pies?)?\s*(?:x|×|by|por)\s*(\d{1,3}(?:[.,]\d+)?)\s*(?:ft|feet|pies?)?\b/);
+  const floor=room?round(value(room[1])*value(room[2])):0;
+  const cabinetry=/\b(cabinets?|gabinetes?|alacenas?|shaker)\b/.test(s);
+  const countertop=/\b(countertops?|quartz|cuarzo|encimeras?|granito)\b/.test(s);
+  const tile=/\b(tile|loseta|azulejo|flooring|piso)\b/.test(s);
+  const cabinetLf=s.match(/\b(\d+(?:[.,]\d+)?)\s*(?:linear\s+(?:ft|feet)|lf|pies?\s+lineales)\s*(?:of\s+|de\s+)?(?:base\s+|upper\s+|wall\s+)?(?:cabinets?|gabinetes?|alacenas?)\b/)||
+   s.match(/\b(?:cabinets?|gabinetes?)\s*(?:of\s+|de\s+)?(\d+(?:[.,]\d+)?)\s*(?:linear\s+(?:ft|feet)|lf|pies?\s+lineales)\b/);
+  const quartzSf=s.match(/\b(\d+(?:[.,]\d+)?)\s*(?:sq\.?\s*ft|square\s+feet|ft2|ft²|pies?\s+cuadrados)\s*(?:of\s+|de\s+)?(?:quartz|cuarzo|countertops?|encimeras?|granito)\b/)||
+   s.match(/\b(?:quartz|cuarzo|countertops?|encimeras?|granito)\s*(?:area\s+of\s+|de\s+)?(\d+(?:[.,]\d+)?)\s*(?:sq\.?\s*ft|square\s+feet|ft2|ft²|pies?\s+cuadrados)\b/);
+  const lf=cabinetLf?value(cabinetLf[1]):0,sf=quartzSf?value(quartzSf[1]):0;
+  const demol=/\b(demol|remove existing|tear out|rip out|quitar|retirar)\b/.test(s);
+  const sink=/\b(sink|fregadero|lavaplatos|lavabo)\b/.test(s);
+  const bar=/\b(breakfast bar|barra desayunadora|barra de desayuno|island|isla)\b/.test(s);
+  if(demol)lines.push(item('kitchen-demo','Demolish and remove specified existing kitchen fixtures/finishes',
+   'Demoler y retirar los elementos existentes indicados de cocina',1,'job',1100));
+  if(cabinetry){
+   if(lf>0&&lf<=150){
+    lines.push(item('kitchen-cabinets-material','Cabinet module materials — confirm model/finish',
+     'Material de gabinetes — confirmar modelo y acabado',lf,'linear ft',280));
+    lines.push(item('kitchen-cabinets-labor','Install measured cabinet modules',
+     'Instalar módulos de gabinetes medidos',lf,'linear ft',95));
+   }else{lines.push(item('kitchen-cabinets-review','Measure total cabinet linear feet (uppers and lowers separately)',
+    'Medir pies lineales de gabinetes (altos y bajos por separado)',0,'linear ft',0));
+    unknowns.push('Confirm cabinet linear feet and counts for lower and upper runs. A 10×10 room does not equal 20 linear feet of cabinets.');
+   }
+  }
+  if(countertop){
+   if(sf>0&&sf<=1000){
+    lines.push(item('kitchen-quartz-material','Quartz countertop fabrication/material',
+     'Material y fabricación de cubierta de cuarzo',sf,'sq ft',65));
+    lines.push(item('kitchen-quartz-install','Quartz countertop installation',
+     'Instalación de cubierta de cuarzo',sf,'sq ft',25));
+   }else {lines.push(item('kitchen-quartz-review','Measure countertop area and confirm edges/backsplash',
+     'Medir cubierta y confirmar bordes y salpicadero',0,'sq ft',0));
+    unknowns.push('Confirm actual countertop square footage and countertop/backsplash details.');
+   }
+  }
+  if(tile){
+   if(floor>0&&floor<=2000){
+    lines.push(item('kitchen-floor-prep','Prepare existing kitchen floor substrate',
+     'Preparar base de piso de cocina',floor,'sq ft',4));
+    lines.push(item('kitchen-tile-material','Kitchen floor tile materials (10% waste)',
+     'Material de loseta de cocina (10% desperdicio)',Math.ceil(floor*1.1),'sq ft',4.5));
+    lines.push(item('kitchen-tile-labor','Kitchen floor tile installation',
+     'Mano de obra instalación de loseta en cocina',floor,'sq ft',7.5));
+   }else{lines.push(item('kitchen-floor-review','Confirm room dimensions and measured flooring area',
+    'Confirmar medidas de cocina y área de loseta',0,'sq ft',0));
+    unknowns.push('Kitchen floor dimensions not stated; cannot price the floor.');
+   }
+  }
+  if(sink)lines.push(item('kitchen-sink','Kitchen sink and plumbing reconnection (verify fixture supply)',
+   'Instalar fregadero y reconectar plomería (verificar suministro)',1,'job',850));
+  if(bar){lines.push(item('kitchen-breakfast-bar','Breakfast bar/island — confirm footprint, support and finish',
+    'Barra desayunadora/isla — confirmar medidas, soporte y acabado',0,'job',0));
+   unknowns.push('Breakfast bar/island needs dimensions, cabinet support and countertop overhang/finish; excluded from priced subtotal.');
+  }
+  if(!lines.length)return null;
+  unknowns.push('Confirm layout, cabinet construction, demolition conditions, plumbing/electrical modifications, permits, materials and supplier prices.');
+  return {lines,unknowns,recognized:true,customerScope:{
+   en:['Kitchen work as described, with site measurements and selections to be confirmed.',
+     ...(demol?['Remove and dispose of specified existing kitchen finishes/fixtures.']:[]),
+     ...(cabinetry?['Supply and install the selected kitchen cabinet layout after measuring upper/lower runs.']:[]),
+     ...(countertop?['Fabricate and install measured quartz countertops, subject to finish and edge selection.']:[]),
+     ...(tile?['Prepare the substrate and replace kitchen floor tile in the measured area.']:[]),
+     ...(sink?['Install the kitchen sink and reconnect plumbing at the agreed location.']:[]),
+     ...(bar?['Breakfast bar/island is pending dimension and support confirmation; not included in priced subtotal.']:[])],
+   es:['Trabajos de cocina según lo descrito; confirmar medidas y selecciones.',
+     ...(demol?['Retirar y desechar acabados y accesorios existentes indicados.']:[]),
+     ...(cabinetry?['Suministrar e instalar gabinetes según medidas de muebles altos y bajos.']:[]),
+     ...(countertop?['Fabricar e instalar cubiertas de cuarzo según medidas verificadas.']:[]),
+     ...(tile?['Preparar base y reemplazar la loseta de cocina en el área medida.']:[]),
+     ...(sink?['Instalar fregadero y reconectar plomería en ubicación acordada.']:[]),
+     ...(bar?['Barra desayunadora/isla pendiente de medidas y soporte; no incluida en subtotal.']:[])]
+  }};
+ }
  if(trade==='concrete'){
   if(!/\b(concrete|cemento|concreto|losa|slab|patio|driveway)\b/.test(s))return null;
   const dimensions=s.match(/\b(\d{1,3}(?:[.,]\d+)?)\s*(?:ft|feet|pies?)?\s*(?:x|×|by|por)\s*(\d{1,3}(?:[.,]\d+)?)\s*(?:ft|feet|pies?)?\b/);
