@@ -93,6 +93,7 @@ export default function App(){
  const [sharedEmail,setSharedEmail]=useState('');
  const [sharedCode,setSharedCode]=useState('');
  const [sharedSession,setSharedSession]=useState<BetaSession|null>(null);
+  const [showCloudSettings,setShowCloudSettings]=useState(false);
  const [sharedBusy,setSharedBusy]=useState(false);
  const [sharedMessage,setSharedMessage]=useState('');
  const [researchRefs,setResearchRefs]=useState<ResearchReference[]>([]);
@@ -335,12 +336,12 @@ export default function App(){
     costLaborBurdenMultiplier:saved.costLaborBurdenMultiplier}:item;
   });
   const manual=project.lines.filter(item=>item.id.startsWith('manual-')&&!lines.some(x=>x.id===item.id));
-  const suggested=suggestPreliminaryPrices(project.trade,lines);
+  const suggested=suggestPreliminaryPrices(project.trade,lines,project.description);
   patch({lines:[...suggested.lines,...manual],customerScope:draft.customerScope,unknowns:[...draft.unknowns.filter(note=>!(suggested.lines.every(item=>item.rate>0)&&note.startsWith('Enter verified prices'))),...suggested.notes],
    exclusions:futureBreaker?['Future feeder wiring, terminations and final connections are excluded from this job.']:project.exclusions,
    futureWork:futureBreaker?['Future feeder wiring and final connections are separate work.']:project.futureWork});
   setAiConnected(false);
-  setInfo(suggested.suggested?tr('Preliminary LA prices added automatically for '+suggested.suggested+' work items. These are planning assumptions, not confirmed quotes. Review before sending.','Se agregaron precios preliminares de LA automáticamente para '+suggested.suggested+' partidas. Son supuestos de planificación, no cotizaciones confirmadas. Revísalos antes de enviar.'):tr('The notes do not identify enough recognized priced tasks. Add or dictate the missing work scope for a complete estimate.','Las notas no identifican suficientes partidas con precio. Describe el trabajo que falta para un estimado completo.'));
+  setInfo(suggested.suggested?tr('Preliminary amounts were added to '+suggested.suggested+' work items. These are examples, not confirmed bids; review before sharing.','Se agregaron montos preliminares a '+suggested.suggested+' partidas. Son ejemplos, no cotizaciones confirmadas. Revisa antes de compartir.'):draft.recognized?tr('Work items recognized. A $0 rate means missing pricing, not free work. Enter or verify rates in Price.','Partidas reconocidas. Una tarifa de $0 significa precio faltante, no trabajo gratis. Ingresa o verifica tarifas en Precio.'):tr('Could not recognize the complete scope. Review the description and missing details before pricing.','No se reconoció todo el alcance. Revisa la descripción y los detalles faltantes antes de asignar precios.'));
   setStage(2);
  };
 
@@ -361,7 +362,7 @@ export default function App(){
     await verifyBackendAccess(sharedConfig,session);
    }
    setSharedSession(session);setSharedCode('');
-   setSharedMessage(tr('Backend connection and contractor membership verified. You can request AI scope.','Conexión al servidor y acceso del contratista verificados. Puedes solicitar el alcance con IA.'));}
+   setSharedMessage(tr('Cloud account connected. Shared research and pricing checks are available. AI scope needs separate configuration.','Cuenta en la nube conectada. Puedes consultar referencias y verificar precios. La IA necesita configuración adicional.'));}
   catch(e){setSharedMessage(e instanceof Error?e.message:'Could not connect.');}
   finally{setSharedBusy(false);}
  };
@@ -477,7 +478,7 @@ export default function App(){
      </Pressable>
     </View>
     <View style={styles.heroBottom}>
-     <Text style={styles.heroVersion}>{'Contractor Office Pro v'+(Constants.expoConfig?.version||'0.1.0')+' · '+(sharedEnabled?'AI settings present (not verified)':'Offline · AI not configured')}</Text>
+     <Text style={styles.heroVersion}>{'Contractor Office Pro v'+(Constants.expoConfig?.version||'0.1.0')+' · '+(sharedEnabled?'Cloud settings present · Optional sign-in':'Offline · Cloud not configured')}</Text>
      <View style={styles.languageSwitch}>
       {(['en','es'] as const).map(lang=><Pressable key={lang} accessibilityRole="button" accessibilityLabel={lang==='en'?'English':'Español'} accessibilityState={{selected:businessProfile.language===lang}} onPress={()=>chooseLanguage(lang)} style={[styles.languageOption,businessProfile.language===lang&&styles.languageSelected]}>
        <Text style={[styles.languageText,businessProfile.language===lang&&styles.languageTextSelected]}>{lang.toUpperCase()}</Text>
@@ -628,15 +629,16 @@ export default function App(){
     <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
     {sharedEnabled&&<View style={styles.lineCard}>
-     <Text style={styles.h2}>{tr('AI estimating — optional','Estimación con IA — opcional')}</Text>
-     <Text style={styles.hint}>{tr('The Expo estimate and PDF work even if this service is offline.','El estimado y PDF de Expo funcionan aunque este servicio no esté disponible.')}</Text>
-     {!sharedSession&&<>
+     <Text style={styles.h2}>{tr('Cloud account — optional','Cuenta en la nube — opcional')}</Text>
+     <Text style={styles.hint}>{tr('No email or verification code is needed for normal estimates. Cloud sign-in is only for shared pricing checks and research; AI may be unavailable.','No necesitas correo ni código para estimados normales. El acceso a la nube sirve para verificar precios y consultar referencias; la IA puede no estar disponible.')}</Text>
+     <Action title={showCloudSettings?tr('Hide cloud login','Ocultar acceso a la nube'):tr('Cloud login (optional)','Acceso a la nube (opcional)')} secondary onPress={()=>setShowCloudSettings(v=>!v)}/>
+     {!sharedSession&&showCloudSettings&&<>
       <Input label={tr('Business account email','Correo de la cuenta')} value={sharedEmail} onChangeText={setSharedEmail} placeholder="email@example.com"/>
       <Action title={tr('Send email code','Enviar código por correo')} onPress={sendSharedCode} disabled={sharedBusy}/>
       <Input label={tr('Verification code','Código de verificación')} value={sharedCode} onChangeText={setSharedCode} placeholder="123456" number secure/>
-      <Action title={tr('Connect AI estimating','Conectar estimación con IA')} onPress={connectShared} disabled={sharedBusy}/>
+      <Action title={tr('Connect cloud account','Conectar cuenta en la nube')} onPress={connectShared} disabled={sharedBusy}/>
      </>}
-     {!!sharedSession&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
+     {!!sharedSession&&showCloudSettings&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
     </View>}
     {!!info&&<Text style={styles.notice}>{info}</Text>}
@@ -659,6 +661,13 @@ export default function App(){
       <Text style={styles.notice}>{tr('For research only. Does not change the estimate or customer PDF.','Solo para investigar. No cambia el estimado ni el PDF del cliente.')}</Text>
      </View>}
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
+    </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative outlet-device replacement example'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Review outlet prices before sending','Revisar precios de tomacorrientes antes de enviar')}</Text>
+     <Text style={styles.notice}>{tr('These are assumptions from an earlier contractor example, NOT verified supplier prices. Overhead and profit are added separately. Edit the rates below or approve them explicitly for this job.','Son supuestos de un ejemplo anterior, NO precios verificados. Gastos generales y utilidad se agregan aparte. Edita las tarifas o apruébalas para este trabajo.')}</Text>
+     <Action title={tr('Approve reviewed outlet allowances','Aprobar provisiones revisadas de tomacorrientes')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative outlet-device replacement example')?{...item,rateSource:'Contractor-reviewed outlet example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor accepted historical example; not a verified supplier quotation'}}:item)});
+     }}/>
     </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}

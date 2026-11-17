@@ -111,3 +111,15 @@ test('Customer document includes a professional detailed scope but never contrac
  assert.ok(spanish.includes('Pintura de 3 habitaciones'));
  assert.ok(!spanish.includes('$37.98'));
 });
+
+test('a positive illustrative outlet allowance still blocks PDF until contractor approval',()=>{
+ const p={...sample,trade:'electrical',lines:[
+  {...item(3,140),id:'local-outlets-standard',rateSource:'Illustrative outlet-device replacement example — contractor sample, not verified'},
+  {...item(2,199.5),id:'local-outlets-gfci',rateSource:'Illustrative outlet-device replacement example — contractor sample, not verified'}
+ ]};
+ const before=estimateReadiness(p);
+ assert.equal(before.ready,false);
+ assert.ok(before.issues.some(x=>x.includes('approve')));
+ const reviewed={...p,lines:p.lines.map(x=>({...x,rateSource:'Contractor-reviewed outlet example'}))};
+ assert.equal(estimateReadiness(reviewed).ready,true);
+});

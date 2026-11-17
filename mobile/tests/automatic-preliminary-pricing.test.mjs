@@ -54,6 +54,43 @@ test('a permit-only transcript does not hallucinate a panel or fake whole-job qu
 });
 test('the native app actually calls automatic pricing during Create Work Items',()=>{
  const app=fs.readFileSync('App.tsx','utf8');
- assert.match(app,/const suggested=suggestPreliminaryPrices\(project\.trade,lines\)/);
+ assert.match(app,/const suggested=suggestPreliminaryPrices\(project\.trade,lines,project\.description\)/);
  assert.match(app,/lines:\[\.\.\.suggested\.lines,\.\.\.manual\]/);
 });
+
+test('specific device-only replacement gets a nonzero but explicitly unapproved preliminary breakdown',()=>{
+ const description='Install five new electrical outlets total: three standard outlets and two GFCI outlets. All wiring already exists. Replace the existing devices only.';
+ const p=localEstimate(description,'electrical');
+ const q=suggestPreliminaryPrices('electrical',p.lines,description);
+ assert.equal(q.lines.length,2);
+ assert.equal(q.lines.find(x=>x.id==='local-outlets-standard').quantity,3);
+ assert.equal(q.lines.find(x=>x.id==='local-outlets-gfci').quantity,2);
+ assert.equal(q.lines.find(x=>x.id==='local-outlets-standard').rate,140);
+ assert.equal(q.lines.find(x=>x.id==='local-outlets-gfci').rate,199.5);
+ assert.equal(q.lines.reduce((n,x)=>n+x.quantity*x.rate,0),819);
+ assert.equal(Math.round(estimate.totals({lines:q.lines,overheadPct:10,profitPct:20}).total*100)/100,1081.08);
+ assert.equal(estimate.estimateReadiness({lines:q.lines}).ready,false);
+ assert.ok(q.notes.some(x=>x.includes('NOT approved')));
+});
+test('uncertain wiring or new installation cannot inherit example replacement prices',()=>{
+ const descriptions=[
+  'Install five new electrical outlets: three standard and two GFCI outlets.',
+  'Run new wiring for five outlets, two GFCI outlets.'
+ ];
+ for(const description of descriptions){
+  const parsed=localEstimate(description,'electrical');
+  const quote=suggestPreliminaryPrices('electrical',parsed.lines,description);
+  assert.equal(quote.suggested,0);
+  assert.ok(quote.lines.every(x=>x.rate===0));
+ }
+});
+test('contractor-entered outlet prices cannot be overwritten by sample pricing',()=>{
+ const description='Replace five outlets, two are GFCI; existing wiring.';
+ const parsed=localEstimate(description,'electrical');
+ parsed.lines[0].rate=175;
+ parsed.lines[0].rateSource='Contractor-entered rate';
+ const quote=suggestPreliminaryPrices('electrical',parsed.lines,description);
+ assert.equal(quote.lines[0].rate,175);
+ assert.equal(quote.lines[0].rateSource,'Contractor-entered rate');
+});
+
