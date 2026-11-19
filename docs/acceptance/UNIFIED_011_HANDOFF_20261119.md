@@ -10,8 +10,8 @@ Updated 2026-11-19. Source of truth: `main` after merged PR #51; do not deploy f
 - Supabase `Contractor Office Pro Dev` has 1,674 research references, but **no approved `price_book_items`**, contractor organization/member or cloud jobs as last checked Nov 19.
 
 ## Still required before claiming user-ready
-1. Confirm the Render deployed SHA, and redeploy the current approved `backend/` revision if it remains behind the first-business bootstrap changes. Do not put private server secrets into Expo.
-2. In an authorized Supabase test account, verify email code template/delivery, first business onboarding, member isolation and authenticated backend calls on the real iPhone. No real account setup has yet been proven.
+1. **Verified Nov 19:** Render exposes `/v1/account/bootstrap`, `/v1/account/status`, `/v1/interpret`, `/v1/estimate/price`, `/v1/research-references` and returns HTTP 200 on `/health`; anonymously calling account/status or presenting a deliberately invalid bearer token returns HTTP 401, confirming the authorization boundary. The configured `/ready` endpoint returns HTTP 503 because at least one required variable is absent (the code currently includes `OPENAI_API_KEY` in this check). Exact Render deployed commit SHA is not revealed by this public API; check Render dashboard before changes. **No blind redeploy is necessary just to make bootstrap route appear.**
+2. **Still pending:** Supabase Auth and memberships currently have zero registered users, businesses, and members. With owner's consent, run real email OTP delivery, first business onboarding, member isolation, authenticated pricing call and log-out on the real iPhone. Source-controlled email templates contain `{{ .Token }}`, but their activation in the hosted Auth service has not been verified. Do not create test users or send OTPs to an unconfirmed email address.
 3. Approve source-audited, regional, unit-consistent rates into the real pricebook before describing any price as verified or market sourced. Keep reference-only data read-only. Other residential trades still need richer assemblies and validation.
 4. Run a real connected iPhone test: dictate seven devices EN/ES; verify 2 regular switches + 2 regular outlets + 3 GFCI; review prices, explicitly approve, save/reopen My Jobs and share a private PDF; repeat on painting/plumbing/concrete/remodel with missing-dimension safeguards.
 5. Preserve device storage and local uncommitted Mac files. Run `git status --short` before `git switch main && git pull --ff-only origin main`. Do not uninstall the app. Version displayed after updated build should be 0.1.1.
@@ -19,3 +19,10 @@ Updated 2026-11-19. Source of truth: `main` after merged PR #51; do not deploy f
 ## Developer responsibilities
 - No need to rewrite Expo, clone Derek's Swift UI, re-import unapproved master data or reimplement the backend.
 - Remaining owner/Derek-assisted actions are **live deployment/configuration and real-account/device QA**, plus **source-approved pricing catalog expansion**. Neither is implied by passing offline CI.
+
+## Step 2 Render smoke test evidence
+
+- GitHub Action: `.github/workflows/step2-live-backend-contract.yml` (merged PR #53). It performs unauthenticated and deliberately invalid-token *read-only* probes, does not create jobs or users, and checks no credentials into logs.
+- On November 19, the successful probe returned: health 200; required OpenAPI paths present; missing-token 401; invalid-token 401; optional `/ready` 503.
+- Supabase security advisor warns about four authenticated-executable `SECURITY DEFINER` functions (including `create_org_for_user`). The bootstrap implementation checks `auth.uid()` and uses the caller's own ID; the warnings should still receive a production security review. No security policies changed in this step.
+- This is **partial Step 2 verification**, not a signed-in end-to-end pass. Do not advertise AI interpretation as operational while the provider API key is absent.
