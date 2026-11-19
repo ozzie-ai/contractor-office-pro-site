@@ -137,3 +137,51 @@ test('new wiring does not get device replacement rates',()=>{
  assert.equal(suggested.suggested,0);
  assert.ok(suggested.lines.every(x=>x.rate===0));
 });
+
+
+test('five-device dictation: two standard plus three GFCI gets a provisional $625 reviewable amount',()=>{
+ const description='Replace five outlets, two normal outlets and three GFCIs.';
+ const scope=localEstimate(description,'electrical');
+ assert.equal(scope.lines.find(x=>x.id==='local-outlets-standard')?.quantity,2);
+ assert.equal(scope.lines.find(x=>x.id==='local-outlets-gfci')?.quantity,3);
+ const draft=suggestPreliminaryPrices('electrical',scope.lines,description);
+ assert.equal(draft.lines.find(x=>x.id==='local-outlets-standard')?.rate,95);
+ assert.equal(draft.lines.find(x=>x.id==='local-outlets-gfci')?.rate,145);
+ assert.equal(draft.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
+ assert.equal(estimate.estimateReadiness({lines:draft.lines}).ready,false,'Contractor review remains mandatory');
+ assert.ok(draft.notes.some(x=>x.includes('Confirm wiring')));
+});
+
+test('quick five-device ID variant: two standard and three GFCI receives the same cautious model',()=>{
+ const description='Replace 5 outlets total, 2 standard and 3 GFCI.';
+ const parsed=localEstimate(description,'electrical');
+ assert.equal(parsed.lines.find(x=>x.id==='local-outlets-standard')?.quantity,2);
+ assert.equal(parsed.lines.find(x=>x.id==='local-outlets-gfci')?.quantity,3);
+ const draft=suggestPreliminaryPrices('electrical',parsed.lines,description);
+ assert.equal(draft.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
+ assert.equal(estimate.estimateReadiness({lines:draft.lines}).ready,false);
+});
+
+
+test('real Spanish-English dictation: five outlets, dos de ellos regular and tres de ellos GFCI',()=>{
+ const spoken='Necesito reemplazar cinco outlets existing wiring. Necesito reemplazar los outlets por nuevos, dos de ellos son regular outlets y tres de ellos son GFCI. Yo voy a poner el material de los nuevos outlets.';
+ const scope=localEstimate(spoken,'electrical');
+ assert.equal(scope.recognized,true);
+ assert.deepEqual(Array.from(scope.lines,x=>[x.id,x.quantity]),[
+  ['local-outlets-standard',2],['local-outlets-gfci',3]
+ ]);
+ const priced=suggestPreliminaryPrices('electrical',scope.lines,spoken);
+ assert.equal(priced.suggested,2);
+ assert.equal(priced.lines.find(x=>x.id==='local-outlets-standard')?.rate,95);
+ assert.equal(priced.lines.find(x=>x.id==='local-outlets-gfci')?.rate,145);
+ assert.equal(priced.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
+ assert.equal(estimate.estimateReadiness({lines:priced.lines}).ready,false,'Unverified assumptions cannot be sent as approved prices');
+});
+
+test('mixed dictation with explicitly new wiring must not inherit replacement prices',()=>{
+ const spoken='Necesito reemplazar cinco outlets, dos de ellos son regular outlets y tres de ellos son GFCIs, con new wiring and new circuits.';
+ const scope=localEstimate(spoken,'electrical');
+ const priced=suggestPreliminaryPrices('electrical',scope.lines,spoken);
+ assert.equal(priced.suggested,0);
+ assert.ok(priced.lines.every(x=>x.rate===0));
+});

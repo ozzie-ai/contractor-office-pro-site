@@ -34,7 +34,7 @@ function quickOutletCount(s:string):LocalDraft|null{
  };
  const countWord='(?:\\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)';
  const outlet='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
- if(!new RegExp('\\b'+outlet+'\\b').test(s)||!/\b(?:gfci|gfi)\b/.test(s))return null;
+ if(!new RegExp('\\b'+outlet+'\\b').test(s)||!/\b(?:gfcis?|gfis?)\b/.test(s))return null;
  // Do not strip unrelated work from a multi-trade description.
  if(/\b(panel|tablero|breaker|circuit|circuito|light|lights|luz|luces|dimmer|shower|bathroom|bano|kitchen|cocina|charger|evse|permit|permiso|wire|cable|painting|pintura)\b/.test(s))return null;
  // Speech frequently includes adjectives and itemized groups.
@@ -42,10 +42,10 @@ function quickOutletCount(s:string):LocalDraft|null{
  const adjective='(?:existing|old|new|newly|nuevo|nueva|nuevos|nuevas|viejos?|electrical|electricos?|electricas?|standard|regular|normal(?:es)?|comun(?:es)?)';
  const totals=Array.from(s.matchAll(new RegExp('\\b('+countWord+')\\s+(?:'+adjective+'\\s+){0,4}'+outlet+'\\b','g')));
  const total=totals.find(m=>!/\b(?:standard|regular|normal(?:es)?|comun(?:es)?)\b/.test(m[0]));
- const standardMatch=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:are|son)\\s+)?(?:standard|regular|normal(?:es)?|comun(?:es)?)\\b'));
- const gfci=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:son|are)\\s+|(?:of\\s+them\\s+are)\\s+)?(?:gfci|gfi)\\b'))
-  ||s.match(new RegExp('\\b('+countWord+')\\s+(?:gfci|gfi)\\s+'+outlet+'\\b'))
-  ||s.match(new RegExp('\\b('+countWord+')\\s+'+outlet+'\\s+(?:gfci|gfi)\\b'));
+ const standardMatch=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:de\\s+ellos?\\s+|of\\s+them\\s+)?(?:are|son)\\s+)?(?:standard|regular|normal(?:es)?|comun(?:es)?)\\b'));
+ const gfci=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:de\\s+ellos?\\s+|of\\s+them\\s+)?(?:son|are)\\s+)?(?:gfcis?|gfis?)\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+(?:gfcis?|gfis?)\\s+'+outlet+'\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+'+outlet+'\\s+(?:gfcis?|gfis?)\\b'));
  if((!total&&!standardMatch)||!gfci)return null;
  const toNum=(value:string)=>words[value]??Number(value);
  const protectedCount=toNum(gfci[1]);
@@ -67,7 +67,7 @@ function quickOutletCount(s:string):LocalDraft|null{
  const newInstall=/\b(?:install|instalar|instalacion|new|nuevo|nueva)\b/.test(s);
  // A clarified device-only replacement takes precedence over earlier "install new".
  const replaceDevicesOnly=/\b(?:replace|replacing|cambiar|reemplazar)\b[^.!?\n]{0,45}\b(?:existing|old|existentes?)\s+(?:devices?|outlets?|receptacles?|tomacorrientes?)\s+only\b/.test(s);
- const replaceAction=replace&&(!newInstall||replaceDevicesOnly);
+ const replaceAction=replace&&(!newInstall||replaceDevicesOnly||!/\b(?:new wiring|new circuits?|cableado nuevo|circuitos? nuevos?)\b/.test(s));
  const installAction=newInstall&&!replace;
  const action=replaceAction?'Replace':installAction?'Install':'Install or replace (confirm)';
  const actionEs=replaceAction?'Reemplazar':installAction?'Instalar':'Instalar o reemplazar (confirmar)';
