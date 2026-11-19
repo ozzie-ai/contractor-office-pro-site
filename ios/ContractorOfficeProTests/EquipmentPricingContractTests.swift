@@ -12,8 +12,8 @@ final class EquipmentPricingContractTests: XCTestCase {
         let coder = JSONEncoder()
         coder.keyEncodingStrategy = .convertToSnakeCase
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: coder.encode(cost)) as? [String: Any])
-        XCTAssertEqual((object["equipment_cost_per_unit"] as? NSNumber)?.decimalValue, 40)
-        XCTAssertEqual((object["material_cost_per_unit"] as? NSNumber)?.decimalValue, 25)
+        XCTAssertEqual(Decimal(string: String(describing: object["equipment_cost_per_unit"] ?? "")), 40)
+        XCTAssertEqual(Decimal(string: String(describing: object["material_cost_per_unit"] ?? "")), 25)
     }
 
     func testOlderReviewDraftWithoutEquipmentStillDecodes() throws {
