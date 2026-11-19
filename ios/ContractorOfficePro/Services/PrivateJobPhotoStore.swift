@@ -17,7 +17,7 @@ nonisolated enum PrivateJobPhotoStore {
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    /// Import a copy into the application's protected Documents domain.
+    /// Import a copy into the application's protected Application Support folder.
     /// Never keep a Photos library URL or leak its metadata to the PDF.
     @discardableResult
     static func save(_ bytes: Data, jobID: UUID) throws -> URL {
