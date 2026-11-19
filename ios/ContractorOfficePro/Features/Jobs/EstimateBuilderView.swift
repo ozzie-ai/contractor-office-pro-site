@@ -32,6 +32,8 @@ struct EstimateBuilderView: View {
     @State private var photoSelection: [PhotosPickerItem] = []
     @State private var photoFiles: [URL] = []
     @State private var photoMessage: String?
+    @State private var pendingPhotoInspection: URL?
+    @State private var photoObservations: EstimatingAPIClient.PhotoInspectionResponse?
 
     var body: some View {
         NavigationStack {
@@ -108,8 +110,14 @@ struct EstimateBuilderView: View {
                             Text(String(url.lastPathComponent.prefix(8)) + "…")
                                 .font(.caption)
                             Spacer()
+                            Button {
+                                pendingPhotoInspection = url
+                            } label: { Image(systemName: "sparkles") }
+                                .disabled(busy)
+                                .accessibilityLabel("Review photo with AI (requires consent)")
                             Button(role: .destructive) {
                                 do {
+                                    photoObservations = nil
                                     try PrivateJobPhotoStore.remove(url, jobID: job.id)
                                     photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
                                 } catch {
@@ -117,6 +125,15 @@ struct EstimateBuilderView: View {
                                 }
                             } label: { Image(systemName: "trash") }
                         }
+                    }
+                    if let insight = photoObservations {
+                        Text("AI PHOTO OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
+                        ForEach(insight.observations.visibleConditions, id: \.self) { Text("Visible: " + $0) }
+                        ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
+                        ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
+                        ForEach(insight.observations.limitations, id: \.self) { Text("Limit: " + $0) }
+                        Text("Photo observations are not added to the estimate automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     if let photoMessage { Text(photoMessage).font(.caption).foregroundStyle(.orange) }
                 } header: {
@@ -306,6 +323,20 @@ struct EstimateBuilderView: View {
                     Button("estimate.close") { voice.stop(); dismiss() }
                 }
             }
+            .confirmationDialog("Send this jobsite photo to AI for review?",
+                                isPresented: Binding(
+                                    get: { pendingPhotoInspection != nil },
+                                    set: { if !$0 { pendingPhotoInspection = nil } }
+                                ),
+                                titleVisibility: .visible) {
+                Button("Send selected photo for AI observations") {
+                    if let url = pendingPhotoInspection { Task { await inspectSelectedPhoto(url) } }
+                    pendingPhotoInspection = nil
+                }
+                Button("Keep photo private", role: .cancel) { pendingPhotoInspection = nil }
+            } message: {
+                Text("This uploads only the selected photo to an external AI provider. It may incur usage charges when enabled. All conclusions need verification.")
+            }
             .onChange(of: photoSelection) { _, selected in
                 Task { await importPhotos(selected) }
             }
@@ -371,6 +402,25 @@ struct EstimateBuilderView: View {
     private func refreshRates() async {
         guard let api = try? api() else { return }
         if let saved = try? await api.pricebook() { book = saved }
+    }
+
+    private func inspectSelectedPhoto(_ url: URL) async {
+        busy = true
+        photoMessage = nil
+        photoObservations = nil
+        defer { busy = false }
+        do {
+            guard PrivateJobPhotoStore.files(jobID: job.id).contains(url),
+                  let image = UIImage(data: try Data(contentsOf: url)),
+                  let jpeg = image.jpegData(compressionQuality: 0.65) else {
+                photoMessage = "Cannot read the selected job photo."
+                return
+            }
+            // Never upload private transcription or pricing with the photo.
+            photoObservations = try await api().inspectPhoto(jpegData: jpeg, context: "")
+        } catch {
+            photoMessage = "AI photo review is unavailable. The local photo and estimate are unchanged."
+        }
     }
 
     private func importPhotos(_ selected: [PhotosPickerItem]) async {
