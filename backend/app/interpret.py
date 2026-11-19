@@ -94,7 +94,10 @@ async def interpret_description(description: str) -> InterpretResponse:
     # Safe deterministic fast path for the well-specified small outlet job.
     # All other requests continue through the general bilingual AI interpreter.
     from .quick_electrical import parse_outlet_job
-    quick = parse_outlet_job(description)
+    from .quick_devices import parse_mixed_device_job
+    # Explicitly counted mixed devices come before outlet-only fast path,
+    # otherwise switches could be lost or require a paid AI provider.
+    quick = parse_mixed_device_job(description) or parse_outlet_job(description)
     if quick is not None:
         return InterpretResponse(interpretation=quick)
     key = os.getenv("OPENAI_API_KEY", "")
