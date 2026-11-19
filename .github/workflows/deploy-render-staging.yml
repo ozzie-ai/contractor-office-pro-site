@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --silent --show-error --fail-with-body --max-time 40 --request POST "$HOOK" >/dev/null
+          # Pin Render to the exact vetted main commit, not a stale service branch.\n          curl --silent --show-error --fail-with-body --max-time 40 --request POST "${HOOK}&ref=${GITHUB_SHA}" >/dev/null
           echo "Render deployment requested for existing staging service. No paid plan or new service created."
       - name: Verify new capability contract is live
         shell: bash
