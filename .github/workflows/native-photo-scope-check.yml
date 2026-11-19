@@ -1,0 +1,47 @@
+name: Native photo and scope safety checks
+on:
+  pull_request:
+    paths:
+      - 'ios/ContractorOfficePro/**'
+      - 'backend/app/photo_inspection.py'
+      - 'backend/app/main.py'
+      - 'backend/tests/test_photo_inspection.py'
+      - '.github/workflows/native-photo-scope-check.yml'
+jobs:
+  syntax-and-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse changed Apple source without Xcode signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift --version
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/PrivateJobPhotoStore.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/EstimatingAPIClient.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift
+      - name: Check privacy and approval integration contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          view=Path('ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift').read_text()
+          pdf=Path('ios/ContractorOfficePro/Services/CustomerEstimatePDF.swift').read_text()
+          api=Path('ios/ContractorOfficePro/Services/EstimatingAPIClient.swift').read_text()
+          store=Path('ios/ContractorOfficePro/Services/PrivateJobPhotoStore.swift').read_text()
+          required_view=['PhotosPicker(selection:', 'PrivateJobPhotoStore.save(data, jobID: job.id)',
+              'photoObservations = try await api().inspectPhoto', 'pendingPhotoInspection',
+              'guard response.version == 2', 'try workspace.saveApprovedEstimate(']
+          for token in required_view: assert token in view,token
+          assert 'contractorConsent: true' in api
+          assert '4_000_000' in api
+          assert 'completeFileProtectionUnlessOpen' in store
+          assert 'photos' not in pdf.lower()
+          assert 'notes' not in pdf.lower()
+          assert 'transcript' not in pdf.lower() or 'Never pass a transcript' in pdf
+          assert 'guard approved' in pdf
+          print('Swift source privacy/approval contract: PASS')
+          PY
