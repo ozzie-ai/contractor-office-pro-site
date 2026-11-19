@@ -1,5 +1,7 @@
 import Foundation
 import SwiftUI
+import PhotosUI
+import UIKit
 
 /// A focused capture → review → price → approve workflow.
 /// The backend is the authority for calculation; the user approves every quote.
@@ -27,6 +29,9 @@ struct EstimateBuilderView: View {
     @State private var pdfURL: URL?
     @State private var busy = false
     @State private var message: String?
+    @State private var photoSelection: [PhotosPickerItem] = []
+    @State private var photoFiles: [URL] = []
+    @State private var photoMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -39,7 +44,7 @@ struct EstimateBuilderView: View {
                     .pickerStyle(.segmented)
                     TextEditor(text: $notes)
                         .frame(minHeight: 110)
-                        .disabled(voice.isRecording)
+                        .disabled(voice.isRecording || busy)
                         .accessibilityLabel(Text("estimate.voice_notes"))
                     Button {
                         if voice.isRecording {
@@ -65,6 +70,7 @@ struct EstimateBuilderView: View {
                     } label: {
                         Label("estimate.analyze", systemImage: "sparkles")
                     }
+                    .disabled(busy || voice.isRecording || notes.trimmingCharacters(in: .whitespacesAndNewlines).count < 10)
                     Button(role: .destructive) {
                         voice.stop()
                         notes = ""
@@ -77,6 +83,48 @@ struct EstimateBuilderView: View {
                     Text("estimate.voice_notes")
                 } footer: {
                     Text("estimate.private_notes_notice")
+                }
+
+                Section {
+                    PhotosPicker(selection: $photoSelection, maxSelectionCount: 8,
+                                 matching: .images) {
+                        Label(dictationLanguage == "es" ? "Agregar fotos del trabajo" : "Add jobsite photos",
+                              systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(busy || photoFiles.count >= PrivateJobPhotoStore.maximumPhotos)
+                    if photoFiles.isEmpty {
+                        Text(dictationLanguage == "es"
+                             ? "Las fotos permanecen privadas en este iPhone; todavía no se analizan con IA."
+                             : "Photos stay private on this iPhone; AI photo analysis is not enabled yet.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(photoFiles, id: \.self) { url in
+                        HStack {
+                            if let data = try? Data(contentsOf: url),
+                               let image = UIImage(data: data) {
+                                Image(uiImage: image).resizable().scaledToFill()
+                                    .frame(width: 64, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            Text(url.lastPathComponent.prefix(8) + "…")
+                                .font(.caption)
+                            Spacer()
+                            Button(role: .destructive) {
+                                do {
+                                    try PrivateJobPhotoStore.remove(url, jobID: job.id)
+                                    photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+                                } catch {
+                                    photoMessage = "Could not remove photo."
+                                }
+                            } label: { Image(systemName: "trash") }
+                        }
+                    }
+                    if let photoMessage { Text(photoMessage).font(.caption).foregroundStyle(.orange) }
+                } header: {
+                    Text(dictationLanguage == "es" ? "Fotos del trabajo" : "Jobsite photos")
+                } footer: {
+                    Text(dictationLanguage == "es"
+                         ? "No se envían al servidor ni se incluyen en el presupuesto del cliente."
+                         : "Not uploaded to a server or included in the customer's PDF.")
                 }
 
                 if !items.isEmpty {
@@ -258,6 +306,9 @@ struct EstimateBuilderView: View {
                     Button("estimate.close") { voice.stop(); dismiss() }
                 }
             }
+            .onChange(of: photoSelection) { _, selected in
+                Task { await importPhotos(selected) }
+            }
             .onChange(of: voice.transcript) { _, text in
                 // Partial recognition replaces ONLY this session's segment,
                 // never the earlier dictated/typed work.
@@ -279,6 +330,7 @@ struct EstimateBuilderView: View {
             .onChange(of: customerLanguage) { _, _ in invalidatePrice() }
             .task {
                 notes = PrivateJobDraftStore.load(jobID: job.id)
+                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
                 await refreshRates()
             }
             .onDisappear { voice.stop() }
@@ -321,13 +373,53 @@ struct EstimateBuilderView: View {
         if let saved = try? await api.pricebook() { book = saved }
     }
 
+    private func importPhotos(_ selected: [PhotosPickerItem]) async {
+        guard !selected.isEmpty else { return }
+        photoMessage = nil
+        for pickerItem in selected {
+            guard photoFiles.count < PrivateJobPhotoStore.maximumPhotos else {
+                photoMessage = "Photo limit reached (8)."
+                break
+            }
+            do {
+                guard let data = try await pickerItem.loadTransferable(type: Data.self),
+                      UIImage(data: data) != nil else {
+                    photoMessage = "A selected photo could not be read."
+                    continue
+                }
+                try PrivateJobPhotoStore.save(data, jobID: job.id)
+                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+            } catch {
+                photoMessage = "A photo could not be saved. Only images under 10 MB are supported."
+            }
+        }
+        photoSelection = []
+    }
+
     private func analyze() async {
         voice.stop()
         busy = true
         message = nil
         defer { busy = false }
         do {
-            let response = try await api().interpret(notes)
+            let submittedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard submittedNotes.count >= 10 else {
+                message = "Describe the work before analyzing."
+                return
+            }
+            let response = try await api().interpret(submittedNotes)
+            // Never apply stale network results if the underlying private draft changed.
+            guard notes.trimmingCharacters(in: .whitespacesAndNewlines) == submittedNotes else {
+                message = "Job notes changed. Analyze the current description again."
+                return
+            }
+            guard response.version == 2, response.pricingStatus == "not_priced",
+                  !response.interpretation.tasks.isEmpty,
+                  response.interpretation.tasks.count <= 100,
+                  response.interpretation.tasks.allSatisfy({ !$0.descriptionEn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+                message = "Scope requires review; no work items were changed."
+                return
+            }
             items = response.interpretation.tasks.enumerated().map {
                 EditableEstimateTask($0.element, index: $0.offset, normalizeUnit: Self.unit)
             }
