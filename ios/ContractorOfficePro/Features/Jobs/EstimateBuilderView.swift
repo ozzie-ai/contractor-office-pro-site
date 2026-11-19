@@ -29,6 +29,7 @@ struct EstimateBuilderView: View {
     @State private var pdfURL: URL?
     @State private var busy = false
     @State private var message: String?
+    @State private var restoringDraft = false
     @State private var photoSelection: [PhotosPickerItem] = []
     @State private var photoFiles: [URL] = []
     @State private var photoMessage: String?
@@ -346,23 +347,41 @@ struct EstimateBuilderView: View {
                 if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
             }
             .onChange(of: notes) { _, newText in
-                // Keep voice notes available on this device even without a server.
+                guard !restoringDraft else { return }
                 PrivateJobDraftStore.save(newText, jobID: job.id)
-                // Private dictation changed: do not share stale interpreted scope.
+                // New dictation invalidates any previously extracted scope.
                 items = []
                 unknowns = []
+                resolvedUnknowns = []
                 exclusions = []
                 invalidatePrice()
+                persistReview()
             }
-            .onChange(of: items) { _, _ in invalidatePrice() }
-            .onChange(of: overhead) { _, _ in invalidatePrice() }
-            .onChange(of: profit) { _, _ in invalidatePrice() }
-            .onChange(of: tripCost) { _, _ in invalidatePrice() }
-            .onChange(of: customerLanguage) { _, _ in invalidatePrice() }
+            .onChange(of: items) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: unknowns) { _, _ in persistReview() }
+            .onChange(of: resolvedUnknowns) { _, _ in persistReview() }
+            .onChange(of: exclusions) { _, _ in persistReview() }
+            .onChange(of: overhead) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
             .task {
+                restoringDraft = true
                 notes = PrivateJobDraftStore.load(jobID: job.id)
+                if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
+                    items = review.items.map(EditableEstimateTask.init)
+                    unknowns = review.unknowns
+                    resolvedUnknowns = Set(review.resolvedUnknowns)
+                    exclusions = review.exclusions
+                    overhead = review.overhead
+                    profit = review.profit
+                    tripCost = review.tripCost
+                    customerLanguage = review.customerLanguage == "es" ? "es" : "en"
+                }
                 photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
                 await refreshRates()
+                await Task.yield()
+                restoringDraft = false
             }
             .onDisappear { voice.stop() }
         }
@@ -569,6 +588,21 @@ struct EstimateBuilderView: View {
             .replacingOccurrences(of: ",", with: "."))
     }
 
+    private func persistReview() {
+        guard !restoringDraft else { return }
+        let snapshot = EstimateReviewDraft(
+            items: items.map(\.reviewSnapshot),
+            unknowns: unknowns,
+            resolvedUnknowns: resolvedUnknowns.sorted(),
+            exclusions: exclusions,
+            overhead: overhead, profit: profit, tripCost: tripCost,
+            customerLanguage: customerLanguage
+        )
+        if !PrivateEstimateReviewStore.save(snapshot, jobID: job.id) {
+            message = "Could not save estimate draft. Keep this job open."
+        }
+    }
+
     private func invalidatePrice() {
         calculation = nil
         approved = false
@@ -593,6 +627,31 @@ private struct EditableEstimateTask: Identifiable, Equatable {
     var priceSource = "contractor_entered"
     var requiresConfirmation: Bool
     var confirmed: Bool
+
+    var reviewSnapshot: EstimateReviewDraft.Item {
+        EstimateReviewDraft.Item(taskCode: taskCode, descriptionEn: descriptionEn,
+            descriptionEs: descriptionEs, scopeID: scopeID, quantity: quantity,
+            unit: unit, laborHours: laborHours, laborRate: laborRate,
+            materialCost: materialCost, selectedRateID: selectedRateID,
+            priceSource: priceSource, requiresConfirmation: requiresConfirmation,
+            confirmed: confirmed)
+    }
+
+    init(_ stored: EstimateReviewDraft.Item) {
+        taskCode = stored.taskCode
+        descriptionEn = stored.descriptionEn
+        descriptionEs = stored.descriptionEs
+        scopeID = stored.scopeID
+        quantity = stored.quantity
+        unit = stored.unit
+        laborHours = stored.laborHours
+        laborRate = stored.laborRate
+        materialCost = stored.materialCost
+        selectedRateID = stored.selectedRateID
+        priceSource = stored.priceSource
+        requiresConfirmation = stored.requiresConfirmation
+        confirmed = stored.confirmed
+    }
 
     init(_ source: EstimatingAPIClient.InterpretationResponse.Task, index: Int,
          normalizeUnit: (String?) -> String) {

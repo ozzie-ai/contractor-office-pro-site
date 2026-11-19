@@ -1,0 +1,47 @@
+name: Native estimate draft persistence checks
+on:
+  pull_request:
+    paths:
+      - 'ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift'
+      - 'ios/ContractorOfficeProTests/PrivateEstimateReviewStoreTests.swift'
+      - '.github/workflows/swift-review-draft.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift'
+      - '.github/workflows/swift-review-draft.yml'
+
+jobs:
+  structural-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Swift source and verify protected draft lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift
+          swiftc -frontend -parse ios/ContractorOfficeProTests/PrivateEstimateReviewStoreTests.swift
+          python3 - <<'PY'
+          from pathlib import Path
+          store=Path('ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift').read_text()
+          view=Path('ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift').read_text()
+          detail=Path('ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift').read_text()
+          pdf=Path('ios/ContractorOfficePro/Services/CustomerEstimatePDF.swift').read_text()
+          for key in ('PrivateEstimateReviewStore.load(jobID: job.id)',
+                      'PrivateEstimateReviewStore.save(snapshot, jobID: job.id)',
+                      'items = review.items.map(EditableEstimateTask.init)',
+                      'guard !restoringDraft else { return }',
+                      'try workspace.saveApprovedEstimate('):
+              assert key in view,key
+          assert 'completeFileProtectionUnlessOpen' in store
+          assert 'PrivateEstimateReviewStore.clear(jobID: job.id)' in detail
+          assert 'guard approved' in pdf
+          assert 'EstimateReviewDraft' not in pdf
+          print('Native draft persistence structure and customer isolation: PASS')
+          PY

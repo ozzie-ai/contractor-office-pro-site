@@ -108,6 +108,7 @@ struct JobDetailView: View {
             Button(role: .destructive) {
                 if (try? workspace.delete(job)) != nil {
                     PrivateJobDraftStore.clear(jobID: job.id)
+                    PrivateEstimateReviewStore.clear(jobID: job.id)
                     PrivateJobPhotoStore.clear(jobID: job.id)
                     dismiss()
                 } else {
