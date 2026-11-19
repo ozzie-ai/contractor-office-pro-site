@@ -1,0 +1,81 @@
+name: Deploy Render staging (manual, free service)
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging:
+        description: 'Type DEPLOY-STAGING to deploy the approved main branch'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  test-and-deploy:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_staging == 'DEPLOY-STAGING' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Test backend before deploying
+        working-directory: backend
+        run: |
+          python -m pip install -r requirements.txt
+          PYTHONPATH=. python -m pytest -q
+      - name: Verify approved deployment prerequisites
+        env:
+          HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$HOOK" ]]; then
+            echo "::error::RENDER_STAGING_DEPLOY_HOOK_URL is not configured in GitHub Actions staging secrets. Add a deploy hook for the EXISTING free staging service, then rerun."
+            exit 1
+          fi
+          if [[ ! "$HOOK" == https://api.render.com/deploy/srv-dbtnoj3m8hqs73d0vvcg* ]]; then
+            echo "::error::Configured hook does not target the existing Contractor Office Pro staging service."
+            exit 1
+          fi
+          echo "Existing free staging service hook is configured."
+      - name: Trigger deployment of staging service only
+        env:
+          HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pin Render to the exact vetted main commit, not a stale service branch.
+          curl --silent --show-error --fail-with-body --max-time 40 --request POST "${HOOK}&ref=${GITHUB_SHA}" >/dev/null
+          echo "Render deployment requested for existing staging service. No paid plan or new service created."
+      - name: Verify new capability contract is live
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://contractor-office-pro-api-staging.onrender.com"
+          for n in $(seq 1 25); do
+            status="$(curl -sSL --connect-timeout 10 --max-time 40 -o /tmp/cop_capabilities.json -w '%{http_code}' "$base/v1/capabilities" || true)"
+            if [[ "$status" == "200" ]] && python3 - <<'PY'
+          import json
+          p=json.load(open('/tmp/cop_capabilities.json'))
+          assert p.get('deterministic_device_interpretation') is True
+          assert p.get('pricing_math_available') is True
+          assert p.get('live_provider_verification') is False
+          PY
+            then
+              echo "Release contract available on Render: deterministic interpretation + pricing math present."
+              exit 0
+            fi
+            echo "Waiting for staging deployment, attempt $n: HTTP $status"
+            sleep 18
+          done
+          echo "::error::Deployment was triggered but updated /v1/capabilities could not be verified; inspect Render deploy logs."
+          exit 1
