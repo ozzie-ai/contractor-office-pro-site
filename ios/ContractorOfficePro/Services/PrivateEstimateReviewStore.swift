@@ -15,7 +15,7 @@ nonisolated struct EstimateReviewDraft: Codable, Equatable {
         var laborRate: String
         var materialCost: String
         /// Optional so older saved drafts can still decode safely.
-        var equipmentCost: String?
+        var equipmentCost: String? = nil
         var selectedRateID: String
         var priceSource: String
         var requiresConfirmation: Bool
