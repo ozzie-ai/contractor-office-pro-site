@@ -142,11 +142,11 @@ test('new wiring does not get device replacement rates',()=>{
 test('five-device dictation: two standard plus three GFCI gets a provisional $625 reviewable amount',()=>{
  const description='Replace five outlets, two normal outlets and three GFCIs.';
  const scope=localEstimate(description,'electrical');
- assert.equal(scope.lines.find(x=>x.id==='local-standard-outlets')?.quantity,2);
- assert.equal(scope.lines.find(x=>x.id==='local-gfci')?.quantity,3);
+ assert.equal(scope.lines.find(x=>x.id==='local-outlets-standard')?.quantity,2);
+ assert.equal(scope.lines.find(x=>x.id==='local-outlets-gfci')?.quantity,3);
  const draft=suggestPreliminaryPrices('electrical',scope.lines,description);
- assert.equal(draft.lines.find(x=>x.id==='local-standard-outlets')?.rate,95);
- assert.equal(draft.lines.find(x=>x.id==='local-gfci')?.rate,145);
+ assert.equal(draft.lines.find(x=>x.id==='local-outlets-standard')?.rate,95);
+ assert.equal(draft.lines.find(x=>x.id==='local-outlets-gfci')?.rate,145);
  assert.equal(draft.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
  assert.equal(estimate.estimateReadiness({lines:draft.lines}).ready,false,'Contractor review remains mandatory');
  assert.ok(draft.notes.some(x=>x.includes('Confirm wiring')));
