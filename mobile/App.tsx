@@ -669,6 +669,15 @@ export default function App(){
       patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative outlet-device replacement example')?{...item,rateSource:'Contractor-reviewed outlet example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor accepted historical example; not a verified supplier quotation'}}:item)});
      }}/>
     </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative existing-wiring device allowance'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Approve estimated device replacement rates','Aprobar precios preliminares para dispositivos')}</Text>
+     <Text style={styles.notice}>{tr('The amounts for switches, standard outlets and GFCIs are planning assumptions with existing wiring, not verified supplier quotations. Check site conditions, material and labor before sharing.','Los montos para interruptores, tomacorrientes normales y GFCI son supuestos con cableado existente, no precios verificados de proveedores. Revisa materiales, mano de obra y condiciones antes de compartir.')}</Text>
+     <Action title={tr('Approve these reviewed rates for this job','Aprobar estas tarifas revisadas para este trabajo')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative existing-wiring device allowance')?{...item,
+       rateSource:'Contractor-reviewed device planning allowance',
+       priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor reviewed and accepted planning allowance; not a live supplier price'}}:item)});
+     }}/>
+    </View>}
     {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative legacy field estimate'))&&<View style={styles.lineCard}>
      <Text style={styles.h2}>{tr('Review restored field estimate','Revisar estimado recuperado')}</Text>
      <Text style={styles.notice}>{tr('Concrete and faucet prices are historical editable planning examples—not live supplier quotes. Confirm site access, scope and prices before sending.','Los precios de concreto y grifos son ejemplos anteriores editables, no cotizaciones actuales. Confirma acceso, alcance y tarifas antes de enviar.')}</Text>
