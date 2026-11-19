@@ -230,6 +230,8 @@ struct EstimateBuilderView: View {
                                     .keyboardType(.decimalPad)
                                 TextField("estimate.material_per_unit", text: $item.materialCost)
                                     .keyboardType(.decimalPad)
+                                TextField("Equipment per unit / Equipo por unidad", text: $item.equipmentCost)
+                                    .keyboardType(.decimalPad)
                                 Picker("estimate.price_source", selection: $item.priceSource) {
                                     Text("estimate.contractor_rate").tag("contractor_entered")
                                     Text("estimate.allowance").tag("planning_allowance")
@@ -619,6 +621,7 @@ struct EstimateBuilderView: View {
                     laborHoursPerUnit: Self.decimal(item.laborHours) ?? -1,
                     loadedLaborRate: Self.decimal(item.laborRate) ?? -1,
                     materialCostPerUnit: Self.decimal(item.materialCost) ?? -1,
+                    equipmentCostPerUnit: item.equipmentCost.isEmpty ? 0 : (Self.decimal(item.equipmentCost) ?? -1),
                     source: item.priceSource
                 ) : nil
                 return EstimatingAPIClient.WorkItem(
@@ -725,6 +728,7 @@ private struct EditableEstimateTask: Identifiable, Equatable {
     var laborHours = ""
     var laborRate = ""
     var materialCost = ""
+    var equipmentCost = ""
     var selectedRateID = ""
     var priceSource = "contractor_entered"
     var requiresConfirmation: Bool
@@ -734,7 +738,8 @@ private struct EditableEstimateTask: Identifiable, Equatable {
         EstimateReviewDraft.Item(taskCode: taskCode, descriptionEn: descriptionEn,
             descriptionEs: descriptionEs, scopeID: scopeID, quantity: quantity,
             unit: unit, laborHours: laborHours, laborRate: laborRate,
-            materialCost: materialCost, selectedRateID: selectedRateID,
+            materialCost: materialCost, equipmentCost: equipmentCost,
+            selectedRateID: selectedRateID,
             priceSource: priceSource, requiresConfirmation: requiresConfirmation,
             confirmed: confirmed)
     }
@@ -749,6 +754,7 @@ private struct EditableEstimateTask: Identifiable, Equatable {
         laborHours = stored.laborHours
         laborRate = stored.laborRate
         materialCost = stored.materialCost
+        equipmentCost = stored.equipmentCost ?? ""
         selectedRateID = stored.selectedRateID
         priceSource = stored.priceSource
         requiresConfirmation = stored.requiresConfirmation
