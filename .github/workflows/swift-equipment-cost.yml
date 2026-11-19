@@ -1,0 +1,39 @@
+name: Native equipment unit cost contract
+on:
+  pull_request:
+    paths:
+      - ios/ContractorOfficePro/Services/EstimatingAPIClient.swift
+      - ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift
+      - ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+      - ios/ContractorOfficeProTests/EquipmentPricingContractTests.swift
+      - .github/workflows/swift-equipment-cost.yml
+  push:
+    branches: [main]
+    paths:
+      - ios/ContractorOfficePro/Services/EstimatingAPIClient.swift
+      - .github/workflows/swift-equipment-cost.yml
+jobs:
+  native-pricing-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift syntax and equipment rate wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/EstimatingAPIClient.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          swiftc -frontend -parse ios/ContractorOfficeProTests/EquipmentPricingContractTests.swift
+          python3 - <<'PY'
+          from pathlib import Path
+          builder=Path('ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift').read_text()
+          bridge=Path('ios/ContractorOfficePro/Services/EstimatingAPIClient.swift').read_text()
+          draft=Path('ios/ContractorOfficePro/Services/PrivateEstimateReviewStore.swift').read_text()
+          assert 'equipmentCostPerUnit: item.equipmentCost.isEmpty ? 0' in builder
+          assert 'equipmentCostPerUnit: Decimal = 0' in bridge
+          assert 'equipmentCost: String? = nil' in draft
+          assert 'equipmentCost = stored.equipmentCost ?? ""' in builder
+          print('Swift equipment pricing and saved draft compatibility: PASS')
+          PY
