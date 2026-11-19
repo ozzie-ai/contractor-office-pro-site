@@ -54,6 +54,25 @@ struct EstimatingAPIClient {
         let pricingStatus: String
     }
 
+    struct PhotoInspectionRequest: Encodable, Sendable {
+        let imageBase64: String
+        let mimeType: String
+        let contractorConsent: Bool
+        let context: String
+    }
+
+    struct PhotoInspectionResponse: Decodable, Sendable {
+        struct Observations: Decodable, Sendable {
+            let visibleConditions: [String]
+            let possibleWork: [String]
+            let missingInformation: [String]
+            let limitations: [String]
+        }
+        let observations: Observations
+        let pricingStatus: String
+        let approvedForScope: Bool
+    }
+
     struct DirectCost: Encodable, Sendable {
         let laborHoursPerUnit: Decimal
         let loadedLaborRate: Decimal
@@ -163,6 +182,23 @@ struct EstimatingAPIClient {
 
     func interpret(_ description: String) async throws -> InterpretationResponse {
         try await post("v1/interpret", body: InterpretationRequest(description: description))
+    }
+
+    /// Explicit per-photo consent only. Only an encoded image and bounded
+    /// context are transmitted; no private transcript is sent by this method.
+    func inspectPhoto(jpegData: Data, context: String) async throws -> PhotoInspectionResponse {
+        guard !jpegData.isEmpty, jpegData.count <= 4_000_000, context.count <= 1500 else {
+            throw Failure.unexpectedResponse
+        }
+        let body = PhotoInspectionRequest(
+            imageBase64: jpegData.base64EncodedString(),
+            mimeType: "image/jpeg", contractorConsent: true, context: context
+        )
+        let response: PhotoInspectionResponse = try await post("v1/photo/inspect", body: body)
+        guard response.pricingStatus == "not_priced", response.approvedForScope == false else {
+            throw Failure.unexpectedResponse
+        }
+        return response
     }
 
     func price(_ draft: PriceRequest) async throws -> PriceResponse {
