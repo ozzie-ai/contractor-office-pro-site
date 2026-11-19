@@ -38,6 +38,37 @@ struct EstimatingAPIClient {
             let specifications: [String]
             let status: String
             let taskCode: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case category, descriptionEn, descriptionEs, quantity, unit
+                case specifications, status, taskCode
+            }
+
+            init(from decoder: Decoder) throws {
+                let values = try decoder.container(keyedBy: CodingKeys.self)
+                category = try values.decode(String.self, forKey: .category)
+                descriptionEn = try values.decode(String.self, forKey: .descriptionEn)
+                descriptionEs = try values.decode(String.self, forKey: .descriptionEs)
+                // FastAPI serializes Decimal quantities as numeric JSON, not
+                // strings. Accept both without silently converting invalid
+                // quantities to zero.
+                if let string = try? values.decode(String.self, forKey: .quantity) {
+                    quantity = string
+                } else if let number = try? values.decode(Decimal.self, forKey: .quantity) {
+                    quantity = NSDecimalNumber(decimal: number).stringValue
+                } else if try values.decodeNil(forKey: .quantity) {
+                    quantity = nil
+                } else {
+                    throw DecodingError.typeMismatch(
+                        String.self, .init(codingPath: values.codingPath + [CodingKeys.quantity],
+                        debugDescription: "Quantity must be a number, text, or null")
+                    )
+                }
+                unit = try values.decodeIfPresent(String.self, forKey: .unit)
+                specifications = try values.decode([String].self, forKey: .specifications)
+                status = try values.decode(String.self, forKey: .status)
+                taskCode = try values.decodeIfPresent(String.self, forKey: .taskCode)
+            }
         }
         struct Job: Decodable, Sendable {
             let trade: String
