@@ -38,7 +38,7 @@ final class BackendInterpretationContractTests: XCTestCase {
     }
 
     func testLegacyStringQuantityAndMissingQuantityRemainExplicit() throws {
-        XCTAssertEqual(try decode("\\"3\\"").interpretation.tasks.first?.quantity, "3")
+        XCTAssertEqual(try decode(#""3""#).interpretation.tasks.first?.quantity, "3")
         XCTAssertNil(try decode("null").interpretation.tasks.first?.quantity)
     }
 
