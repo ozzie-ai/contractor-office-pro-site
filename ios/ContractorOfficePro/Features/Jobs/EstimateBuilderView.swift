@@ -520,8 +520,15 @@ struct EstimateBuilderView: View {
                 blueprintMessage = "Could not prepare a blueprint preview."
                 return
             }
-            photoObservations = try await api().inspectPhoto(jpegData: jpeg,
+            let inspected = try await api().inspectPhoto(jpegData: jpeg,
                 context: "Raster preview of page 1 from blueprint PDF. Only printed dimensions may be quoted and must be verified; do not infer scale or prices.")
+            // A removed/replaced blueprint must never display observations from
+            // an earlier upload after the network request finishes.
+            guard PrivateBlueprintStore.load(jobID: job.id) == url, blueprintURL == url else {
+                blueprintMessage = "Blueprint changed while inspecting. Select the current file again."
+                return
+            }
+            photoObservations = inspected
         } catch {
             blueprintMessage = "AI blueprint review unavailable. The stored PDF is unchanged."
         }
@@ -540,7 +547,15 @@ struct EstimateBuilderView: View {
                 return
             }
             // Never upload private transcription or pricing with the photo.
-            photoObservations = try await api().inspectPhoto(jpegData: jpeg, context: "")
+            let inspected = try await api().inspectPhoto(jpegData: jpeg, context: "")
+            // Do not present analysis of a photo that was deleted or replaced
+            // during the network request.
+            guard PrivateJobPhotoStore.files(jobID: job.id).contains(url),
+                  photoFiles.contains(url) else {
+                photoMessage = "Photo changed during inspection. Choose the current photo again."
+                return
+            }
+            photoObservations = inspected
         } catch {
             photoMessage = "AI photo review is unavailable. The local photo and estimate are unchanged."
         }
