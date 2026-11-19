@@ -94,99 +94,8 @@ struct EstimateBuilderView: View {
                     Text("estimate.private_notes_notice")
                 }
 
-                Section {
-                    PhotosPicker(selection: $photoSelection, maxSelectionCount: 8,
-                                 matching: .images) {
-                        Label(dictationLanguage == "es" ? "Agregar fotos del trabajo" : "Add jobsite photos",
-                              systemImage: "photo.on.rectangle.angled")
-                    }
-                    .disabled(busy || photoFiles.count >= PrivateJobPhotoStore.maximumPhotos)
-                    if photoFiles.isEmpty {
-                        Text(dictationLanguage == "es"
-                             ? "Las fotos permanecen en este iPhone, salvo que autorices enviar una imagen seleccionada para revisión con IA."
-                             : "Photos stay on this iPhone unless you explicitly approve sending a selected image for AI review.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    ForEach(photoFiles, id: \.self) { url in
-                        HStack {
-                            if let data = try? Data(contentsOf: url),
-                               let image = UIImage(data: data) {
-                                Image(uiImage: image).resizable().scaledToFill()
-                                    .frame(width: 64, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            Text(String(url.lastPathComponent.prefix(8)) + "…")
-                                .font(.caption)
-                            Spacer()
-                            Button {
-                                pendingPhotoInspection = url
-                            } label: { Image(systemName: "sparkles") }
-                                .disabled(busy)
-                                .accessibilityLabel("Review photo with AI (requires consent)")
-                            Button(role: .destructive) {
-                                do {
-                                    photoObservations = nil
-                                    try PrivateJobPhotoStore.remove(url, jobID: job.id)
-                                    photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
-                                } catch {
-                                    photoMessage = "Could not remove photo."
-                                }
-                            } label: { Image(systemName: "trash") }
-                        }
-                    }
-                    if let insight = photoObservations {
-                        Text("AI VISUAL OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
-                        ForEach(insight.observations.visibleConditions, id: \.self) { Text("Visible: " + $0) }
-                        ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
-                        ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
-                        ForEach(insight.observations.limitations, id: \.self) { Text("Limit: " + $0) }
-                        Text("Photo observations are not added to the estimate automatically.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let photoMessage { Text(photoMessage).font(.caption).foregroundStyle(.orange) }
-                } header: {
-                    Text(dictationLanguage == "es" ? "Fotos del trabajo" : "Jobsite photos")
-                } footer: {
-                    Text(dictationLanguage == "es"
-                         ? "Solo se envía la imagen que autorices para revisión con IA; no se incluye en el PDF del cliente."
-                         : "Only a photo you authorize for AI review is uploaded; images are excluded from the customer's PDF.")
-                }
-
-                Section {
-                    Button {
-                        showBlueprintImporter = true
-                    } label: {
-                        Label(dictationLanguage == "es" ? "Adjuntar plano PDF" : "Attach blueprint PDF",
-                              systemImage: "doc.richtext")
-                    }
-                    if let blueprintURL {
-                        HStack {
-                            Label(dictationLanguage == "es" ? "Plano guardado en este iPhone" : "Blueprint saved on this iPhone",
-                                  systemImage: "doc.text")
-                            Spacer()
-                            Button {
-                                showBlueprintConsent = true
-                            } label: { Image(systemName: "sparkles") }
-                                .disabled(busy)
-                                .accessibilityLabel("Review first blueprint page with AI (requires consent)")
-                            Button(role: .destructive) {
-                                PrivateBlueprintStore.clear(jobID: job.id)
-                                self.blueprintURL = nil
-                                photoObservations = nil
-                            } label: { Image(systemName: "trash") }
-                        }
-                        Text(blueprintURL.lastPathComponent)
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let blueprintMessage {
-                        Text(blueprintMessage).font(.caption).foregroundStyle(.orange)
-                    }
-                } header: {
-                    Text(dictationLanguage == "es" ? "Planos" : "Blueprints")
-                } footer: {
-                    Text(dictationLanguage == "es"
-                         ? "Se guarda localmente. La IA solo analizará una imagen de la primera página si lo autorizas; no calcula mediciones definitivas."
-                         : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
-                }
+                photoSection
+                blueprintSection
 
                 if !items.isEmpty {
                     Section {
@@ -447,6 +356,108 @@ struct EstimateBuilderView: View {
             }
             .onDisappear { voice.stop() }
         }
+    }
+
+    // Separate photo/blueprint SwiftUI builder expressions to keep Xcode
+    // typechecking within its limits as the native screen grows.
+    private var photoSection: some View {
+                Section {
+                    PhotosPicker(selection: $photoSelection, maxSelectionCount: 8,
+                                 matching: .images) {
+                        Label(dictationLanguage == "es" ? "Agregar fotos del trabajo" : "Add jobsite photos",
+                              systemImage: "photo.on.rectangle.angled")
+                    }
+                    .disabled(busy || photoFiles.count >= PrivateJobPhotoStore.maximumPhotos)
+                    if photoFiles.isEmpty {
+                        Text(dictationLanguage == "es"
+                             ? "Las fotos permanecen en este iPhone, salvo que autorices enviar una imagen seleccionada para revisión con IA."
+                             : "Photos stay on this iPhone unless you explicitly approve sending a selected image for AI review.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    ForEach(photoFiles, id: \.self) { url in
+                        HStack {
+                            if let data = try? Data(contentsOf: url),
+                               let image = UIImage(data: data) {
+                                Image(uiImage: image).resizable().scaledToFill()
+                                    .frame(width: 64, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            Text(String(url.lastPathComponent.prefix(8)) + "…")
+                                .font(.caption)
+                            Spacer()
+                            Button {
+                                pendingPhotoInspection = url
+                            } label: { Image(systemName: "sparkles") }
+                                .disabled(busy)
+                                .accessibilityLabel("Review photo with AI (requires consent)")
+                            Button(role: .destructive) {
+                                do {
+                                    photoObservations = nil
+                                    try PrivateJobPhotoStore.remove(url, jobID: job.id)
+                                    photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+                                } catch {
+                                    photoMessage = "Could not remove photo."
+                                }
+                            } label: { Image(systemName: "trash") }
+                        }
+                    }
+                    if let insight = photoObservations {
+                        Text("AI VISUAL OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
+                        ForEach(insight.observations.visibleConditions, id: \.self) { Text("Visible: " + $0) }
+                        ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
+                        ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
+                        ForEach(insight.observations.limitations, id: \.self) { Text("Limit: " + $0) }
+                        Text("Photo observations are not added to the estimate automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let photoMessage { Text(photoMessage).font(.caption).foregroundStyle(.orange) }
+                } header: {
+                    Text(dictationLanguage == "es" ? "Fotos del trabajo" : "Jobsite photos")
+                } footer: {
+                    Text(dictationLanguage == "es"
+                         ? "Solo se envía la imagen que autorices para revisión con IA; no se incluye en el PDF del cliente."
+                         : "Only a photo you authorize for AI review is uploaded; images are excluded from the customer's PDF.")
+                }
+
+    }
+
+    private var blueprintSection: some View {
+                Section {
+                    Button {
+                        showBlueprintImporter = true
+                    } label: {
+                        Label(dictationLanguage == "es" ? "Adjuntar plano PDF" : "Attach blueprint PDF",
+                              systemImage: "doc.richtext")
+                    }
+                    if let blueprintURL {
+                        HStack {
+                            Label(dictationLanguage == "es" ? "Plano guardado en este iPhone" : "Blueprint saved on this iPhone",
+                                  systemImage: "doc.text")
+                            Spacer()
+                            Button {
+                                showBlueprintConsent = true
+                            } label: { Image(systemName: "sparkles") }
+                                .disabled(busy)
+                                .accessibilityLabel("Review first blueprint page with AI (requires consent)")
+                            Button(role: .destructive) {
+                                PrivateBlueprintStore.clear(jobID: job.id)
+                                self.blueprintURL = nil
+                                photoObservations = nil
+                            } label: { Image(systemName: "trash") }
+                        }
+                        Text(blueprintURL.lastPathComponent)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let blueprintMessage {
+                        Text(blueprintMessage).font(.caption).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text(dictationLanguage == "es" ? "Planos" : "Blueprints")
+                } footer: {
+                    Text(dictationLanguage == "es"
+                         ? "Se guarda localmente. La IA solo analizará una imagen de la primera página si lo autorizas; no calcula mediciones definitivas."
+                         : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
+                }
+
     }
 
     private static let units = ["each", "job", "sq ft", "linear ft", "cu yd", "hr", "day"]
