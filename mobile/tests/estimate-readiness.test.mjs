@@ -47,7 +47,7 @@ test('Every trade customer PDF hides individual labor, material purchase rates, 
   ]};
   const html=proposalHtml(p);
   assert.ok(html.includes('Interior eggshell paint'),trade+' scope missing');
-  assert.ok(html.includes('total project price'),trade+' bundled selling price missing');
+  assert.ok(html.includes(trade==='cleaning'?'total project price':'<td>Interior eggshell paint</td>'),trade+' customer selling-price line missing');
   for(const leaked of ['Painting labor total crew hours','Mobilization and purchasing cost','$37.98','$60.00','$75.00','Overhead','Profit markup','>Profit<','>Subtotal<'])assert.equal(html.includes(leaked),false,trade+' leaked '+leaked);
   assert.ok(html.includes(money(totals(p).total)),trade+' selling price missing');
  }
