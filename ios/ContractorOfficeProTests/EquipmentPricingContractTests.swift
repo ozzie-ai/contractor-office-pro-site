@@ -3,6 +3,7 @@ import XCTest
 @testable import ContractorOfficePro
 
 final class EquipmentPricingContractTests: XCTestCase {
+    @MainActor
     func testEquipmentCostEncodesForSharedPricingEngine() throws {
         let cost = EstimatingAPIClient.DirectCost(
             laborHoursPerUnit: 1.5, loadedLaborRate: 65,
@@ -16,6 +17,7 @@ final class EquipmentPricingContractTests: XCTestCase {
         XCTAssertEqual(Decimal(string: String(describing: object["material_cost_per_unit"] ?? "")), 25)
     }
 
+    @MainActor
     func testOlderReviewDraftWithoutEquipmentStillDecodes() throws {
         let raw = """
         {"version":1,"items":[{"taskCode":"switch","descriptionEn":"Replace switch",
