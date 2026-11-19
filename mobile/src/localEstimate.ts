@@ -113,8 +113,9 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   // upgrade even if voice transcription drops the word "upgrade".
   const upgrade=panel&&(/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*|convert\w*)\b/.test(s)||(amps.includes(100)&&amps.includes(200)));
   const dedicatedBreaker=/(?:\b(breaker|interruptor termomagnetico|disyuntor)\b)/.test(s)&&/\b(posterior\w*|despues|future|later|otro trabajo|only|solo|solamente|nomas|unicamente)\b/.test(s);
-  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/)
-   ||s.match(/\b(\d{1,3}|veinte|twenty)\b[^.!?\n]{0,38}?\b(?:circuits?|circuitos?)\b/);
+  // Require a number tied directly to a circuit noun. A loose 38-character
+  // search wrongly interprets "3 GFCIs with new wiring and circuits" as 3 circuits.
+  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/);
   const circuitQty=circuits?parseCount(circuits[1]):0;
   const permit=/\b(permiso|permit|inspection|inspeccion)\b/.test(s);
   const permitSection=s.match(/(?:permiso|permit)[^.!?\n]{0,90}/)?.[0]||'';
