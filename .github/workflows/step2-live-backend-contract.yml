@@ -41,6 +41,14 @@ jobs:
           code="$(curl -sS --connect-timeout 15 --max-time 40 -o "$tmp/noauth" -w '%{http_code}' "$base/v1/account/status" || true)"
           echo "No-token account status HTTP $code"
           [[ "$code" == "401" ]] || { echo "::error::Account endpoint must reject anonymous access (401)"; exit 1; }
+          # Invalid token exercises the Supabase configuration boundary without
+          # creating a user or disclosing credentials. 401 = auth configured
+          # and token rejected; 503 = missing auth configuration/provider.
+          code="$(curl -sS --connect-timeout 15 --max-time 40 \
+            -H 'Authorization: Bearer invalid-step2-probe-token' \
+            -o "$tmp/badtoken" -w '%{http_code}' "$base/v1/account/status" || true)"
+          echo "Invalid bearer token HTTP $code"
+          [[ "$code" == "401" ]] || { echo "::error::Authenticated provider boundary not ready (expected 401 invalid-token rejection)"; exit 1; }
           code="$(curl -sS --connect-timeout 15 --max-time 40 -o "$tmp/ready" -w '%{http_code}' "$base/ready" || true)"
           echo "Optional configuration readiness HTTP $code (200 or 503 allowed)"
           [[ "$code" == "200" || "$code" == "503" ]] || { echo "::error::Unexpected readiness response"; exit 1; }
