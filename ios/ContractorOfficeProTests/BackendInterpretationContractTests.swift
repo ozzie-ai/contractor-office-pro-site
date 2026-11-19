@@ -3,6 +3,7 @@ import XCTest
 @testable import ContractorOfficePro
 
 final class BackendInterpretationContractTests: XCTestCase {
+    @MainActor
     private func decode(_ quantityJSON: String) throws -> EstimatingAPIClient.InterpretationResponse {
         let body = """
         {
@@ -32,16 +33,19 @@ final class BackendInterpretationContractTests: XCTestCase {
                                   from: Data(body.utf8))
     }
 
+    @MainActor
     func testPythonNumericQuantityLoadsInSwiftWithoutLosingWorkItem() throws {
         XCTAssertEqual(try decode("2").interpretation.tasks.first?.quantity, "2")
         XCTAssertEqual(try decode("2.5").interpretation.tasks.first?.quantity, "2.5")
     }
 
+    @MainActor
     func testLegacyStringQuantityAndMissingQuantityRemainExplicit() throws {
         XCTAssertEqual(try decode(#""3""#).interpretation.tasks.first?.quantity, "3")
         XCTAssertNil(try decode("null").interpretation.tasks.first?.quantity)
     }
 
+    @MainActor
     func testMalformedQuantityIsRejectedRatherThanInventingZero() {
         XCTAssertThrowsError(try decode("true"))
     }
