@@ -103,8 +103,8 @@ struct EstimateBuilderView: View {
                     .disabled(busy || photoFiles.count >= PrivateJobPhotoStore.maximumPhotos)
                     if photoFiles.isEmpty {
                         Text(dictationLanguage == "es"
-                             ? "Las fotos permanecen privadas en este iPhone; todavía no se analizan con IA."
-                             : "Photos stay private on this iPhone; AI photo analysis is not enabled yet.")
+                             ? "Las fotos permanecen en este iPhone, salvo que autorices enviar una imagen seleccionada para revisión con IA."
+                             : "Photos stay on this iPhone unless you explicitly approve sending a selected image for AI review.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     ForEach(photoFiles, id: \.self) { url in
@@ -147,8 +147,8 @@ struct EstimateBuilderView: View {
                     Text(dictationLanguage == "es" ? "Fotos del trabajo" : "Jobsite photos")
                 } footer: {
                     Text(dictationLanguage == "es"
-                         ? "No se envían al servidor ni se incluyen en el presupuesto del cliente."
-                         : "Not uploaded to a server or included in the customer's PDF.")
+                         ? "Solo se envía la imagen que autorices para revisión con IA; no se incluye en el PDF del cliente."
+                         : "Only a photo you authorize for AI review is uploaded; images are excluded from the customer's PDF.")
                 }
 
                 Section {
