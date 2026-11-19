@@ -1,0 +1,47 @@
+name: Native blueprint PDF safety checks
+on:
+  pull_request:
+    paths:
+      - 'ios/ContractorOfficePro/Services/PrivateBlueprintStore.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift'
+      - 'ios/ContractorOfficeProTests/PrivateBlueprintStoreTests.swift'
+      - '.github/workflows/swift-blueprint-intake.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/ContractorOfficePro/Services/PrivateBlueprintStore.swift'
+      - '.github/workflows/swift-blueprint-intake.yml'
+
+jobs:
+  blueprint-source-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift syntax and blueprint privacy contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc -frontend -parse ios/ContractorOfficePro/Services/PrivateBlueprintStore.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          swiftc -frontend -parse ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift
+          swiftc -frontend -parse ios/ContractorOfficeProTests/PrivateBlueprintStoreTests.swift
+          python3 - <<'PY'
+          from pathlib import Path
+          view=Path('ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift').read_text()
+          store=Path('ios/ContractorOfficePro/Services/PrivateBlueprintStore.swift').read_text()
+          pdf=Path('ios/ContractorOfficePro/Services/CustomerEstimatePDF.swift').read_text()
+          detail=Path('ios/ContractorOfficePro/Features/Jobs/JobDetailView.swift').read_text()
+          for token in ('fileImporter(isPresented: $showBlueprintImporter',
+                        'PDFDocument(data: data)', 'PrivateBlueprintStore.save(data, jobID: job.id)',
+                        'firstPage.thumbnail(', 'showBlueprintConsent',
+                        'PrivateBlueprintStore.load(jobID: job.id)'):
+              assert token in view,token
+          assert 'completeFileProtectionUnlessOpen' in store
+          assert '15_000_000' in store
+          assert 'PrivateBlueprintStore.clear(jobID: job.id)' in detail
+          assert 'PrivateBlueprintStore' not in pdf
+          assert 'PDFDocument' not in pdf
+          print('Blueprint local storage, explicit AI consent, and customer PDF separation: PASS')
+          PY

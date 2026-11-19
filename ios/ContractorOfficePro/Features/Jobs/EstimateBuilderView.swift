@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 import PhotosUI
 import UIKit
+import PDFKit
+import UniformTypeIdentifiers
 
 /// A focused capture → review → price → approve workflow.
 /// The backend is the authority for calculation; the user approves every quote.
@@ -35,6 +37,10 @@ struct EstimateBuilderView: View {
     @State private var photoMessage: String?
     @State private var pendingPhotoInspection: URL?
     @State private var photoObservations: EstimatingAPIClient.PhotoInspectionResponse?
+    @State private var showBlueprintImporter = false
+    @State private var blueprintURL: URL?
+    @State private var blueprintMessage: String?
+    @State private var showBlueprintConsent = false
 
     var body: some View {
         NavigationStack {
@@ -128,7 +134,7 @@ struct EstimateBuilderView: View {
                         }
                     }
                     if let insight = photoObservations {
-                        Text("AI PHOTO OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
+                        Text("AI VISUAL OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
                         ForEach(insight.observations.visibleConditions, id: \.self) { Text("Visible: " + $0) }
                         ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
                         ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
@@ -143,6 +149,43 @@ struct EstimateBuilderView: View {
                     Text(dictationLanguage == "es"
                          ? "No se envían al servidor ni se incluyen en el presupuesto del cliente."
                          : "Not uploaded to a server or included in the customer's PDF.")
+                }
+
+                Section {
+                    Button {
+                        showBlueprintImporter = true
+                    } label: {
+                        Label(dictationLanguage == "es" ? "Adjuntar plano PDF" : "Attach blueprint PDF",
+                              systemImage: "doc.richtext")
+                    }
+                    if let blueprintURL {
+                        HStack {
+                            Label(dictationLanguage == "es" ? "Plano guardado en este iPhone" : "Blueprint saved on this iPhone",
+                                  systemImage: "doc.text")
+                            Spacer()
+                            Button {
+                                showBlueprintConsent = true
+                            } label: { Image(systemName: "sparkles") }
+                                .disabled(busy)
+                                .accessibilityLabel("Review first blueprint page with AI (requires consent)")
+                            Button(role: .destructive) {
+                                PrivateBlueprintStore.clear(jobID: job.id)
+                                self.blueprintURL = nil
+                                photoObservations = nil
+                            } label: { Image(systemName: "trash") }
+                        }
+                        Text(blueprintURL.lastPathComponent)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if let blueprintMessage {
+                        Text(blueprintMessage).font(.caption).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text(dictationLanguage == "es" ? "Planos" : "Blueprints")
+                } footer: {
+                    Text(dictationLanguage == "es"
+                         ? "Se guarda localmente. La IA solo analizará una imagen de la primera página si lo autorizas; no calcula mediciones definitivas."
+                         : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
                 }
 
                 if !items.isEmpty {
@@ -324,6 +367,22 @@ struct EstimateBuilderView: View {
                     Button("estimate.close") { voice.stop(); dismiss() }
                 }
             }
+            .fileImporter(isPresented: $showBlueprintImporter, allowedContentTypes: [.pdf]) { result in
+                switch result {
+                case .success(let url): importBlueprint(url)
+                case .failure: blueprintMessage = "Blueprint selection failed."
+                }
+            }
+            .confirmationDialog("Send the first blueprint page to AI for review?",
+                                isPresented: $showBlueprintConsent,
+                                titleVisibility: .visible) {
+                Button("Send first blueprint page for AI observations") {
+                    if let blueprintURL { Task { await inspectBlueprintPage(blueprintURL) } }
+                }
+                Button("Keep blueprint private", role: .cancel) {}
+            } message: {
+                Text("Only a raster image of page 1 is uploaded when enabled; the PDF remains private. Printed dimensions and quantities must be independently checked.")
+            }
             .confirmationDialog("Send this jobsite photo to AI for review?",
                                 isPresented: Binding(
                                     get: { pendingPhotoInspection != nil },
@@ -379,6 +438,7 @@ struct EstimateBuilderView: View {
                     customerLanguage = review.customerLanguage == "es" ? "es" : "en"
                 }
                 photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+                blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
                 await refreshRates()
                 await Task.yield()
                 restoringDraft = false
@@ -421,6 +481,48 @@ struct EstimateBuilderView: View {
     private func refreshRates() async {
         guard let api = try? api() else { return }
         if let saved = try? await api.pricebook() { book = saved }
+    }
+
+    private func importBlueprint(_ source: URL) {
+        blueprintMessage = nil
+        let access = source.startAccessingSecurityScopedResource()
+        defer { if access { source.stopAccessingSecurityScopedResource() } }
+        do {
+            let data = try Data(contentsOf: source)
+            guard let document = PDFDocument(data: data), document.pageCount > 0 else {
+                blueprintMessage = "Invalid or unreadable blueprint PDF."
+                return
+            }
+            blueprintURL = try PrivateBlueprintStore.save(data, jobID: job.id)
+            photoObservations = nil
+        } catch {
+            blueprintMessage = "Could not save the blueprint. PDF limit: 15 MB."
+        }
+    }
+
+    private func inspectBlueprintPage(_ url: URL) async {
+        busy = true
+        blueprintMessage = nil
+        photoObservations = nil
+        defer { busy = false }
+        do {
+            guard PrivateBlueprintStore.load(jobID: job.id) == url,
+                  let data = try? Data(contentsOf: url),
+                  let document = PDFDocument(data: data),
+                  let firstPage = document.page(at: 0) else {
+                blueprintMessage = "Could not read the first blueprint page."
+                return
+            }
+            let image = firstPage.thumbnail(of: CGSize(width: 1280, height: 1656), for: .cropBox)
+            guard let jpeg = image.jpegData(compressionQuality: 0.65) else {
+                blueprintMessage = "Could not prepare a blueprint preview."
+                return
+            }
+            photoObservations = try await api().inspectPhoto(jpegData: jpeg,
+                context: "Raster preview of page 1 from blueprint PDF. Only printed dimensions may be quoted and must be verified; do not infer scale or prices.")
+        } catch {
+            blueprintMessage = "AI blueprint review unavailable. The stored PDF is unchanged."
+        }
     }
 
     private func inspectSelectedPhoto(_ url: URL) async {

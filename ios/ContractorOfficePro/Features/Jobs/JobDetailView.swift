@@ -110,6 +110,7 @@ struct JobDetailView: View {
                     PrivateJobDraftStore.clear(jobID: job.id)
                     PrivateEstimateReviewStore.clear(jobID: job.id)
                     PrivateJobPhotoStore.clear(jobID: job.id)
+                    PrivateBlueprintStore.clear(jobID: job.id)
                     dismiss()
                 } else {
                     saveFailed = true
