@@ -46,8 +46,8 @@ export function suggestPreliminaryPrices(trade:Trade,lines:EstimateLine[],descri
   let rate=0;
   if(outletExample&&item.id==='local-outlets-standard')rate=140;
   if(outletExample&&item.id==='local-outlets-gfci')rate=199.5;
-  if(deviceAllowance&&['local-standard-outlets','local-outlets-standard'].includes(item.id)&&item.quantity>0)rate=95;
-  if(deviceAllowance&&['local-gfci','local-outlets-gfci'].includes(item.id)&&item.quantity>0)rate=145;
+  if(!outletExample&&deviceAllowance&&['local-standard-outlets','local-outlets-standard'].includes(item.id)&&item.quantity>0)rate=95;
+  if(!outletExample&&deviceAllowance&&['local-gfci','local-outlets-gfci'].includes(item.id)&&item.quantity>0)rate=145;
   if(deviceAllowance&&item.id==='local-standard-switches'&&item.quantity>0)rate=105;
   if(item.id==='local-panel-upgrade'&&is200)rate=2100;
   if(item.id==='local-existing-circuits'&&item.quantity>0&&item.quantity<=60)rate=35;
