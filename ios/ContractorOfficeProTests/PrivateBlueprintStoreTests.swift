@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import ContractorOfficePro
 
-final class PrivateBlueprintStoreTests: XCTestCase {
+nonisolated final class PrivateBlueprintStoreTests: XCTestCase {
     func testPrivateBlueprintSurvivesReopeningJobAndCanBeDeleted() throws {
         let jobID = UUID()
         defer { PrivateBlueprintStore.clear(jobID: jobID) }
