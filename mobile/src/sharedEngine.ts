@@ -153,6 +153,45 @@ export async function interpretWithDerek(c:SharedConfig,session:BetaSession,desc
   unknown_details:Array.isArray(raw.unknown_details)?raw.unknown_details:[]
  };
 }
+export type PhotoInspection={
+ observations:{
+  visible_conditions:string[];
+  possible_work:string[];
+  missing_information:string[];
+  limitations:string[];
+ };
+ pricing_status:'not_priced';
+ approved_for_scope:false;
+};
+/** Single private photo, uploaded only after explicit contractor consent.
+ * No server storage or automatic price/scope changes are requested.
+ */
+export async function inspectPhotoWithDerek(c:SharedConfig,session:BetaSession,
+ photo:{base64:string;mimeType:'image/jpeg'|'image/png'|'image/webp';context:string},
+ contractorConsent:boolean,http:Http=fetch):Promise<PhotoInspection>{
+ if(!contractorConsent)throw new Error('Confirm photo-sharing consent before AI inspection.');
+ if(!photo.base64||photo.base64.length>5_500_000||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(photo.base64))
+  throw new Error('Photo is too large or unreadable for AI inspection.');
+ const bytesApprox=Math.floor(photo.base64.length*3/4)-(photo.base64.endsWith('==')?2:photo.base64.endsWith('=')?1:0);
+ if(bytesApprox>4_000_000)throw new Error('Photo exceeds 4 MB; choose a smaller image.');
+ if(!['image/jpeg','image/png','image/webp'].includes(photo.mimeType))
+  throw new Error('Photo type must be JPEG, PNG or WebP.');
+ const base=secureBase(c.apiUrl);
+ const response=await jsonRequest<PhotoInspection>(base+'/v1/photo/inspect',{
+  method:'POST',headers:{Authorization:'Bearer '+session.accessToken},
+  body:JSON.stringify({image_base64:photo.base64,mime_type:photo.mimeType,
+    contractor_consent:true,context:photo.context.slice(0,1500)})
+ },http);
+ const o=response?.observations;
+ const valid=(v:unknown)=>Array.isArray(v)&&v.length<=12&&v.every(x=>typeof x==='string'&&x.length<=1000);
+ if(!o||!valid(o.visible_conditions)||!valid(o.possible_work)||
+    !valid(o.missing_information)||!valid(o.limitations)||
+    response.pricing_status!=='not_priced'||response.approved_for_scope!==false)
+  throw new Error('Photo AI response failed safety validation; estimate unchanged.');
+ return response;
+}
+
 const units:Record<string,string>={
  'each':'each','ea':'each','unit':'each','job':'job','sq ft':'sq ft','sf':'sq ft','sqft':'sq ft',
  'linear ft':'linear ft','lf':'linear ft','ft':'linear ft','cu yd':'cu yd','cy':'cu yd',
