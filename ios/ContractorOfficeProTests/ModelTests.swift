@@ -62,6 +62,7 @@ struct ModelTests {
     }
 }
 
+@MainActor
 @Suite("Estimate math")
 struct EstimateCalculatorTests {
     @Test func roundsPerLineAndTaxesOnlyTaxableLines() throws {
