@@ -100,13 +100,13 @@ export function mapInterpretation(result:Interpretation):Pick<Project,'lines'|'e
 const esc=(s:string)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]||c));
 export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  const es=p.language==='es',tr=es?{
-  title:mode==='proposal'?'PROPUESTA DE TRABAJO':'ESTIMADO DE TRABAJO',contractor:'Contratista',customer:'Cliente',location:'Ciudad',work:'Trabajo incluido',
+  title:mode==='proposal'?'PROPUESTA DE TRABAJO':'ESTIMADO DE TRABAJO',contractor:'Contratista',customer:'Cliente',location:'Ciudad',site:'Dirección del trabajo',work:'Trabajo incluido',
   qty:'Cantidad',unit:'Unidad',rate:'Tarifa',amount:'Importe',excluded:'No incluido',future:'Trabajo futuro — no incluido',
   subtotal:'Subtotal',overhead:'Gastos generales',profit:'Utilidad',total:'Precio estimado',signature:'Firma del cliente',
   date:'Fecha',draft:'BORRADOR — El contratista debe confirmar precios y cantidades.',
   notice:'Este estimado resume el trabajo y precio propuesto. Confirmar los detalles antes de comenzar.'
  }:{
-  title:mode==='proposal'?'WORK PROPOSAL':'WORK ESTIMATE',contractor:'Contractor',customer:'Customer',location:'City',work:'Included work',
+  title:mode==='proposal'?'WORK PROPOSAL':'WORK ESTIMATE',contractor:'Contractor',customer:'Customer',location:'City',site:'Job site',work:'Included work',
   qty:'Qty',unit:'Unit',rate:'Rate',amount:'Amount',excluded:'Not included',future:'Future work — excluded',
   subtotal:'Subtotal',overhead:'Overhead',profit:'Profit',total:'Estimated price',signature:'Customer signature',
   date:'Date',draft:'DRAFT — Contractor must confirm pricing and quantities.',
@@ -136,15 +136,35 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
   '<ol class="work-scope">'+curatedScope.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ol>':
   customerTasks.length?'<ul class="work-scope">'+customerTasks.map(x=>'<li>'+esc(es?x.description_es:x.description_en)+(x.quantity>1?' — '+esc(String(x.quantity))+' '+esc(x.unit):'')+'</li>').join('')+'</ul>':
   '<p>'+esc(es?'Trabajo de '+TRADES[p.trade].es.toLowerCase()+' según alcance acordado.':'Work in '+TRADES[p.trade].en.toLowerCase()+' as agreed in the scope.')+'</p>';
- const rows='<tr><td>'+esc(es?'Trabajo incluido — precio por el proyecto':'Included work — total project price')+'</td><td>1</td><td>'+(es?'trabajo':'job')+'</td><td>'+esc(money(sum.total))+'</td></tr>';
+ // The customer sees SELLING prices per deliverable, never direct-cost rates,
+ // labor/material allocations, overhead, profit, or price-source metadata.
+ // Distribute the final contract price (including indirect costs) over the
+ // customer-facing tasks; place rounding cents on the last item.
+ const billedTasks=!isCleaning&&customerTasks.length>0?customerTasks:[];
+ const taskBase=billedTasks.reduce((total,x)=>total+Math.max(0,x.quantity)*Math.max(0,x.rate),0);
+ const cents=Math.round(sum.total*100);
+ let usedCents=0;
+ const rows=billedTasks.length&&taskBase>0?billedTasks.map((x,i)=>{
+  const base=Math.max(0,x.quantity)*Math.max(0,x.rate);
+  const amountCents=i===billedTasks.length-1?cents-usedCents:Math.round(cents*base/taskBase);
+  usedCents+=amountCents;
+  return '<tr><td>'+esc(es?x.description_es:x.description_en)+'</td><td>'+esc(String(x.quantity))+
+   '</td><td>'+esc(x.unit)+'</td><td>'+esc(money(amountCents/100))+'</td></tr>';
+ }).join(''):'<tr><td>'+esc(es?'Trabajo incluido — precio por el proyecto':'Included work — total project price')+'</td><td>1</td><td>'+(es?'trabajo':'job')+'</td><td>'+esc(money(sum.total))+'</td></tr>';
+ // Saved jobs from older versions may contain a full street address in City.
+ // Label it as an address instead of misrepresenting it as a municipality.
+ const cityText=(p.city||'').trim(),addressText=(p.address||'').trim();
+ const cityLooksLikeAddress=/^\\d{1,6}\\s+.+|\\b(?:street|st\\.?|road|rd\\.?|avenue|ave\\.?|boulevard|blvd\\.?|drive|dr\\.?|lane|ln\\.?|court|ct\\.?|way)\\b/i.test(cityText);
+ const placeLabel=addressText||cityLooksLikeAddress?tr.site:tr.location;
+ const placeText=addressText||cityText||'—';
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
  return '<!doctype html><html lang="'+p.language+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
  'body{font-family:Arial,sans-serif;color:#173b42;padding:20px 24px;line-height:1.35}h1{font-size:24px;border-bottom:3px solid #177b6c;padding-bottom:10px}h3{margin-top:24px}.work-scope{padding-left:22px;line-height:1.55}.work-scope li{margin:0 0 9px 0}table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:9px 5px;border-bottom:1px solid #d6dede;text-align:left}.total{display:flex;justify-content:space-between;margin-top:9px}.summary{break-inside:avoid;page-break-inside:avoid;margin-top:22px}.grand{font-size:21px;border-top:2px solid #173b42;padding-top:15px;margin-top:15px}.notice{font-size:12px;color:#4b6668}.sign{margin-top:18px;break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}'+
  '</style></head><body><h1>'+tr.title+'</h1>'+
  (incomplete?'<p class="notice"><b>'+tr.draft+'</b></p>':'')+
- '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+(p.trade==='cleaning'?(es?'Dirección del servicio':'Service address'):tr.location)+':</b> '+esc(p.address||p.city||'—')+'</p>'+
+ '<p><b>'+tr.contractor+':</b> '+esc(p.contractor||'—')+'<br><b>'+tr.customer+':</b> '+esc(p.customer||'—')+'<br><b>'+(p.trade==='cleaning'?(es?'Dirección del servicio':'Service address'):placeLabel)+':</b> '+esc(placeText)+'</p>'+
  '<h3>'+tr.work+' — '+esc(TRADES[p.trade][p.language])+'</h3>'+
- scopeList+
+ (curatedScope.length||isCleaning?scopeList:'')+
  '<table><thead><tr><th>'+tr.work+'</th><th>'+tr.qty+'</th><th>'+tr.unit+'</th><th>'+tr.amount+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
  (cleaning?'<section style="break-inside:avoid;page-break-inside:avoid;margin-top:14px"><h3>'+(es?'PLAN DE LIMPIEZA':'CLEANING SERVICE PLAN')+'</h3><p>'+(es?'Tipo de servicio: ':'Service type: ')+esc(({residential:es?'Residencial':'Residential',office:es?'Oficina':'Office',post_construction:es?'Después de construcción':'Post-construction',specialty:es?'Especializada':'Specialty'} as Record<CleaningType,string>)[cleaning.type])+'<br>'+(es?'Frecuencia: ':'Frequency: ')+esc(frequencyLabel(cleaning.frequency))+(cleaning.type==='post_construction'?'<br>'+(es?'Nivel de polvo: ':'Dust level: ')+esc(dustLabel(cleaning.dustLevel||'moderate')):'')+'</p>'+(recurring?'<p><b>'+(es?'Precio por visita posterior: ':'Price per subsequent visit: ')+esc(money(recurringCleaningPrice(p)))+'</b></p><p class="notice">'+(es?'La primera limpieza profunda y cada visita posterior tienen precios separados. Confirmar alcance y calendario.':'The initial deep clean and subsequent visits are priced separately. Confirm scope and schedule.')+'</p>':'<p class="notice">'+(es?'Estimado de una sola limpieza. No incluye visitas futuras.':'One-time cleaning estimate. Future visits are not included.')+'</p>')+'</section>':'')+
  list(tr.excluded,p.exclusions)+list(tr.future,p.futureWork)+
