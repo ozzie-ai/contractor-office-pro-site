@@ -16,6 +16,7 @@ from .interpret import InterpretRequest, InterpretResponse, interpret_descriptio
 from .pricebook import (PriceBookCreate, PriceBookEntry, list_pricebook,
                         create_pricebook_entry, resolve_ratebook_ids, normalized_unit)
 from .research import ResearchReference, list_research_references
+from .photo_inspection import PhotoInspectionRequest, PhotoInspectionResponse, inspect_photo
 
 app = FastAPI(title="Contractor Office Pro API", version="0.1.0")
 
@@ -187,6 +188,14 @@ async def estimate_price(
             }))
         request = request.model_copy(update={"items": adjusted})
     return price_estimate(request)
+
+
+@app.post("/v1/photo/inspect", response_model=PhotoInspectionResponse)
+async def inspect_jobsite_photo(
+    request: PhotoInspectionRequest, principal: Principal = Depends(require_principal),
+) -> PhotoInspectionResponse:
+    """Authenticated, explicit-consent observation only. No photo storage."""
+    return await inspect_photo(request)
 
 
 @app.post("/v1/interpret", response_model=InterpretResponse)
