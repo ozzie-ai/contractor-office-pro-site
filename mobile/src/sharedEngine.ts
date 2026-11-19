@@ -220,6 +220,46 @@ export async function listResearchReferences(c:SharedConfig,session:BetaSession,
  return result;
 }
 
+export type ContractorDirectRate={
+ id:string;kind:'labor'|'material'|'markup'|'other';name_en:string;name_es:string|null;
+ unit:string;unit_cost:string;unit_price:string;category:string|null;
+ source:'contractor_entered';
+};
+/** Ratebook data belongs to the authenticated contractor's business.
+ * Never substitute market research references for their direct costs.
+ */
+export async function listContractorDirectRates(c:SharedConfig,session:BetaSession,
+ http:Http=fetch):Promise<ContractorDirectRate[]>{
+ const base=secureBase(c.apiUrl);
+ const response=await jsonRequest<ContractorDirectRate[]>(base+'/v1/pricebook?limit=200',{
+  method:'GET',headers:{Authorization:'Bearer '+session.accessToken}
+ },http);
+ if(!Array.isArray(response)||response.length>200||
+    response.some(x=>!x||typeof x.id!=='string'||typeof x.name_en!=='string'||
+      typeof x.unit!=='string'||!['labor','material','markup','other'].includes(x.kind)||
+      x.source!=='contractor_entered'||!Number.isFinite(Number(x.unit_cost))||
+      !Number.isFinite(Number(x.unit_price))||Number(x.unit_cost)<0||Number(x.unit_price)<=0))
+  throw new Error('Contractor pricebook could not be verified. Current estimate unchanged.');
+ return response;
+}
+const rateKey=(s:string)=>s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const rateUnit=(s:string)=>({
+ 'ea':'each','unit':'each','each':'each','sf':'sq ft','sqft':'sq ft','sq ft':'sq ft',
+ 'lf':'linear ft','linear ft':'linear ft','ft':'linear ft','hr':'hr','hour':'hr'
+} as Record<string,string>)[s.trim().toLowerCase()]||s.trim().toLowerCase();
+/** Strict, unambiguous match. Do not guess work assemblies from semantic similarity.
+ * Only full-scope contractor 'other' service rates are eligible for installed
+ * job item pricing; raw material/labor rows are not standalone installed costs.
+ */
+export function exactContractorRateMatches(line:Pick<Project['lines'][number],
+ 'description_en'|'description_es'|'unit'>,rates:ContractorDirectRate[]):ContractorDirectRate[]{
+ const english=rateKey(line.description_en),spanish=rateKey(line.description_es);
+ return rates.filter(x=>x.kind==='other'&&Number(x.unit_cost)>0&&
+   rateUnit(x.unit)===rateUnit(line.unit)&&
+   (rateKey(x.name_en)===english||
+    (!!x.name_es&&rateKey(x.name_es)===spanish)));
+}
+
 export type SharedPriceCheck={
  status:'incomplete'|'ready_for_contractor_review';
  selling_total:string|null;
