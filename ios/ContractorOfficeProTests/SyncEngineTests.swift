@@ -4,6 +4,7 @@ import Testing
 @testable import ContractorOfficePro
 
 /// Two "phones" sharing one FakeBackend that enforces the same LWW rule as the real server.
+@MainActor
 @Suite("Sync engine")
 struct SyncEngineTests {
     let backend = FakeBackend()
