@@ -1,10 +1,14 @@
-# Contractor Office Pro — Pilot v44
+# Contractor Office Pro — iPhone application and legacy web pilot
 
 **You Build. We Handle the Office.**
 
 A bilingual, mobile-first contractor estimating prototype. Contractors can dictate in Spanish or English, confirm quantities and prices, and review an **English customer-facing construction proposal**.
 
-**Public pilot:** https://ozzie-ai.github.io/contractor-office-pro-site/?v=44&lang=es
+**CURRENT TESTED UX — the iPhone development build:** The Expo/React Native app in [mobile/](mobile/README.md). Derek's separate native Swift app has now also been preserved under [ios/](ios/INTEGRATION_README.md) for compatibility and feature evaluation. Both can work against a shared client-agnostic backend; neither should be discarded on device-platform grounds. Our unified development branch is `integration/expo-fastapi-supabase-unified-20261115` (draft [PR #46](https://github.com/ozzie-ai/contractor-office-pro-site/pull/46)). Follow the [iPhone source-of-truth runbook](mobile/README.md). GitHub commits are not automatically installed on the existing iPhone build.
+
+**LEGACY WEB PROTOTYPE ONLY (NOT the current iPhone version):** https://ozzie-ai.github.io/contractor-office-pro-site/?v=44&lang=es
+
+**Please do not equate** the older GitHub Pages website, default `main` branch, Render backend deployment or a passing CI check with a current Xcode-installed iPhone app. The backend and data are separate services; real phone testing remains necessary. Read the [unified architecture and capability audit](docs/ONE_PRODUCT_INTEGRATION_AUDIT.md) before changing client stack.
 
 ## Planned launch order
 1. Electrical (including EV charging, breakers, GFCI, lighting and panel upgrades)

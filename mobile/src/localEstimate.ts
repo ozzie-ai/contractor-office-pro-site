@@ -1,5 +1,6 @@
 import {EstimateLine,Trade} from './estimate';
 import {mobilePaintingEstimate} from './paintingEstimate';
+import {legacyFieldEstimate} from './legacyFieldParity';
 import type {PaintingMeasurements} from './paintingEstimate';
 type LocalDraft={lines:EstimateLine[];unknowns:string[];recognized:boolean;customerScope?:{en:string[];es:string[]}};
 type Dim={a:number;b:number;index:number;end:number};
@@ -21,12 +22,86 @@ const near=(s:string,all:Dim[],re:RegExp):Dim|undefined=>{
 };
 const showerRe=/\b(shower|regadera|ducha)\b/,roomRe=/\b(bano|bathroom|room|cuarto)\b/;
 const size=(d:Dim)=>d.a+' × '+d.b+' ft';
+/**
+ * Outlet-only quantity guard for the existing Expo iPhone app.
+ * It is intentionally narrow: we ask for review on mixed/ambiguous jobs and
+ * NEVER invent per-unit installed rates from a spoken count.
+ */
+function quickOutletCount(s:string):LocalDraft|null{
+ const words:Record<string,number>={
+  one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,
+  un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10
+ };
+ const countWord='(?:\\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)';
+ const outlet='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
+ if(!new RegExp('\\b'+outlet+'\\b').test(s)||!/\b(?:gfci|gfi)\b/.test(s))return null;
+ // Do not strip unrelated work from a multi-trade description.
+ if(/\b(panel|tablero|breaker|circuit|circuito|light|lights|luz|luces|dimmer|shower|bathroom|bano|kitchen|cocina|charger|evse|permit|permiso|wire|cable|painting|pintura)\b/.test(s))return null;
+ // Speech frequently includes adjectives and itemized groups.
+ // Ex: "five NEW ELECTRICAL outlets total, three standard and two GFCI".
+ const adjective='(?:existing|old|new|newly|nuevo|nueva|nuevos|nuevas|viejos?|electrical|electricos?|electricas?|standard|regular|normal(?:es)?|comun(?:es)?)';
+ const totals=Array.from(s.matchAll(new RegExp('\\b('+countWord+')\\s+(?:'+adjective+'\\s+){0,4}'+outlet+'\\b','g')));
+ const total=totals.find(m=>!/\b(?:standard|regular|normal(?:es)?|comun(?:es)?)\b/.test(m[0]));
+ const standardMatch=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:are|son)\\s+)?(?:standard|regular|normal(?:es)?|comun(?:es)?)\\b'));
+ const gfci=s.match(new RegExp('\\b('+countWord+')\\s+(?:(?:son|are)\\s+|(?:of\\s+them\\s+are)\\s+)?(?:gfci|gfi)\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+(?:gfci|gfi)\\s+'+outlet+'\\b'))
+  ||s.match(new RegExp('\\b('+countWord+')\\s+'+outlet+'\\s+(?:gfci|gfi)\\b'));
+ if((!total&&!standardMatch)||!gfci)return null;
+ const toNum=(value:string)=>words[value]??Number(value);
+ const protectedCount=toNum(gfci[1]);
+ const standardExplicit=standardMatch?toNum(standardMatch[1]):null;
+ const all=total?toNum(total[1]):standardExplicit!==null?standardExplicit+protectedCount:0;
+ if(!Number.isInteger(all)||!Number.isInteger(protectedCount)||all<1||all>100||protectedCount<1||protectedCount>all)return null;
+ if(standardExplicit!==null&&standardExplicit+protectedCount!==all){
+  return {lines:[line('outlets-count-unclear','Confirm count: standard and GFCI quantities conflict',
+    'Confirmar cantidad: no coinciden tomacorrientes normales y GFCI',0,'each',0)],
+   unknowns:['Confirm standard and GFCI quantities: the dictated counts conflict.'],recognized:false};
+ }
+ if(/\b(?:plus|additional|more|extra|mas|adicionales|otros)\b/.test(s)){
+  return {lines:[line('outlets-count-unclear','Confirm outlet count: are GFCI included or additional?',
+    'Confirmar cantidad: ¿los GFCI están incluidos o son adicionales?',0,'each',0)],
+    unknowns:['Clarify whether GFCI receptacles are part of the total or additional.'],recognized:false};
+ }
+ const standard=all-protectedCount;
+ const replace=/\b(?:replace|replacing|swap|change|cambiar|cambiando|reemplazar|reemplazando|sustituir)\b/.test(s);
+ const newInstall=/\b(?:install|instalar|instalacion|new|nuevo|nueva)\b/.test(s);
+ // A clarified device-only replacement takes precedence over earlier "install new".
+ const replaceDevicesOnly=/\b(?:replace|replacing|cambiar|reemplazar)\b[^.!?\n]{0,45}\b(?:existing|old|existentes?)\s+(?:devices?|outlets?|receptacles?|tomacorrientes?)\s+only\b/.test(s);
+ const replaceAction=replace&&(!newInstall||replaceDevicesOnly);
+ const installAction=newInstall&&!replace;
+ const action=replaceAction?'Replace':installAction?'Install':'Install or replace (confirm)';
+ const actionEs=replaceAction?'Reemplazar':installAction?'Instalar':'Instalar o reemplazar (confirmar)';
+ const work:EstimateLine[]=[];
+ if(standard>0)work.push(line('outlets-standard',action+' '+standard+' standard receptacles (verify existing wiring)',
+  actionEs+' '+standard+' tomacorrientes estandar (verificar cableado)',standard,'each',0));
+ work.push(line('outlets-gfci',action+' '+protectedCount+' GFCI receptacles (verify protection and circuit)',
+  actionEs+' '+protectedCount+' tomacorrientes GFCI (verificar circuito y proteccion)',protectedCount,'each',0));
+ return {
+  lines:work,
+  unknowns:[
+   action.includes('confirm')?'Confirm replacement versus installation, existing wiring, box/plate conditions and permits.':'Verify existing wiring, box/plate conditions and permit requirements.',
+   'Unit rates must be reviewed. $0 means missing pricing, not free work.'
+  ],
+  recognized:true
+ };
+}
+
 export function localEstimate(description:string,_trade:Trade,paintingMeasurements:PaintingMeasurements={}):LocalDraft{
  const s=tidy(description),lines:EstimateLine[]=[],unknowns:string[]=[];
  if(_trade==='painting'){
   const painting=mobilePaintingEstimate(description,paintingMeasurements);
   if(painting)return painting;
  }
+ if(_trade==='electrical'){
+  // Mixed switch/outlet scopes must reach the full electrical parser;
+  // outlet-only quick parsing must not silently drop wall switches.
+  const mixedSwitches=/\b(?:switches?|interruptores?|apagadores?)\b/.test(s);
+  const outlets=mixedSwitches?null:quickOutletCount(s);
+  if(outlets)return outlets;
+ }
+ // Restore measured concrete and faucet jobs from earlier browser estimator.
+ const recovered=legacyFieldEstimate(description,_trade);
+ if(recovered)return recovered;
 
  // Electrical scope has its own parser: no bathroom defaults or unrelated fixtures.
  if(_trade==='electrical'){
@@ -38,8 +113,9 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
   // upgrade even if voice transcription drops the word "upgrade".
   const upgrade=panel&&(/\b(upgrad\w*|actualiz\w*|ampli\w*|aument\w*|reemplaz\w*|cambi\w*|convert\w*)\b/.test(s)||(amps.includes(100)&&amps.includes(200)));
   const dedicatedBreaker=/(?:\b(breaker|interruptor termomagnetico|disyuntor)\b)/.test(s)&&/\b(posterior\w*|despues|future|later|otro trabajo|only|solo|solamente|nomas|unicamente)\b/.test(s);
-  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/)
-   ||s.match(/\b(\d{1,3}|veinte|twenty)\b[^.!?\n]{0,38}?\b(?:circuits?|circuitos?)\b/);
+  // Require a number tied directly to a circuit noun. A loose 38-character
+  // search wrongly interprets "3 GFCIs with new wiring and circuits" as 3 circuits.
+  const circuits=s.match(/\b(\d{1,3}|veinte|twenty)\s*(?:de\s+los\s+|de\s+los\s+que\s+)?(?:(?:existing|existen(?:tes?)?|old|viejos?|nuevos?|new)\s+)?(?:circuits?|circuitos?)\b/);
   const circuitQty=circuits?parseCount(circuits[1]):0;
   const permit=/\b(permiso|permit|inspection|inspeccion)\b/.test(s);
   const permitSection=s.match(/(?:permiso|permit)[^.!?\n]{0,90}/)?.[0]||'';
@@ -88,10 +164,47 @@ export function localEstimate(description:string,_trade:Trade,paintingMeasuremen
    lines.push(line('dimmer',replace?'Replace existing wall switch with LED-compatible dimmer':'Install LED-compatible dimmer (verify location)',
     replace?'Reemplazar interruptor existente con dimmer compatible con LED':'Instalar dimmer compatible con LED (confirmar lugar)',1,'each',0));
   }
-  const gfci=/\b(gfci|gfi|ground.fault)\b/.test(s);
-  if(gfci){
-   lines.push(line('gfci','Install or replace GFCI receptacle (confirm existing wiring)',
-    'Instalar o reemplazar tomacorriente GFCI (verificar cableado)',1,'each',0));
+  const receptacleWord='(?:outlets?|receptacles?|tomacorrientes?|enchufes?|contactos?)';
+  const quantityWord='(\\d{1,3}|un|una|uno|one|dos|two|tres|three|cuatro|four|cinco|five|seis|six|siete|seven|ocho|eight|nueve|nine|diez|ten|veinte|twenty)';
+  const standardMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?(?:standard|regular|normales?|regulares?)\\s+'+receptacleWord+'\\b'));
+  const standardAfterMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+'+receptacleWord+'\\s+(?:standard|regular|normales?|regulares?)\\b'));
+  const totalOutletMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|new|nuevos?|existentes?)\\s+)?'+receptacleWord+'\\b'));
+  const gfciMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:gfcis?|gfis?|ground.fault)\\s+'+receptacleWord+'|(?:gfcis?|gfis?|ground.fault))\\b'));
+  const hasGfci=/\b(?:gfcis?|gfis?|ground.fault)\b/.test(s);
+  const standardCount=standardMatch?parseCount(standardMatch[1]):standardAfterMatch?parseCount(standardAfterMatch[1]):0;
+  const totalOutlets=totalOutletMatch?parseCount(totalOutletMatch[1]):0;
+  const gfciCount=gfciMatch?parseCount(gfciMatch[1]):0;
+  const addStandard=(qty:number)=>lines.push(line('standard-outlets','Replace '+qty+' standard receptacles (existing wiring to verify)',
+    'Reemplazar '+qty+' tomacorrientes normales (verificar cableado existente)',qty,'each',0));
+  const addGfci=(qty:number)=>lines.push(line('gfci','Replace '+qty+' GFCI receptacles (existing wiring to verify)',
+    'Reemplazar '+qty+' tomacorrientes GFCI (verificar cableado existente)',qty,'each',0));
+  if(standardCount>0 && standardCount<=200){
+   // "2 regular outlets and 3 GFCIs" names independent quantities.
+   addStandard(standardCount);
+   if(gfciCount>0&&gfciCount<=200)addGfci(gfciCount);
+   else if(hasGfci)unknowns.push('Confirm the GFCI quantity; none was recognized.');
+  }else if(totalOutletMatch && (totalOutlets<1||totalOutlets>200)){
+   unknowns.push('Confirm total outlet count; dictated quantity is outside the supported range.');
+  }else if(totalOutlets>0){
+   // "5 outlets, 2 GFCI" means GFCIs are part of the five.
+   if(hasGfci&&!gfciMatch)unknowns.push('Confirm how many of the '+totalOutlets+' outlets are GFCI; the transcript did not specify a quantity.');
+   else if(gfciCount>totalOutlets)unknowns.push('GFCI quantity exceeds the total outlet count; confirm counts before pricing.');
+   else{
+    if(totalOutlets-gfciCount>0)addStandard(totalOutlets-gfciCount);
+    if(gfciCount>0)addGfci(gfciCount);
+   }
+  }else if(hasGfci){
+   if(gfciCount>0&&gfciCount<=200)addGfci(gfciCount);
+   else unknowns.push('Confirm GFCI count; no quantity was recognized.');
+  }
+  // A regular switch is not a dimmer. Recognize it as a separate replacement.
+  const switchMatch=s.match(new RegExp('\\b'+quantityWord+'\\s+(?:(?:existing|regular|standard|normales?|regulares?)\\s+)?(?:switches|switch|interruptores|interruptor|apagadores|apagador)\\b'));
+  const switchQty=switchMatch?parseCount(switchMatch[1]):0;
+  if(switchQty>0&&switchQty<=200&&!dimmer)lines.push(line('standard-switches',
+   'Replace '+switchQty+' standard wall switches (existing wiring to verify)',
+   'Reemplazar '+switchQty+' interruptores de pared normales (verificar cableado existente)',switchQty,'each',0));
+  if(standardCount>0||totalOutlets>0||hasGfci||switchQty>0){
+   unknowns.push('Confirm these are device replacements using existing wiring; no new circuits, boxes, or drywall repairs are included.');
   }
   if(!lines.length){
    lines.push(line('unclassified','Review dictated electrical scope and define work items','Revisar descripcion electrica y definir partidas',1,'job',0));

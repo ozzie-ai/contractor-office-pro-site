@@ -1,0 +1,23 @@
+name: Residential pricing staging safety
+on:
+  pull_request:
+    paths:
+      - 'database/export_reviewed_pricing.py'
+      - 'database/tests/**'
+      - '.github/workflows/pricing-data-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'database/export_reviewed_pricing.py'
+      - 'database/tests/**'
+      - '.github/workflows/pricing-data-gate.yml'
+
+jobs:
+  approval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s database/tests -p 'test_*.py' -v

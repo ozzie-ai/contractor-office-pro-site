@@ -14,7 +14,8 @@ import {upsertRecessedLights} from './src/electricalItems';
 import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/businessProfile';
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
-import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary} from './src/estimate';
+import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -89,6 +90,16 @@ export default function App(){
  const [propertyMessage,setPropertyMessage]=useState('');
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
+ const [sharedEmail,setSharedEmail]=useState('');
+ const [sharedCode,setSharedCode]=useState('');
+ const [sharedSession,setSharedSession]=useState<BetaSession|null>(null);
+  const [showCloudSettings,setShowCloudSettings]=useState(false);
+ const [sharedBusy,setSharedBusy]=useState(false);
+ const [sharedMessage,setSharedMessage]=useState('');
+ const [researchRefs,setResearchRefs]=useState<ResearchReference[]>([]);
+ const [showResearchRefs,setShowResearchRefs]=useState(false);
+ const sharedEnabled=isSharedConfigured();
+
  useEffect(()=>{
   const profile=readProfile();
   setBusinessProfile(profile);
@@ -325,13 +336,88 @@ export default function App(){
     costLaborBurdenMultiplier:saved.costLaborBurdenMultiplier}:item;
   });
   const manual=project.lines.filter(item=>item.id.startsWith('manual-')&&!lines.some(x=>x.id===item.id));
-  const suggested=suggestPreliminaryPrices(project.trade,lines);
+  const suggested=suggestPreliminaryPrices(project.trade,lines,project.description);
   patch({lines:[...suggested.lines,...manual],customerScope:draft.customerScope,unknowns:[...draft.unknowns.filter(note=>!(suggested.lines.every(item=>item.rate>0)&&note.startsWith('Enter verified prices'))),...suggested.notes],
    exclusions:futureBreaker?['Future feeder wiring, terminations and final connections are excluded from this job.']:project.exclusions,
    futureWork:futureBreaker?['Future feeder wiring and final connections are separate work.']:project.futureWork});
   setAiConnected(false);
-  setInfo(suggested.suggested?tr('Preliminary LA prices added automatically for '+suggested.suggested+' work items. These are planning assumptions, not confirmed quotes. Review before sending.','Se agregaron precios preliminares de LA automáticamente para '+suggested.suggested+' partidas. Son supuestos de planificación, no cotizaciones confirmadas. Revísalos antes de enviar.'):tr('The notes do not identify enough recognized priced tasks. Add or dictate the missing work scope for a complete estimate.','Las notas no identifican suficientes partidas con precio. Describe el trabajo que falta para un estimado completo.'));
+  setInfo(suggested.suggested?tr('Preliminary amounts were added to '+suggested.suggested+' work items. These are examples, not confirmed bids; review before sharing.','Se agregaron montos preliminares a '+suggested.suggested+' partidas. Son ejemplos, no cotizaciones confirmadas. Revisa antes de compartir.'):draft.recognized?tr('Work items recognized. A $0 rate means missing pricing, not free work. Enter or verify rates in Price.','Partidas reconocidas. Una tarifa de $0 significa precio faltante, no trabajo gratis. Ingresa o verifica tarifas en Precio.'):tr('Could not recognize the complete scope. Review the description and missing details before pricing.','No se reconoció todo el alcance. Revisa la descripción y los detalles faltantes antes de asignar precios.'));
   setStage(2);
+ };
+
+ const sendSharedCode=async()=>{
+  setSharedBusy(true);setSharedMessage('');
+  try{await sendEmailCode(sharedConfig,sharedEmail);
+   setSharedMessage(tr('Sign-in code sent. Check your business account email.','Código enviado. Revisa el correo de tu cuenta comercial.'));}
+  catch(e){setSharedMessage(e instanceof Error?e.message:'Code request failed.');}
+  finally{setSharedBusy(false);}
+ };
+ const connectShared=async()=>{
+  setSharedBusy(true);setSharedMessage('');
+  try{const session=await verifyEmailCode(sharedConfig,sharedEmail,sharedCode);
+   try{await verifyBackendAccess(sharedConfig,session);}
+   catch(e){
+    if(!(e instanceof Error)||!e.message.includes('no active organization membership'))throw e;
+    await bootstrapBusiness(sharedConfig,session,businessProfile.name,sharedEmail.split('@')[0],project.language);
+    await verifyBackendAccess(sharedConfig,session);
+   }
+   setSharedSession(session);setSharedCode('');
+   setSharedMessage(tr('Cloud account connected. Shared research and pricing checks are available. AI scope needs separate configuration.','Cuenta en la nube conectada. Puedes consultar referencias y verificar precios. La IA necesita configuración adicional.'));}
+  catch(e){setSharedMessage(e instanceof Error?e.message:'Could not connect.');}
+  finally{setSharedBusy(false);}
+ };
+ const analyzeShared=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const result=await interpretWithDerek(sharedConfig,session,project.description);
+   const draft=mapInterpretation(result);
+   if(!draft.lines.length)throw new Error('AI found no work items; current job unchanged.');
+   const apply=()=>{
+    patch({lines:draft.lines,unknowns:draft.unknowns,
+     exclusions:draft.exclusions,futureWork:draft.futureWork,customerScope:undefined});
+    setAiConnected(true);setInfo(tr('AI scope drafted. Confirm every quantity and price.','Alcance preparado con IA. Confirma todas las cantidades y precios.'));
+    setStage(2);
+   };
+   if(project.lines.length)Alert.alert(
+    tr('Replace existing work items?','¿Reemplazar las partidas existentes?'),
+    tr('This replaces current items and their rates. Your existing saved job remains available.','Esto reemplaza partidas y tarifas. El trabajo guardado queda disponible.'),
+    [{text:tr('Cancel','Cancelar'),style:'cancel'},
+     {text:tr('Use AI scope','Usar alcance de IA'),onPress:apply}]);
+   else apply();
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'AI unavailable; use local estimate.');}
+  finally{setSharedBusy(false);}
+ };
+ const crossCheckShared=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const result=await verifyWithDerek(sharedConfig,session,project);
+   if(result.status!=='ready_for_contractor_review'||result.selling_total===null)
+    setSharedMessage(tr('Missing pricing: ','Faltan precios: ')+result.missing.join('; '));
+   else{
+    const local=totals(project).total,remote=Number(result.selling_total);
+    const cents=Math.abs(Math.round(local*100)-Math.round(remote*100));
+    setSharedMessage(cents<=1?tr('Shared engine confirms total: ','Motor compartido confirma total: ')+money(remote):
+     tr('Compare totals — Expo: ','Compara totales — Expo: ')+money(local)+' · '+tr('Shared: ','Compartido: ')+money(remote));
+   }
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'Shared pricing unavailable; local prices unchanged.');}
+  finally{setSharedBusy(false);}
+ };
+
+ const loadResearchRefs=async()=>{
+  if(!sharedSession||sharedBusy)return;
+  if(showResearchRefs){setShowResearchRefs(false);return;}
+  setSharedBusy(true);setSharedMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);setSharedSession(session);
+   const data=await listResearchReferences(sharedConfig,session,{budgetOnly:true,limit:50});
+   setResearchRefs(data);setShowResearchRefs(true);
+   if(!data.length)setSharedMessage(tr('No preliminary residential references available.','No hay referencias residenciales preliminares disponibles.'));
+  }catch(e){setSharedMessage(e instanceof Error?e.message:'Reference catalog unavailable.');}
+  finally{setSharedBusy(false);}
  };
  const sharePdf=async(mode:'estimate'|'proposal'='estimate')=>{
   const quote=currentCleaningProject(project);
@@ -392,7 +478,7 @@ export default function App(){
      </Pressable>
     </View>
     <View style={styles.heroBottom}>
-     <Text style={styles.heroVersion}>UI 27 · PILOT</Text>
+     <Text style={styles.heroVersion}>{'Contractor Office Pro v'+(Constants.expoConfig?.version||'0.1.0')+' · '+(sharedEnabled?'Cloud settings present · Optional sign-in':'Offline · Cloud not configured')}</Text>
      <View style={styles.languageSwitch}>
       {(['en','es'] as const).map(lang=><Pressable key={lang} accessibilityRole="button" accessibilityLabel={lang==='en'?'English':'Español'} accessibilityState={{selected:businessProfile.language===lang}} onPress={()=>chooseLanguage(lang)} style={[styles.languageOption,businessProfile.language===lang&&styles.languageSelected]}>
        <Text style={[styles.languageText,businessProfile.language===lang&&styles.languageTextSelected]}>{lang.toUpperCase()}</Text>
@@ -542,10 +628,63 @@ export default function App(){
     <Text style={styles.hint}>{project.trade==='cleaning'?tr('First cleaning and recurring visits are priced separately.','La primera limpieza y las visitas periódicas se calculan por separado.'):tr('Turn your job notes into an editable estimate.','Convierte tus notas en un estimado editable.')}</Text>
     <Action title={project.trade==='cleaning'?tr('Calculate cleaning price','Calcular precio de limpieza'):tr('Create work items','Crear partidas')} onPress={createLocalDraft}/>
     <Action title={tr("Enter items manually","Agregar partidas manualmente")} secondary onPress={()=>{patch({lines:[],unknowns:[]});setStage(2);}}/>
+    {sharedEnabled&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Cloud account — optional','Cuenta en la nube — opcional')}</Text>
+     <Text style={styles.hint}>{tr('No email or verification code is needed for normal estimates. Cloud sign-in is only for shared pricing checks and research; AI may be unavailable.','No necesitas correo ni código para estimados normales. El acceso a la nube sirve para verificar precios y consultar referencias; la IA puede no estar disponible.')}</Text>
+     <Action title={showCloudSettings?tr('Hide cloud login','Ocultar acceso a la nube'):tr('Cloud login (optional)','Acceso a la nube (opcional)')} secondary onPress={()=>setShowCloudSettings(v=>!v)}/>
+     {!sharedSession&&showCloudSettings&&<>
+      <Input label={tr('Business account email','Correo de la cuenta')} value={sharedEmail} onChangeText={setSharedEmail} placeholder="email@example.com"/>
+      <Action title={tr('Send email code','Enviar código por correo')} onPress={sendSharedCode} disabled={sharedBusy}/>
+      <Input label={tr('Verification code','Código de verificación')} value={sharedCode} onChangeText={setSharedCode} placeholder="123456" number secure/>
+      <Action title={tr('Connect cloud account','Conectar cuenta en la nube')} onPress={connectShared} disabled={sharedBusy}/>
+     </>}
+     {!!sharedSession&&showCloudSettings&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
+     {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
+    </View>}
     {!!info&&<Text style={styles.notice}>{info}</Text>}
    </View>}
    {stage===2&&<View style={styles.card}>
     <Text style={styles.h2}>{tr("3 · Review prices","3 · Revisar precios")}</Text>
+    {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&<View style={styles.lineCard}>
+     <Action title={tr('Verify total with shared pricing engine','Verificar total con motor de precios compartido')} secondary disabled={sharedBusy} onPress={crossCheckShared}/>
+     <Action title={showResearchRefs?tr('Hide residential references','Ocultar referencias residenciales'):tr('View preliminary residential references','Ver referencias residenciales preliminares')} secondary disabled={sharedBusy} onPress={loadResearchRefs}/>
+     {showResearchRefs&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr('Preliminary research only — not approved selling rates','Solo investigación preliminar — no son tarifas de venta aprobadas')}</Text>
+      {researchRefs.map(ref=><View key={ref.reference_id} style={{marginTop:10}}>
+       <Text style={styles.label}>{ref.trade+' · '+ref.service}</Text>
+       <Text style={styles.hint}>{ref.locality+' · '+ref.unit+' · '+(
+        ref.low_usd!==null&&ref.high_usd!==null?money(Number(ref.low_usd))+'–'+money(Number(ref.high_usd)):
+         ref.planning_rate_usd!==null?money(Number(ref.planning_rate_usd)):tr('No rate','Sin tarifa'))}</Text>
+       {!!ref.scope&&<Text style={styles.hint}>{ref.scope}</Text>}
+       {!!ref.exclusions&&<Text style={styles.hint}>{tr('Excludes: ','No incluye: ')+ref.exclusions}</Text>}
+      </View>)}
+      <Text style={styles.notice}>{tr('For research only. Does not change the estimate or customer PDF.','Solo para investigar. No cambia el estimado ni el PDF del cliente.')}</Text>
+     </View>}
+     {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
+    </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative outlet-device replacement example'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Review outlet prices before sending','Revisar precios de tomacorrientes antes de enviar')}</Text>
+     <Text style={styles.notice}>{tr('These are assumptions from an earlier contractor example, NOT verified supplier prices. Overhead and profit are added separately. Edit the rates below or approve them explicitly for this job.','Son supuestos de un ejemplo anterior, NO precios verificados. Gastos generales y utilidad se agregan aparte. Edita las tarifas o apruébalas para este trabajo.')}</Text>
+     <Action title={tr('Approve reviewed outlet allowances','Aprobar provisiones revisadas de tomacorrientes')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative outlet-device replacement example')?{...item,rateSource:'Contractor-reviewed outlet example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor accepted historical example; not a verified supplier quotation'}}:item)});
+     }}/>
+    </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative existing-wiring device allowance'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Approve estimated device replacement rates','Aprobar precios preliminares para dispositivos')}</Text>
+     <Text style={styles.notice}>{tr('The amounts for switches, standard outlets and GFCIs are planning assumptions with existing wiring, not verified supplier quotations. Check site conditions, material and labor before sharing.','Los montos para interruptores, tomacorrientes normales y GFCI son supuestos con cableado existente, no precios verificados de proveedores. Revisa materiales, mano de obra y condiciones antes de compartir.')}</Text>
+     <Action title={tr('Approve these reviewed rates for this job','Aprobar estas tarifas revisadas para este trabajo')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative existing-wiring device allowance')?{...item,
+       rateSource:'Contractor-reviewed device planning allowance',
+       priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor reviewed and accepted planning allowance; not a live supplier price'}}:item)});
+     }}/>
+    </View>}
+    {project.lines.some(x=>(x.rateSource||'').startsWith('Illustrative legacy field estimate'))&&<View style={styles.lineCard}>
+     <Text style={styles.h2}>{tr('Review restored field estimate','Revisar estimado recuperado')}</Text>
+     <Text style={styles.notice}>{tr('Concrete and faucet prices are historical editable planning examples—not live supplier quotes. Confirm site access, scope and prices before sending.','Los precios de concreto y grifos son ejemplos anteriores editables, no cotizaciones actuales. Confirma acceso, alcance y tarifas antes de enviar.')}</Text>
+     <Action title={tr('Approve reviewed field allowances','Aprobar precios preliminares revisados')} onPress={()=>{
+      patch({lines:project.lines.map(item=>(item.rateSource||'').startsWith('Illustrative legacy field estimate')?{...item,rateSource:'Contractor-reviewed legacy field example / Ejemplo revisado por contratista',priceEvidence:{kind:'contractor_entered' as const,detail:'Contractor reviewed historical planning estimate; no live supplier quote'}}:item)});
+     }}/>
+    </View>}
     <Text style={styles.hint}>{tr('Review automatically suggested allowances, quantities and prices before sharing. Your changes are preserved.','Revisa los precios preliminares y cantidades sugeridas antes de compartir. Tus cambios se conservan.')}</Text>
     {missingElectricalScope&&<Text style={styles.notice}>{tr('The saved description mentions electrical work but only the permit was recognized. Go to Step 1 and confirm the full job description before sharing.','La descripción menciona trabajo eléctrico, pero solo se reconoció el permiso. Regresa al paso 1 y confirma la descripción completa.')}</Text>}
     {project.lines.some(x=>x.quantity>0&&x.rate>0)&&<View style={styles.lineCard}>

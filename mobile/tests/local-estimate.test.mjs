@@ -8,6 +8,12 @@ import ts from 'typescript';
 
 const file=path.resolve('src/localEstimate.ts');
 function resolvePaintingModule(id){
+ if(id==='./legacyFieldParity'){
+  const js=ts.transpileModule(fs.readFileSync('src/legacyFieldParity.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  const p={exports:{}};
+  vm.runInNewContext(js,{module:p,exports:p.exports});
+  return p.exports;
+ }
  if(id==='./paintingEstimate'){
   const js=ts.transpileModule(fs.readFileSync('src/paintingEstimate.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
   const p={exports:{}};
@@ -139,4 +145,68 @@ test('Concrete and plumbing descriptions cannot silently become bathroom items',
  assert.equal(p.lines[0].rate,0);
  assert.equal(find(c,'shower'),undefined);
  assert.equal(find(p,'shower'),undefined);
+});
+
+
+test('Expo iPhone: five total outlets including two GFCI means three standard + two GFCI',()=>{
+ const r=localEstimate('Replace five outlets, two are GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.equal(r.lines.length,2);
+ assert.ok(r.lines.every(x=>x.rate===0),'missing contractor price must not be invented');
+ assert.ok(r.unknowns.some(x=>x.includes('wiring')));
+});
+
+test('Expo iPhone: Spanish five-outlet voice example counts all five correctly',()=>{
+ const r=localEstimate('Cambiar cinco tomacorrientes, dos son GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.match(find(r,'outlets-gfci').description_es,/Reemplazar/);
+});
+
+test('Expo iPhone: bare shorthand 5 outlets 2 GFCI retains uncertainty about install versus replace',()=>{
+ const r=localEstimate('5 outlets, 2 GFCI','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.match(find(r,'outlets-standard').description_en,/confirm/);
+ assert.equal(r.lines.reduce((sum,x)=>sum+x.quantity,0),5);
+});
+
+test('Expo iPhone: additional GFCI is never secretly interpreted as included count',()=>{
+ const r=localEstimate('Replace five outlets plus two GFCI','electrical');
+ assert.equal(r.recognized,false);
+ assert.equal(find(r,'outlets-count-unclear').quantity,0);
+ assert.ok(r.unknowns.some(x=>x.includes('additional')));
+});
+
+test('Expo iPhone: existing panel and circuit dictation is not handled as a simple outlet job',()=>{
+ const r=localEstimate('Upgrade electrical panel 100A to 200A and replace 5 outlets, two GFCI.','electrical');
+ assert.equal(find(r,'outlets-standard'),undefined);
+ assert.ok(find(r,'panel-upgrade'));
+});
+
+test('live iPhone failure: full five-outlet dictation produces 3 standard and 2 GFCI items',()=>{
+ const speech='Install five new electrical outlets total: three standard outlets and two GFCI outlets. All wiring already exists. Replace the existing devices only.';
+ const r=localEstimate(speech,'electrical');
+ assert.equal(r.recognized,true);
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+ assert.equal(r.lines.length,2);
+ assert.match(find(r,'outlets-standard').description_en,/Replace/);
+ assert.equal(r.lines.reduce((sum,x)=>sum+x.quantity,0),5);
+});
+test('Spanish full voice dictation recognizes standard and GFCI quantities',()=>{
+ const r=localEstimate('Reemplazar cinco tomacorrientes en total: tres normales y dos GFCI. Cableado existente.','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+});
+test('outlet grouping without a total still captures both quantities',()=>{
+ const r=localEstimate('Replace three standard outlets and two GFCI outlets.','electrical');
+ assert.equal(find(r,'outlets-standard').quantity,3);
+ assert.equal(find(r,'outlets-gfci').quantity,2);
+});
+test('conflicting total and item counts never silently become a customer scope',()=>{
+ const r=localEstimate('Replace five outlets: four standard outlets and two GFCI.','electrical');
+ assert.equal(r.recognized,false);
+ assert.equal(find(r,'outlets-count-unclear').quantity,0);
 });
