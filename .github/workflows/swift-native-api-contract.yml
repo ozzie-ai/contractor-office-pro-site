@@ -42,9 +42,12 @@ jobs:
               """
               return try decoder.decode(EstimatingAPIClient.InterpretationResponse.self, from: Data(data.utf8))
           }
-          assert(try parse("2").interpretation.tasks[0].quantity == "2")
-          assert(try parse("2.5").interpretation.tasks[0].quantity == "2.5")
-          assert(try parse("null").interpretation.tasks[0].quantity == nil)
+          let integer = try parse("2")
+          let decimal = try parse("2.5")
+          let unknown = try parse("null")
+          assert(integer.interpretation.tasks[0].quantity == "2")
+          assert(decimal.interpretation.tasks[0].quantity == "2.5")
+          assert(unknown.interpretation.tasks[0].quantity == nil)
           do {
               _ = try parse("true")
               fatalError("Invalid quantity must not decode")
