@@ -8,7 +8,7 @@ from typing import Literal
 
 import httpx
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 MAX_IMAGE_BYTES = 4_000_000
 
@@ -19,13 +19,6 @@ class PhotoInspectionRequest(BaseModel):
     mime_type: Literal["image/jpeg", "image/png", "image/webp"]
     contractor_consent: bool
     context: str = Field(default="", max_length=1500)
-
-    @model_validator(mode="after")
-    def explicit_consent(self):
-        if not self.contractor_consent:
-            raise ValueError("Photo inspection requires explicit contractor consent")
-        return self
-
 
 class PhotoObservations(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -64,6 +57,8 @@ PHOTO_INSTRUCTIONS = "\n".join([
 
 
 async def inspect_photo(payload: PhotoInspectionRequest) -> PhotoInspectionResponse:
+    if not payload.contractor_consent:
+        raise HTTPException(status_code=403, detail={"error": "photo_consent_required"})
     try:
         binary = base64.b64decode(payload.image_base64, validate=True)
     except (ValueError, binascii.Error):
