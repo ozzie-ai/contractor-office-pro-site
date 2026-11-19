@@ -26,8 +26,12 @@ def test_server_blocks_unauthenticated_photo_transfer():
 
 
 def test_explicit_consent_required():
-    response = TestClient(app).post("/v1/photo/inspect", json=request_data(contractor_consent=False))
-    assert response.status_code == 422
+    async def run():
+        with pytest.raises(HTTPException) as exc:
+            await inspect_photo(PhotoInspectionRequest(**request_data(contractor_consent=False)))
+        assert exc.value.status_code == 403
+        assert exc.value.detail == {"error": "photo_consent_required"}
+    asyncio.run(run())
 
 
 def test_image_must_be_valid_and_within_payload_limit():
