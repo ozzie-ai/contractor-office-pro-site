@@ -36,8 +36,8 @@ export function suggestPreliminaryPrices(trade:Trade,lines:EstimateLine[],descri
  const existingWiring=/\b(?:existing wiring|wiring (?:is )?already (?:in place|exists|there)|wiring ready exists|already wired|cableado existente|cableado ya existe|cables existentes)\b/i.test(description);
  const newWiring=/\b(?:new wiring|new circuits?|rewire|run (?:new )?wiring|cableado nuevo|circuitos? nuevos?)\b/i.test(description);
  const replacement=/\b(?:replace|replacing|replacement|change|changing|cambiar|cambiando|reemplazar|reemplazando)\b/i.test(description);
- const deviceAllowance=existingWiring&&!newWiring&&replacement;
- const deviceIds=['local-standard-outlets','local-gfci','local-standard-switches'];
+ const deviceAllowance=replacement&&!newWiring; // Provisional existing-wiring scenario; contractor must confirm wiring before approving.
+ const deviceIds=['local-standard-outlets','local-gfci','local-standard-switches','local-outlets-standard','local-outlets-gfci'];
  let suggested=0;
  const notes:string[]=[];
  const result=lines.map(item=>{
@@ -46,8 +46,8 @@ export function suggestPreliminaryPrices(trade:Trade,lines:EstimateLine[],descri
   let rate=0;
   if(outletExample&&item.id==='local-outlets-standard')rate=140;
   if(outletExample&&item.id==='local-outlets-gfci')rate=199.5;
-  if(deviceAllowance&&item.id==='local-standard-outlets'&&item.quantity>0)rate=95;
-  if(deviceAllowance&&item.id==='local-gfci'&&item.quantity>0)rate=145;
+  if(deviceAllowance&&['local-standard-outlets','local-outlets-standard'].includes(item.id)&&item.quantity>0)rate=95;
+  if(deviceAllowance&&['local-gfci','local-outlets-gfci'].includes(item.id)&&item.quantity>0)rate=145;
   if(deviceAllowance&&item.id==='local-standard-switches'&&item.quantity>0)rate=105;
   if(item.id==='local-panel-upgrade'&&is200)rate=2100;
   if(item.id==='local-existing-circuits'&&item.quantity>0&&item.quantity<=60)rate=35;
@@ -58,14 +58,14 @@ export function suggestPreliminaryPrices(trade:Trade,lines:EstimateLine[],descri
   return {...item,rate,
     rateSource:device?'Illustrative existing-wiring device allowance — requires contractor review':outletExample?OUTLET_EXAMPLE_SOURCE:LA_PANEL_REFERENCE_2026,
     status:'allowance_to_confirm' as const,
-    priceEvidence:device?{kind:'planning_allowance' as const,detail:'Unverified per-device labor and ordinary materials planning assumption; no live supplier quote'}:
+    priceEvidence:device?{kind:'planning_allowance' as const,detail:'Unverified per-device labor and ordinary materials planning assumption; existing serviceable wiring must be confirmed; no live supplier quote'}:
       outletExample?{kind:'planning_allowance' as const,detail:'Historical contractor example only; no supplier unit price verified'}:item.priceEvidence};
  });
  if(suggested&&outletExample){
   notes.push('PRELIMINARY contractor example: 3 standard x $140 + 2 GFCI x $199.50 = $819 before overhead/profit. The split is illustrative, NOT approved or live verified. Contractor review is required before sharing.');
  }
  if(deviceAllowance&&result.some(x=>deviceIds.includes(x.id)&&x.rate>0)){
-  notes.push('PRELIMINARY device replacement allowances, existing wiring: regular outlet $95 each; GFCI $145 each; ordinary wall switch $105 each. These are editable UNVERIFIED assumptions including expected labor/materials, not actual supplier prices, bids or automatically approved selling rates.');
+  notes.push('PRELIMINARY device replacement allowances assuming serviceable existing wiring: regular outlet $95 each; GFCI $145 each; ordinary wall switch $105 each. Confirm wiring, boxes, circuits and work conditions BEFORE approving. These are editable UNVERIFIED assumptions including expected labor/materials, not actual supplier prices, bids or automatically approved selling rates.');
  }
  if(suggested&&!outletExample&&!result.some(x=>deviceIds.includes(x.id)&&x.rate>0)){
   notes.push('PRELIMINARY LA 2026 planning allowances (not live quotes). Panel $2,100/job, existing circuit transfers $35/each, and 100A breaker-only $220 if mentioned. Includes assumed labor/material allocations; review breaker type, utility requirements, panel location and service entry. Rates are editable and are NOT verified direct costs.');
