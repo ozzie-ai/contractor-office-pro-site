@@ -65,6 +65,9 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        # XCTestCase inherits nonisolated initializers. Swift 6 default
+        # MainActor isolation otherwise generates invalid overrides.
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/ContractorOfficePro.app/ContractorOfficePro
         BUNDLE_LOADER: $(TEST_HOST)
   ContractorOfficeProUITests:

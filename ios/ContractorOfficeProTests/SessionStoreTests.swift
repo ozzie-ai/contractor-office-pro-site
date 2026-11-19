@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ContractorOfficePro
 
+@MainActor
 @Suite("Session and business setup")
 struct SessionStoreTests {
     private func makeSession(_ backend: FakeBackend) throws -> (SessionStore, ModelContext) {

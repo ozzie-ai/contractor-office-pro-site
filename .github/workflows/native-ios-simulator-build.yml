@@ -1,0 +1,51 @@
+name: Native SwiftUI iOS simulator build
+on:
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/native-ios-simulator-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-ios:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain information
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project using existing Derek Swift sources
+        working-directory: ios
+        run: xcodegen generate
+      - name: Compile app and XCTest bundles for iOS simulator without signing
+        working-directory: ios
+        run: |
+          set -o pipefail
+          set +e
+          xcodebuild \
+            -project ContractorOfficePro.xcodeproj \
+            -scheme ContractorOfficePro \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "${RUNNER_TEMP}/ContractorOfficePro-DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build-for-testing > "${RUNNER_TEMP}/cop-xcode-build.log" 2>&1
+          exit_code=$?
+          set -e
+          if [[ $exit_code -ne 0 ]]; then
+            echo "::error::Xcode build failed; compiler errors follow."
+            grep -n -E 'error:|fatal error:|BUILD FAILED|TEST BUILD FAILED' "${RUNNER_TEMP}/cop-xcode-build.log" | tail -n 100 || true
+            tail -n 100 "${RUNNER_TEMP}/cop-xcode-build.log"
+          else
+            echo "Complete iOS simulator build-for-testing: PASS"
+            tail -n 45 "${RUNNER_TEMP}/cop-xcode-build.log"
+          fi
+          exit $exit_code

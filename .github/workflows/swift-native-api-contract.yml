@@ -1,0 +1,69 @@
+name: Native Swift backend contract and safety
+on:
+  pull_request:
+    paths:
+      - 'ios/ContractorOfficePro/Services/EstimatingAPIClient.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift'
+      - 'ios/ContractorOfficePro/Services/CustomerEstimatePDF.swift'
+      - 'ios/ContractorOfficePro/Services/Workspace.swift'
+      - '.github/workflows/swift-native-api-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/ContractorOfficePro/Services/EstimatingAPIClient.swift'
+      - '.github/workflows/swift-native-api-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  swift-api-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual Swift network client and decode FastAPI JSON
+        run: |
+          set -euo pipefail
+          swift --version
+          cat >/tmp/main.swift <<'SWIFT'
+          import Foundation
+          let decoder = JSONDecoder()
+          decoder.keyDecodingStrategy = .convertFromSnakeCase
+          func parse(_ raw: String) throws -> EstimatingAPIClient.InterpretationResponse {
+              let data = """
+              {"version":2,"pricing_status":"not_priced","interpretation":{
+              "trade":"electrical","project_summary_en":"Replace devices",
+              "project_summary_es":"Reemplazar dispositivos",
+              "tasks":[{"category":"electrical","description_en":"Replace wall switches",
+              "description_es":"Reemplazar interruptores","quantity":\(raw),
+              "unit":"each","specifications":[],"status":"included_now","task_code":null}],
+              "excluded_work":[],"future_work":[],"unknown_details":[],"confidence_notes":[]}}
+              """
+              return try decoder.decode(EstimatingAPIClient.InterpretationResponse.self, from: Data(data.utf8))
+          }
+          let integer = try parse("2")
+          let decimal = try parse("2.5")
+          let unknown = try parse("null")
+          assert(integer.interpretation.tasks[0].quantity == "2")
+          assert(decimal.interpretation.tasks[0].quantity == "2.5")
+          assert(unknown.interpretation.tasks[0].quantity == nil)
+          do {
+              _ = try parse("true")
+              fatalError("Invalid quantity must not decode")
+          } catch { print("Invalid quantity rejected") }
+          print("Native FastAPI quantity contract: PASS")
+          SWIFT
+          swiftc ios/ContractorOfficePro/Services/EstimatingAPIClient.swift /tmp/main.swift -o /tmp/cop-api-contract
+          /tmp/cop-api-contract
+      - name: Inspect native photo and proposal safety gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'photoFiles.contains(url)' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'blueprintURL == url' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'source.quantity == nil' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'calculation = nil' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'line.missing.isEmpty' ios/ContractorOfficePro/Services/CustomerEstimatePDF.swift
+          grep -Fq '!result.lines.isEmpty' ios/ContractorOfficePro/Services/Workspace.swift
+          echo "Step 2/3/6 safety integration assertions: PASS"

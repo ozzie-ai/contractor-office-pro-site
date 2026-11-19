@@ -50,4 +50,36 @@ struct CustomerEstimatePDFTests {
         #expect(!text.contains("SECRET"))
         #expect(!text.contains("planning_allowance"))
     }
+    @Test func anIncompleteLineCannotAppearInACustomerProposal() {
+        let incomplete = EstimatingAPIClient.PriceResponse.Line(
+            taskCode: "UNMAPPED.1", quantity: nil, unit: "each",
+            descriptionEn: "Shower waterproofing", descriptionEs: "Impermeabilización",
+            directTotal: nil, sellingTotal: nil,
+            source: "planning_allowance", preliminary: true,
+            missing: ["quantity required", "rate missing"]
+        )
+        let result = EstimatingAPIClient.PriceResponse(
+            status: "ready_for_contractor_review", preliminary: true,
+            currency: "USD", customerLanguage: "en", lines: [incomplete],
+            mobilizationSellingTotal: nil, directTotal: "0",
+            sellingTotal: "250.00", missing: [],
+            warning: ""
+        )
+        #expect(throws: CustomerEstimatePDF.Failure.self) {
+            try CustomerEstimatePDF.create(from: result, approved: true)
+        }
+    }
+
+    @Test func anEmptyScopeCannotProduceACustomerProposal() {
+        let result = EstimatingAPIClient.PriceResponse(
+            status: "ready_for_contractor_review", preliminary: true,
+            currency: "USD", customerLanguage: "en", lines: [],
+            mobilizationSellingTotal: nil, directTotal: "100",
+            sellingTotal: "250.00", missing: [], warning: ""
+        )
+        #expect(throws: CustomerEstimatePDF.Failure.self) {
+            try CustomerEstimatePDF.create(from: result, approved: true)
+        }
+    }
+
 }

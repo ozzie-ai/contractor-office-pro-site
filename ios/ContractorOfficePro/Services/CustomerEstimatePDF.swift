@@ -10,8 +10,15 @@ enum CustomerEstimatePDF {
     static func create(from result: EstimatingAPIClient.PriceResponse,
                        approved: Bool) throws -> URL {
         guard approved, result.status == "ready_for_contractor_review",
-              result.missing.isEmpty, let sellingTotal = result.sellingTotal,
-              Decimal(string: sellingTotal) != nil else {
+              result.missing.isEmpty, !result.lines.isEmpty,
+              result.lines.allSatisfy({ line in
+                  line.missing.isEmpty
+                    && !line.descriptionEn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && (Decimal(string: line.quantity ?? "") ?? 0) > 0
+                    && (Decimal(string: line.sellingTotal ?? "") ?? -1) >= 0
+              }),
+              let sellingTotal = result.sellingTotal,
+              (Decimal(string: sellingTotal) ?? -1) >= 0 else {
             throw Failure.incompleteEstimate
         }
         let spanish = result.customerLanguage == "es"
