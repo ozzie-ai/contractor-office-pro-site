@@ -16,7 +16,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,inspectPhotoWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,inspectPhotoWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference,listContractorDirectRates,ContractorDirectRate,exactContractorRateMatches} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -91,6 +91,9 @@ export default function App(){
  const [propertyMessage,setPropertyMessage]=useState('');
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
+ const [contractorRates,setContractorRates]=useState<ContractorDirectRate[]>([]);
+ const [ratebookMessage,setRatebookMessage]=useState('');
+ const [ratebookBusy,setRatebookBusy]=useState(false);
  const [photoAiBusy,setPhotoAiBusy]=useState(false);
  const [photoAiNotes,setPhotoAiNotes]=useState<{jobId:string;notes:string[]}|null>(null);
  const [sharedEmail,setSharedEmail]=useState('');
@@ -274,6 +277,36 @@ export default function App(){
     setPhotos(current=>[...current,...uris].slice(0,20));
    }
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
+ };
+ const loadContractorRates=async()=>{
+  if(!sharedSession||ratebookBusy)return;
+  setRatebookBusy(true);setRatebookMessage('');
+  try{
+   const session=await refreshSession(sharedConfig,sharedSession);
+   setSharedSession(session);
+   const rates=await listContractorDirectRates(sharedConfig,session);
+   setContractorRates(rates);
+   setRatebookMessage(rates.length
+    ?tr('Saved contractor rates loaded. Only exact full-service direct-cost matches may be applied with your approval.','Se cargaron las tarifas de tu empresa. Solo costos directos de servicios completos con coincidencia exacta se pueden aplicar con tu aprobación.')
+    :tr('Your business has no saved contractor rates yet. Research references are NOT approved selling prices.','Tu empresa aún no tiene tarifas guardadas. Las referencias de investigación NO son tarifas de venta aprobadas.'));
+  }catch(e){setRatebookMessage(e instanceof Error?e.message:'Unable to load rates.');}
+  finally{setRatebookBusy(false);}
+ };
+ const approveSavedDirectRate=(index:number,rate:ContractorDirectRate)=>{
+  const line=project.lines[index];
+  if(!line||!exactContractorRateMatches(line,[rate]).length)return;
+  const unitCost=Number(rate.unit_cost);
+  Alert.alert(tr('Use saved contractor direct cost?','¿Usar costo directo guardado?'),
+   tr('Replace this item’s current direct cost with ','Reemplazar el costo directo actual con ')+
+   money(unitCost)+tr(' per ',' por ')+line.unit+
+   tr('. The estimating engine then adds overhead and profit. Confirm this rate includes the entire intended installed service, not materials only.','; el motor agrega gastos generales y utilidad. Confirma que cubre el servicio completo instalado y no solo materiales.'),
+   [{text:tr('Cancel','Cancelar'),style:'cancel'},{
+    text:tr('Use reviewed rate','Usar tarifa revisada'),
+    onPress:()=>setLine(index,{rate:unitCost,
+     rateSource:'Contractor-entered saved direct cost — approved for this job',
+     priceEvidence:{kind:'contractor_entered',detail:'Explicitly selected contractor pricebook direct unit cost; not a live market reference'}}
+   }]
+  );
  };
  const inspectSavedPhoto=async(uri:string)=>{
   if(photoAiBusy||!sharedSession)return;
@@ -804,6 +837,19 @@ export default function App(){
       </View>
       <Action title={tr("Add recessed lights","Agregar luces empotradas")} onPress={addElectricalLights}/>
      </View>}
+    {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&<View style={styles.lineCard}>
+      <Text style={styles.h2}>{tr('Your business pricebook (private)','Tarifario de tu empresa (privado)')}</Text>
+      <Text style={styles.hint}>{tr('Use contractor-entered DIRECT costs only after reviewing the service, unit and inclusions. No AI guesswork; materials-only entries cannot price a complete installation.','Usa costos DIRECTOS de tu empresa solo después de revisar el servicio, unidad e inclusiones. Sin precios inventados; materiales por sí solos no cotizan una instalación completa.')}</Text>
+      <Action secondary disabled={ratebookBusy} title={ratebookBusy?tr('Loading…','Cargando…'):tr('Load saved contractor rates','Cargar tarifas guardadas')} onPress={loadContractorRates}/>
+      {!!ratebookMessage&&<Text style={styles.notice}>{ratebookMessage}</Text>}
+      {project.lines.map((item,i)=>{
+       const matches=exactContractorRateMatches(item,contractorRates);
+       return matches.length===1?<View key={'match-'+item.id} style={{marginTop:7}}>
+        <Text style={styles.hint}>{businessProfile.language==='es'?item.description_es:item.description_en} — {money(Number(matches[0].unit_cost))}/{item.unit}</Text>
+        <Action secondary title={tr('Review and use saved direct cost','Revisar y usar costo directo')} onPress={()=>approveSavedDirectRate(i,matches[0])}/>
+       </View>:matches.length>1?<Text key={'match-'+item.id} style={styles.notice}>{tr('Multiple matching rates — review the business pricebook before applying any.','Varias tarifas coinciden — revisa el tarifario antes de aplicar alguna.')}</Text>:null;
+      })}
+    </View>}
     <Action title={tr("Add work item","Agregar partida")} secondary onPress={addLine}/>
     <Input label={tr("Exclusions (one per line)","Exclusiones (una por línea)")} multiline value={project.exclusions.join('\n')} onChangeText={x=>patch({exclusions:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
     <Input label={tr("Future work (excluded)","Trabajo futuro (no incluido)")} multiline value={project.futureWork.join('\n')} onChangeText={x=>patch({futureWork:x.split('\n').map(x=>x.trim()).filter(Boolean)})}/>
