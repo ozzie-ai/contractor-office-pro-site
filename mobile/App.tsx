@@ -3,6 +3,7 @@ import {ActivityIndicator,Alert,Image,KeyboardAvoidingView,Platform,Pressable,Sc
 import {StatusBar} from 'expo-status-bar';
 import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
+import {File} from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import SpeechInput from './src/SpeechInput';
@@ -15,7 +16,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,inspectPhotoWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -90,6 +91,8 @@ export default function App(){
  const [propertyMessage,setPropertyMessage]=useState('');
  const [info,setInfo]=useState('');
  const [aiConnected,setAiConnected]=useState(false);
+ const [photoAiBusy,setPhotoAiBusy]=useState(false);
+ const [photoAiNotes,setPhotoAiNotes]=useState<{jobId:string;notes:string[]}|null>(null);
  const [sharedEmail,setSharedEmail]=useState('');
  const [sharedCode,setSharedCode]=useState('');
  const [sharedSession,setSharedSession]=useState<BetaSession|null>(null);
@@ -271,6 +274,41 @@ export default function App(){
     setPhotos(current=>[...current,...uris].slice(0,20));
    }
   }catch(e){Alert.alert('Photos','Unable to access camera or photos. Please check device permissions.')}
+ };
+ const inspectSavedPhoto=async(uri:string)=>{
+  if(photoAiBusy||!sharedSession)return;
+  Alert.alert(
+   tr('Share this photo with AI?','¿Compartir esta foto con IA?'),
+   tr('This sends the selected job photo and up to 1,500 characters of your private job description to the AI backend for observations. It does not change your estimate or approve prices.','Esto envía la foto elegida y hasta 1,500 caracteres de tu descripción privada al servidor de IA. No cambia el estimado ni aprueba precios.'),
+   [{text:tr('Cancel','Cancelar'),style:'cancel'},{
+    text:tr('Analyze this photo','Analizar esta foto'),
+    onPress:()=>{void(async()=>{
+     setPhotoAiBusy(true);
+     try{
+      const file=new File(uri);
+      if(!file.exists||!file.size||file.size>4_000_000)
+       throw new Error(tr('Photo missing or larger than 4 MB; choose a smaller JPEG/PNG image.','Foto no disponible o mayor a 4 MB; usa JPEG/PNG más pequeño.'));
+      const mime=file.type;
+      if(mime!=='image/jpeg'&&mime!=='image/png'&&mime!=='image/webp')
+       throw new Error(tr('This photo format is unsupported. Please choose JPEG or PNG.','Formato no admitido. Elige JPEG o PNG.'));
+      const session=await refreshSession(sharedConfig,sharedSession);
+      setSharedSession(session);
+      const result=await inspectPhotoWithDerek(sharedConfig,session,{
+       base64:await file.base64(),mimeType:mime,context:project.description.slice(0,1500)
+      },true);
+      const o=result.observations;
+      setPhotoAiNotes({jobId:activeJobId,notes:[
+       ...o.visible_conditions.map(x=>'Visible: '+x),
+       ...o.possible_work.map(x=>'Possible work (confirm): '+x),
+       ...o.missing_information.map(x=>'Verify: '+x),
+       ...o.limitations.map(x=>'Limit: '+x)
+      ]});
+      setSharedMessage(tr('Photo observations available for review; no prices or scope were changed.','Observaciones de foto disponibles para revisar; no se modificaron partidas ni precios.'));
+     }catch(e){setSharedMessage(e instanceof Error?e.message:'Photo analysis unavailable.');}
+     finally{setPhotoAiBusy(false);}
+    })();}
+   }]
+  );
  };
  const applyWallHeight=()=>{
   const height=Number(wallHeight);
@@ -648,7 +686,8 @@ export default function App(){
     </View>}
     <SpeechInput language={businessProfile.language} description={project.description} onChange={x=>patch({description:x})}/>
     <View style={styles.row}><View style={{flex:1}}><Action title={tr("Take photo","Tomar foto")} secondary onPress={()=>addPhoto(true)}/></View><View style={{flex:1}}><Action title={tr("Add photos","Agregar fotos")} secondary onPress={()=>addPhoto()}/></View></View>
-    <View style={styles.photoRow}>{photos.map((uri,i)=><Pressable key={uri+i} onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>)}</View>
+    <View style={styles.photoRow}>{photos.map((uri,i)=><View key={uri+i} style={{gap:4}}><Image source={{uri}} style={{width:82,height:82,borderRadius:8}}/><Pressable onPress={()=>setPhotos(prev=>prev.filter((_,j)=>j!==i))}><Text style={styles.remove}>{tr('Remove','Eliminar')}</Text></Pressable>{sharedEnabled&&!!sharedSession&&<Pressable accessibilityRole="button" disabled={photoAiBusy||aiCapabilities?.ai_environment_configured===false} onPress={()=>inspectSavedPhoto(uri)}><Text style={styles.remove}>{photoAiBusy?tr('Analyzing…','Analizando…'):tr('AI review','Revisar IA')}</Text></Pressable>}</View>)}</View>
+    {photoAiNotes?.jobId===activeJobId&&photoAiNotes.notes.length>0&&<View style={styles.lineCard}><Text style={styles.h2}>{tr('Private AI photo observations — verify before use','Observaciones privadas de IA — verificar antes de usar')}</Text>{photoAiNotes.notes.map((note,i)=><Text key={'photo-note-'+i} style={styles.hint}>• {note}</Text>)}<Text style={styles.notice}>{tr('AI observations are not measured quantities, approved work, or selling prices. They are not included in the customer PDF.','Observaciones IA no son medidas, partidas aprobadas ni precios. No aparecen en el PDF del cliente.')}</Text></View>}
     <Text style={styles.hint}>{photos.length} {tr('photos saved on this phone.','fotos guardadas en este teléfono.')}</Text>
     <Action title={project.trade==='painting'?tr("Create painting estimate","Crear estimado de pintura"):tr("Next: Scope","Siguiente: Alcance")} onPress={()=>project.trade==='painting'?createLocalDraft():setStage(1)}/>
    </View>}
