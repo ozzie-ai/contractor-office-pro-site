@@ -140,7 +140,9 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  // labor/material allocations, overhead, profit, or price-source metadata.
  // Distribute the final contract price (including indirect costs) over the
  // customer-facing tasks; place rounding cents on the last item.
- const billedTasks=!isCleaning&&customerTasks.length>0?customerTasks:[];
+ // Where a reviewed customerScope already summarizes complex assemblies,
+ // retain a bundled price to avoid exposing material/labor procurement lines.
+ const billedTasks=!isCleaning&&!curatedScope.length&&customerTasks.length>0?customerTasks:[];
  const taskBase=billedTasks.reduce((total,x)=>total+Math.max(0,x.quantity)*Math.max(0,x.rate),0);
  const cents=Math.round(sum.total*100);
  let usedCents=0;
