@@ -37,6 +37,7 @@ struct EstimateBuilderView: View {
     @State private var photoMessage: String?
     @State private var pendingPhotoInspection: URL?
     @State private var photoObservations: EstimatingAPIClient.PhotoInspectionResponse?
+    @State private var blueprintObservations: EstimatingAPIClient.PhotoInspectionResponse?
     @State private var showBlueprintImporter = false
     @State private var blueprintURL: URL?
     @State private var blueprintMessage: String?
@@ -441,7 +442,7 @@ struct EstimateBuilderView: View {
                             Button(role: .destructive) {
                                 PrivateBlueprintStore.clear(jobID: job.id)
                                 self.blueprintURL = nil
-                                photoObservations = nil
+                                blueprintObservations = nil
                             } label: { Image(systemName: "trash") }
                         }
                         Text(blueprintURL.lastPathComponent)
@@ -449,6 +450,15 @@ struct EstimateBuilderView: View {
                     }
                     if let blueprintMessage {
                         Text(blueprintMessage).font(.caption).foregroundStyle(.orange)
+                    }
+                    if let insight = blueprintObservations {
+                        Text("AI BLUEPRINT OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
+                        ForEach(insight.observations.visibleConditions, id: \.self) { Text("Printed or visible: " + $0) }
+                        ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
+                        ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
+                        ForEach(insight.observations.limitations, id: \.self) { Text("Limit: " + $0) }
+                        Text("No measurements or prices are approved automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 } header: {
                     Text(dictationLanguage == "es" ? "Planos" : "Blueprints")
@@ -507,7 +517,7 @@ struct EstimateBuilderView: View {
                 return
             }
             blueprintURL = try PrivateBlueprintStore.save(data, jobID: job.id)
-            photoObservations = nil
+            blueprintObservations = nil
         } catch {
             blueprintMessage = "Could not save the blueprint. PDF limit: 15 MB."
         }
@@ -516,7 +526,7 @@ struct EstimateBuilderView: View {
     private func inspectBlueprintPage(_ url: URL) async {
         busy = true
         blueprintMessage = nil
-        photoObservations = nil
+        blueprintObservations = nil
         defer { busy = false }
         do {
             guard PrivateBlueprintStore.load(jobID: job.id) == url,
@@ -539,7 +549,7 @@ struct EstimateBuilderView: View {
                 blueprintMessage = "Blueprint changed while inspecting. Select the current file again."
                 return
             }
-            photoObservations = inspected
+            blueprintObservations = inspected
         } catch {
             blueprintMessage = "AI blueprint review unavailable. The stored PDF is unchanged."
         }
