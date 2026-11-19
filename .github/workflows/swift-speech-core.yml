@@ -1,0 +1,40 @@
+name: Swift speech note safety
+on:
+  pull_request:
+    paths:
+      - 'ios/ContractorOfficePro/Services/SpeechNoteComposer.swift'
+      - 'ios/ContractorOfficePro/Services/JobVoiceRecorder.swift'
+      - 'ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift'
+      - 'ios/ContractorOfficeProTests/SpeechNoteComposerTests.swift'
+      - '.github/workflows/swift-speech-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ios/ContractorOfficePro/Services/SpeechNoteComposer.swift'
+      - '.github/workflows/swift-speech-core.yml'
+jobs:
+  pure-swift-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and check voice-segment composition without Apple signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift --version
+          cat >/tmp/main.swift <<'SWIFT'
+          import Foundation
+          assert(SpeechNoteComposer.compose(existing: "", segment: "  Two switches  ") == "Two switches")
+          let previous = "Two switches"
+          assert(SpeechNoteComposer.compose(existing: previous, segment: "Three GFCI") == "Two switches\nThree GFCI")
+          assert(SpeechNoteComposer.compose(existing: previous, segment: "Three GFCI outlets") == "Two switches\nThree GFCI outlets")
+          assert(SpeechNoteComposer.compose(existing: previous, segment: "  ") == previous)
+          print("Swift voice note composition: PASS")
+          SWIFT
+          swiftc ios/ContractorOfficePro/Services/SpeechNoteComposer.swift /tmp/main.swift -o /tmp/cop-speech-test
+          /tmp/cop-speech-test
+          grep -Fq 'notesBeforeRecording = notes' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text)' ios/ContractorOfficePro/Features/Jobs/EstimateBuilderView.swift
+          grep -Fq 'transcript = ""' ios/ContractorOfficePro/Services/JobVoiceRecorder.swift
+          echo "Native view integration source contract: PASS"
