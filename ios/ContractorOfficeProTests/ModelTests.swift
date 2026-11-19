@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ContractorOfficePro
 
+@MainActor
 @Suite("Local models")
 struct ModelTests {
     let context: ModelContext
