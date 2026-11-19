@@ -87,3 +87,62 @@ test('unified 0.1.1 seven-device job produces a reviewable private PDF after app
  for(const privateValue of [speech,'$95.00','$145.00','$105.00','Overhead','Profit','Contractor explicitly reviewed illustrative cost'])
   assert.equal(html.includes(privateValue),false,'Private cost or dictation leaked: '+privateValue);
 });
+
+
+test('Tad real PDF acceptance: show 2 regular and 3 GFCI line selling prices, never private markup',()=>{
+ const speech='Necesito reemplazar cinco outlets existing wiring. Dos de ellos son regular outlets y tres de ellos son GFCI.';
+ const scope=local.localEstimate(speech,'electrical');
+ const prelim=prices.suggestPreliminaryPrices('electrical',scope.lines,speech);
+ const approved=prelim.lines.map(x=>({...x,rateSource:'Contractor-reviewed device planning allowance',priceEvidence:{kind:'contractor_entered',detail:'Private actual purchase cost $12.34'}}));
+ const project={...job(approved),description:speech,customer:'Tad',contractor:'Got a hand',
+  city:'32140 Windrush Rd CA 91390',overheadPct:10,profitPct:20};
+ assert.equal(quote.estimateReadiness(project).ready,true);
+ assert.equal(Math.round(quote.totals(project).total*100)/100,825);
+ const html=quote.proposalHtml(project,'estimate');
+ assert.match(html,/<b>Job site:<\/b> 32140 Windrush Rd CA 91390/);
+ assert.doesNotMatch(html,/<b>City:<\/b> 32140/);
+ assert.match(html,/<td>Replace 2 standard receptacles[^<]*<\/td><td>2<\/td><td>each<\/td><td>\$250\.80<\/td>/);
+ assert.match(html,/<td>Replace 3 GFCI receptacles[^<]*<\/td><td>3<\/td><td>each<\/td><td>\$574\.20<\/td>/);
+ assert.match(html, /Estimated price/);
+ assert.match(html, /\$825\.00/);
+ for(const internal of ['$95.00','$145.00','$190.00','$435.00','Overhead','Profit','Private actual purchase cost','contractor-entered']){
+  assert.equal(html.includes(internal),false,'Private estimate value leaked: '+internal);
+ }
+});
+
+test('all-trades proposal: itemized selling prices, hidden job-cost rows, cents reconcile',()=>{
+ const rows=[
+  {id:'plumbing1',description_en:'Replace bathroom faucet',description_es:'Cambiar grifo',quantity:1,unit:'each',rate:175,status:'included_now'},
+  {id:'plumbing2',description_en:'Repair drain',description_es:'Reparar desagüe',quantity:2,unit:'each',rate:85,status:'included_now'},
+  {id:'internal',description_en:'Labor internal allocation',description_es:'Mano de obra costo interno',quantity:1,unit:'job',rate:50,status:'included_now'}
+ ];
+ for(const trade of ['plumbing','painting','concrete','handyman','remodel','electrical']){
+  const p={...job(rows),trade,city:'Santa Clarita',address:'12 Test Way, Santa Clarita, CA',
+   overheadPct:7,profitPct:11,description:'private contractor dictation do not print',language:'en'};
+  const html=quote.proposalHtml(p,'proposal');
+  assert.match(html,/<b>Job site:<\/b> 12 Test Way/);
+  assert.equal((html.match(/<tr><td>Replace bathroom faucet<\/td>/g)||[]).length,1);
+  assert.match(html,/<td>Repair drain<\/td><td>2<\/td><td>each<\/td><td>\$/);
+  assert.ok(!html.includes('Labor internal allocation'));
+  assert.ok(!html.includes('private contractor dictation'));
+  const amounts=Array.from(html.matchAll(/<tr><td>[^<]*<\/td><td>\d+<\/td><td>[^<]*<\/td><td>\$([\d,]+\.\d{2})<\/td><\/tr>/g)).map(x=>Math.round(Number(x[1].replaceAll(',',''))*100));
+  const expected=Math.round(quote.totals(p).total*100);
+  assert.equal(amounts.reduce((n,x)=>n+x,0),expected,'Client items must sum exactly to final total for '+trade);
+ }
+});
+
+test('Spanish proposal itemization escapes user input and preserves cleaning bundle',()=>{
+ const row={id:'test',description_en:'Replace <valve>',description_es:'Cambiar <válvula>',quantity:1,unit:'each',rate:101,status:'included_now'};
+ const p={...job([row]),language:'es',city:'Santa Clarita',customer:'A < B',overheadPct:10,profitPct:10};
+ const html=quote.proposalHtml(p,'proposal');
+ assert.match(html,/Cambiar &lt;válvula&gt;/);
+ assert.match(html,/A &lt; B/);
+ assert.match(html,/<b>Ciudad:<\/b> Santa Clarita/);
+ assert.ok(!html.includes('Gastos generales'));
+ assert.ok(!html.includes('Utilidad'));
+ assert.match(html,/\$122\.21/);
+ const clean={...p,trade:'cleaning',language:'en'};
+ const cleanHtml=quote.proposalHtml(clean,'proposal');
+ assert.match(cleanHtml,/Included work — total project price/);
+ assert.match(cleanHtml,/\$122\.21/);
+});
