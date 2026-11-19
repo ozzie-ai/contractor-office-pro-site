@@ -63,3 +63,27 @@ test('app preserves the local path without sign-in and prompts for independent a
  assert.match(app,/saveJob\(\{id:activeJobId/);
  assert.match(app,/const pdfReady=readiness\.ready/);
 });
+
+test('unified 0.1.1 seven-device job produces a reviewable private PDF after approval',()=>{
+ const speech='Need to replace two switches, two regular outlets, wiring is already in place, and three GFCIs.';
+ const scope=local.localEstimate(speech,'electrical');
+ assert.deepEqual(Array.from(scope.lines,x=>[x.id,x.quantity]),[
+  ['local-standard-outlets',2],['local-gfci',3],['local-standard-switches',2]
+ ]);
+ const priced=prices.suggestPreliminaryPrices('electrical',scope.lines,speech);
+ assert.equal(priced.suggested,3);
+ assert.equal(quote.estimateReadiness({lines:priced.lines}).ready,false);
+ const approved=priced.lines.map(x=>({
+  ...x,
+  rateSource:'Contractor-reviewed device planning allowance',
+  priceEvidence:{kind:'contractor_entered',detail:'Contractor explicitly reviewed illustrative cost'}
+ }));
+ const draft={...job(approved),description:speech,unknowns:scope.unknowns};
+ assert.equal(quote.estimateReadiness(draft).ready,true);
+ assert.equal(Math.round(quote.totals(draft).total*100)/100,1102.2);
+ const html=quote.proposalHtml(draft,'proposal');
+ for(const visible of ['Replace 2 standard receptacles','Replace 3 GFCI receptacles','Replace 2 standard wall switches','$1,102.20'])
+  assert.ok(html.includes(visible),'Client output missing '+visible);
+ for(const privateValue of [speech,'$95.00','$145.00','$105.00','Overhead','Profit','Contractor explicitly reviewed illustrative cost'])
+  assert.equal(html.includes(privateValue),false,'Private cost or dictation leaked: '+privateValue);
+});
