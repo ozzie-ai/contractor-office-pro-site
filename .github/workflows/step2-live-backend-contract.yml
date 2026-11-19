@@ -1,0 +1,55 @@
+name: Step 2 live backend contract probe
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/step2-live-backend-contract.yml
+jobs:
+  public-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Check deployed endpoints without secrets or customer data
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://contractor-office-pro-api-staging.onrender.com"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          for i in 1 2 3 4; do
+            code="$(curl -sSL --connect-timeout 15 --max-time 70 -o "$tmp/health" -w '%{http_code}' "$base/health" || true)"
+            [[ "$code" == "200" ]] && break
+            echo "Render startup attempt $i returned HTTP $code"
+            sleep 12
+          done
+          [[ "$code" == "200" ]] || { echo "::error::Health endpoint unavailable"; exit 1; }
+          echo "HEALTH HTTP $code"
+          code="$(curl -sS --connect-timeout 15 --max-time 40 -o "$tmp/openapi" -w '%{http_code}' "$base/openapi.json" || true)"
+          [[ "$code" == "200" ]] || { echo "::error::OpenAPI unavailable HTTP $code"; exit 1; }
+          python3 - "$tmp/openapi" <<'PY'
+          import json,sys
+          spec=json.load(open(sys.argv[1]))
+          paths=set(spec.get("paths",{}))
+          required={"/health","/v1/account/bootstrap","/v1/account/status","/v1/estimate/price","/v1/interpret","/v1/research-references"}
+          missing=required-paths
+          print("LIVE ENDPOINTS:",", ".join(sorted(paths)))
+          if missing:
+              print("MISSING DEPLOYED ENDPOINTS:",", ".join(sorted(missing)))
+              sys.exit(1)
+          print("Live route contract: PASS")
+          PY
+          code="$(curl -sS --connect-timeout 15 --max-time 40 -o "$tmp/noauth" -w '%{http_code}' "$base/v1/account/status" || true)"
+          echo "No-token account status HTTP $code"
+          [[ "$code" == "401" ]] || { echo "::error::Account endpoint must reject anonymous access (401)"; exit 1; }
+          # Invalid token exercises the Supabase configuration boundary without
+          # creating a user or disclosing credentials. 401 = auth configured
+          # and token rejected; 503 = missing auth configuration/provider.
+          code="$(curl -sS --connect-timeout 15 --max-time 40 \
+            -H 'Authorization: Bearer invalid-step2-probe-token' \
+            -o "$tmp/badtoken" -w '%{http_code}' "$base/v1/account/status" || true)"
+          echo "Invalid bearer token HTTP $code"
+          [[ "$code" == "401" ]] || { echo "::error::Authenticated provider boundary not ready (expected 401 invalid-token rejection)"; exit 1; }
+          code="$(curl -sS --connect-timeout 15 --max-time 40 -o "$tmp/ready" -w '%{http_code}' "$base/ready" || true)"
+          echo "Optional configuration readiness HTTP $code (200 or 503 allowed)"
+          [[ "$code" == "200" || "$code" == "503" ]] || { echo "::error::Unexpected readiness response"; exit 1; }
+          echo "Live public contract and anonymous authorization gate: PASS"
