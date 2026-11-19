@@ -125,20 +125,37 @@ async def bootstrap_business(
     return {"status": "authorized"}
 
 
-@app.get("/ready")
-def readiness() -> dict[str, str]:
-    """Configuration readiness, not a claim that external accounts work.
-
-    Liveness (/health) stays available during deployment; never reveal key values.
-    """
-    configured = (
+def _auth_environment_configured() -> bool:
+    """Environment presence only; does not prove Supabase email delivery."""
+    return (
         os.getenv("SUPABASE_URL", "").startswith("https://")
         and bool(os.getenv("SUPABASE_ANON_KEY", "").strip())
-        and bool(os.getenv("OPENAI_API_KEY", "").strip())
     )
-    if not configured:
-        raise HTTPException(status_code=503, detail={"error": "backend_configuration_missing"})
+
+
+@app.get("/ready")
+def readiness() -> dict[str, str]:
+    """Auth/pricing base readiness does not depend on paid AI being enabled."""
+    if not _auth_environment_configured():
+        raise HTTPException(status_code=503, detail={"error": "auth_configuration_missing"})
     return {"status": "configured", "component": "pricing_api"}
+
+
+@app.get("/v1/capabilities")
+def capabilities() -> dict[str, object]:
+    """Public non-secret capabilities; not an authentication or external health proof.
+
+    Mobile can distinguish running offline-compatible services from paid AI.
+    No tokens, account existence, tenant IDs, or private secrets are exposed.
+    """
+    return {
+        "component": "pricing_api",
+        "auth_environment_configured": _auth_environment_configured(),
+        "ai_environment_configured": bool(os.getenv("OPENAI_API_KEY", "").strip()),
+        "deterministic_device_interpretation": True,
+        "pricing_math_available": True,
+        "live_provider_verification": False,
+    }
 
 
 @app.post("/v1/estimate/price", response_model=EstimateResult)
