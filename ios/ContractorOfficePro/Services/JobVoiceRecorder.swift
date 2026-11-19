@@ -16,6 +16,7 @@ final class JobVoiceRecorder: ObservableObject {
 
     func start(language: String) async {
         stop()
+        transcript = ""
         errorMessage = nil
 
         let speechAuthorized = await withCheckedContinuation { continuation in
@@ -68,8 +69,11 @@ final class JobVoiceRecorder: ObservableObject {
                 let finished = result?.isFinal ?? false
                 let failed = error != nil
                 Task { @MainActor in
-                    if let words { self?.transcript = words }
-                    if finished || failed { self?.stop() }
+                    // A cancelled/stopped recording must not overwrite notes
+                    // after a new recording or manual editing has begun.
+                    guard let self, self.isRecording else { return }
+                    if let words { self.transcript = words }
+                    if finished || failed { self.stop() }
                 }
             }
         } catch {
