@@ -15,7 +15,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -96,6 +96,9 @@ export default function App(){
   const [showCloudSettings,setShowCloudSettings]=useState(false);
  const [sharedBusy,setSharedBusy]=useState(false);
  const [sharedMessage,setSharedMessage]=useState('');
+ const [aiCapabilities,setAiCapabilities]=useState<AiCapabilities|null>(null);
+ const [aiCapabilityBusy,setAiCapabilityBusy]=useState(false);
+ const [aiCapabilityMessage,setAiCapabilityMessage]=useState('');
  const [researchRefs,setResearchRefs]=useState<ResearchReference[]>([]);
  const [showResearchRefs,setShowResearchRefs]=useState(false);
  const sharedEnabled=isSharedConfigured();
@@ -366,6 +369,21 @@ export default function App(){
   catch(e){setSharedMessage(e instanceof Error?e.message:'Could not connect.');}
   finally{setSharedBusy(false);}
  };
+ const checkAiReadiness=async()=>{
+  if(aiCapabilityBusy)return;
+  setAiCapabilityBusy(true);
+  setAiCapabilityMessage('');
+  try{
+   const result=await getAiCapabilities(sharedConfig);
+   setAiCapabilities(result);
+   setAiCapabilityMessage(result.ai_environment_configured
+    ?tr('AI backend configured. Sign in to analyze; provider access is not yet verified.','IA configurada en el servidor. Inicia sesión para analizar; falta verificar el proveedor.')
+    :tr('AI model is NOT configured on the server. Local estimates and PDFs still work. A server-side API key is required; never enter it on the iPhone.','La IA no está configurada en el servidor. Los estimados y PDF locales siguen funcionando. Se requiere una clave privada en el servidor, nunca en el iPhone.'));
+  }catch{
+   setAiCapabilities(null);
+   setAiCapabilityMessage(tr('Cannot verify server AI status. Your offline estimate remains available.','No se pudo verificar la IA del servidor. Tu estimado local sigue disponible.'));
+  }finally{setAiCapabilityBusy(false);}
+ };
  const analyzeShared=async()=>{
   if(!sharedSession||sharedBusy)return;
   setSharedBusy(true);setSharedMessage('');
@@ -380,12 +398,23 @@ export default function App(){
     setAiConnected(true);setInfo(tr('AI scope drafted. Confirm every quantity and price.','Alcance preparado con IA. Confirma todas las cantidades y precios.'));
     setStage(2);
    };
-   if(project.lines.length)Alert.alert(
-    tr('Replace existing work items?','¿Reemplazar las partidas existentes?'),
-    tr('This replaces current items and their rates. Your existing saved job remains available.','Esto reemplaza partidas y tarifas. El trabajo guardado queda disponible.'),
-    [{text:tr('Cancel','Cancelar'),style:'cancel'},
-     {text:tr('Use AI scope','Usar alcance de IA'),onPress:apply}]);
-   else apply();
+   // Always require explicit confirmation before applying AI scope.
+   // The AI route returns quantities and descriptions, NEVER prices.
+   // Existing contractor-priced items must not be silently discarded.
+   const preview=draft.lines.slice(0,6).map(x=>
+    '• '+(project.language==='es'?x.description_es:x.description_en)+
+    ' — '+(x.quantity>0?String(x.quantity):'?')+' '+x.unit).join('\n');
+   Alert.alert(
+    tr('Review AI work items (no prices)','Revisar partidas de IA (sin precios)'),
+    tr('AI found ','La IA encontró ')+draft.lines.length+
+    tr(' work items. All AI rates start at $0 until reviewed.',' partidas. Todos los precios de IA inician en $0 hasta su revisión.')+
+    '\n\n'+preview+(draft.lines.length>6?'\n…':'')+
+    (project.lines.length
+      ?'\n\n'+tr('Applying this replaces the current work items and rates. Cancel to preserve your current estimate.','Aplicar esto reemplaza partidas y precios actuales. Cancela para conservar tu estimado.')
+      :''),
+    [{text:tr('Keep current estimate','Conservar estimado'),style:'cancel'},
+     {text:tr('Apply AI draft (unpriced)','Aplicar IA (sin precios)'),onPress:apply}]
+   );
   }catch(e){setSharedMessage(e instanceof Error?e.message:'AI unavailable; use local estimate.');}
   finally{setSharedBusy(false);}
  };
@@ -638,7 +667,9 @@ export default function App(){
       <Input label={tr('Verification code','Código de verificación')} value={sharedCode} onChangeText={setSharedCode} placeholder="123456" number secure/>
       <Action title={tr('Connect cloud account','Conectar cuenta en la nube')} onPress={connectShared} disabled={sharedBusy}/>
      </>}
-     {!!sharedSession&&showCloudSettings&&<Action title={tr('Analyze this job with AI','Analizar este trabajo con IA')} onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10}/>}
+     <Action title={aiCapabilityBusy?tr('Checking AI status…','Comprobando IA…'):tr('Check AI readiness','Comprobar disponibilidad de IA')} secondary disabled={aiCapabilityBusy} onPress={checkAiReadiness}/>
+     {!!aiCapabilityMessage&&<Text style={styles.notice}>{aiCapabilityMessage}</Text>}
+     {!!sharedSession&&<Action title={tr('Review job with AI (optional)','Revisar trabajo con IA (opcional)')} secondary onPress={analyzeShared} disabled={sharedBusy||project.description.trim().length<10||aiCapabilities?.ai_environment_configured===false}/>}
      {!!sharedMessage&&<Text style={styles.notice}>{sharedMessage}</Text>}
     </View>}
     {!!info&&<Text style={styles.notice}>{info}</Text>}

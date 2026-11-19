@@ -184,3 +184,31 @@ test('residential research references require JWT and cannot be final selling ra
   ok:true,status:200,json:async()=>[{...approved,automatic_final_quote:true}]
  })));
 });
+
+test('public AI capabilities check does not send transcript, auth token or API secrets',async()=>{
+ const flags=await bridge.getAiCapabilities(config,async(url,init)=>{
+  assert.equal(url,'https://api.example.test/v1/capabilities');
+  assert.equal(init.method,'GET');
+  assert.equal(init.body,undefined);
+  assert.equal(init.headers.Authorization,undefined);
+  return {ok:true,status:200,json:async()=>({
+   auth_environment_configured:true,ai_environment_configured:false,
+   deterministic_device_interpretation:true,pricing_math_available:true,
+   live_provider_verification:false
+  })};
+ });
+ assert.equal(flags.ai_environment_configured,false);
+ assert.equal(flags.pricing_math_available,true);
+ await assert.rejects(bridge.getAiCapabilities(config,mock(200,{ai_environment_configured:true})),
+  e=>e.message.includes('could not be verified'));
+});
+
+test('app shows AI configuration status and requires explicit consent before overwriting work',()=>{
+ const app=readFileSync('App.tsx','utf8');
+ assert.match(app,/getAiCapabilities\(sharedConfig\)/);
+ assert.match(app,/Check AI readiness/);
+ assert.match(app,/AI model is NOT configured on the server/);
+ assert.match(app,/Keep current estimate/);
+ assert.match(app,/Apply AI draft \(unpriced\)/);
+ assert.match(app,/if\(!draft\.lines\.length\)/);
+});

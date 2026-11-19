@@ -100,6 +100,30 @@ export async function refreshSession(c:SharedConfig,session:BetaSession,http:Htt
  return {accessToken:response.access_token,refreshToken:response.refresh_token||session.refreshToken,
   expiresAt:Date.now()+(response.expires_in||3600)*1000};
 }
+export type AiCapabilities={
+ auth_environment_configured:boolean;
+ ai_environment_configured:boolean;
+ deterministic_device_interpretation:boolean;
+ pricing_math_available:boolean;
+ live_provider_verification:boolean;
+};
+/** Public server configuration signals, NOT a guarantee that the AI provider is reachable.
+ * Never send a transcript or user token when checking readiness.
+ */
+export async function getAiCapabilities(c:SharedConfig,http:Http=fetch):Promise<AiCapabilities>{
+ const base=secureBase(c.apiUrl);
+ const response=await jsonRequest<Partial<AiCapabilities>>(base+'/v1/capabilities',{
+  method:'GET'
+ },http);
+ if(typeof response?.ai_environment_configured!=='boolean'||
+    typeof response?.auth_environment_configured!=='boolean'||
+    typeof response?.deterministic_device_interpretation!=='boolean'||
+    typeof response?.pricing_math_available!=='boolean'||
+    typeof response?.live_provider_verification!=='boolean')
+   throw new Error('Server AI capabilities could not be verified; offline estimating is unchanged.');
+ return response as AiCapabilities;
+}
+
 export async function interpretWithDerek(c:SharedConfig,session:BetaSession,description:string,http:Http=fetch):Promise<Interpretation>{
  if(description.trim().length<10||description.length>10000)throw new Error('Describe the work before requesting AI.');
  const base=secureBase(c.apiUrl);
