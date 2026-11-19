@@ -172,25 +172,7 @@ struct EstimateBuilderView: View {
             .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
             .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
             .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
-            .task {
-                restoringDraft = true
-                notes = PrivateJobDraftStore.load(jobID: job.id)
-                if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
-                    items = review.items.map(EditableEstimateTask.init)
-                    unknowns = review.unknowns
-                    resolvedUnknowns = Set(review.resolvedUnknowns)
-                    exclusions = review.exclusions
-                    overhead = review.overhead
-                    profit = review.profit
-                    tripCost = review.tripCost
-                    customerLanguage = review.customerLanguage == "es" ? "es" : "en"
-                }
-                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
-                blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
-                await refreshRates()
-                await Task.yield()
-                restoringDraft = false
-            }
+            .task { await restorePrivateDraft() }
             .onDisappear { voice.stop() }
         }
     }
@@ -481,6 +463,26 @@ struct EstimateBuilderView: View {
                     }
                 }
 
+    }
+
+    private func restorePrivateDraft() async {
+        restoringDraft = true
+        notes = PrivateJobDraftStore.load(jobID: job.id)
+        if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
+            items = review.items.map(EditableEstimateTask.init)
+            unknowns = review.unknowns
+            resolvedUnknowns = Set(review.resolvedUnknowns)
+            exclusions = review.exclusions
+            overhead = review.overhead
+            profit = review.profit
+            tripCost = review.tripCost
+            customerLanguage = review.customerLanguage == "es" ? "es" : "en"
+        }
+        photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+        blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
+        await refreshRates()
+        await Task.yield()
+        restoringDraft = false
     }
 
     private static let units = ["each", "job", "sq ft", "linear ft", "cu yd", "hr", "day"]
