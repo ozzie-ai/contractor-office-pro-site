@@ -77,7 +77,8 @@ export function estimateReadiness(p:Pick<Project,'lines'>):{ready:boolean;issues
   if(!Number.isFinite(x.quantity)||x.quantity<=0)issues.push(name+': enter a measured quantity.');
   if(!Number.isFinite(x.rate)||x.rate<=0)issues.push(name+': enter a positive rate.');
    if((x.rateSource||'').startsWith('Illustrative outlet-device replacement example')||
-      (x.rateSource||'').startsWith('Illustrative legacy field estimate'))
+      (x.rateSource||'').startsWith('Illustrative legacy field estimate')||
+      (x.rateSource||'').startsWith('Illustrative existing-wiring device allowance'))
     issues.push(name+': contractor must review and approve the illustrative price before exporting.');
   if(!x.description_en.trim()||!x.description_es.trim())issues.push(name+': complete both customer descriptions.');
  }
