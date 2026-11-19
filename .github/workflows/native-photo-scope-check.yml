@@ -33,7 +33,7 @@ jobs:
           api=Path('ios/ContractorOfficePro/Services/EstimatingAPIClient.swift').read_text()
           store=Path('ios/ContractorOfficePro/Services/PrivateJobPhotoStore.swift').read_text()
           required_view=['PhotosPicker(selection:', 'PrivateJobPhotoStore.save(data, jobID: job.id)',
-              'photoObservations = try await api().inspectPhoto', 'pendingPhotoInspection',
+              'let inspected = try await api().inspectPhoto', 'photoObservations = inspected', 'pendingPhotoInspection',
               'guard response.version == 2', 'try workspace.saveApprovedEstimate(']
           for token in required_view: assert token in view,token
           assert 'contractorConsent: true' in api
