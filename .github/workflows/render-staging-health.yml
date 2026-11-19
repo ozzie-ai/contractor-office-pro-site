@@ -1,0 +1,30 @@
+name: Render staging availability
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/render-staging-health.yml
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public Render staging /health
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://contractor-office-pro-api-staging.onrender.com/health"
+          response_file="$(mktemp)"
+          for attempt in 1 2 3 4; do
+            status="$(curl --location --silent --show-error --connect-timeout 15 --max-time 60 \
+              -o "$response_file" -w '%{http_code}' "$url" || true)"
+            if [[ "$status" == "200" ]]; then
+              echo "Staging responds HTTP 200"
+              cat "$response_file"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $status. Waiting for cold-start if needed."
+            sleep 12
+          done
+          echo "::error::Staging /health was not available (expected HTTP 200)"
+          exit 1
