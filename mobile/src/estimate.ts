@@ -154,7 +154,7 @@ export function proposalHtml(p:Project,mode:'estimate'|'proposal'='estimate'){
  // Saved jobs from older versions may contain a full street address in City.
  // Label it as an address instead of misrepresenting it as a municipality.
  const cityText=(p.city||'').trim(),addressText=(p.address||'').trim();
- const cityLooksLikeAddress=/^\\d{1,6}\\s+.+|\\b(?:street|st\\.?|road|rd\\.?|avenue|ave\\.?|boulevard|blvd\\.?|drive|dr\\.?|lane|ln\\.?|court|ct\\.?|way)\\b/i.test(cityText);
+ const cityLooksLikeAddress=/^\d{1,6}\s+.+|\b(?:street|st\.?|road|rd\.?|avenue|ave\.?|boulevard|blvd\.?|drive|dr\.?|lane|ln\.?|court|ct\.?|way)\b/i.test(cityText);
  const placeLabel=addressText||cityLooksLikeAddress?tr.site:tr.location;
  const placeText=addressText||cityText||'—';
  const line=(label:string,value:string)=>'<div class="total"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
