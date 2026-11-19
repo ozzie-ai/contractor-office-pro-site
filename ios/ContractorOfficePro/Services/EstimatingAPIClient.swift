@@ -77,6 +77,7 @@ struct EstimatingAPIClient {
         let laborHoursPerUnit: Decimal
         let loadedLaborRate: Decimal
         let materialCostPerUnit: Decimal
+        var equipmentCostPerUnit: Decimal = 0
         let source: String // contractor_entered or planning_allowance only
     }
 
