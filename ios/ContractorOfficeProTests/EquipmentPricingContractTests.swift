@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import ContractorOfficePro
 
-final class EquipmentPricingContractTests: XCTestCase {
+nonisolated final class EquipmentPricingContractTests: XCTestCase {
     func testEquipmentCostEncodesForSharedPricingEngine() throws {
         let cost = EstimatingAPIClient.DirectCost(
             laborHoursPerUnit: 1.5, loadedLaborRate: 65,
