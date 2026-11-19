@@ -105,7 +105,7 @@ struct EstimateBuilderView: View {
                                 Image(uiImage: image).resizable().scaledToFill()
                                     .frame(width: 64, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 8))
                             }
-                            Text(url.lastPathComponent.prefix(8) + "…")
+                            Text(String(url.lastPathComponent.prefix(8)) + "…")
                                 .font(.caption)
                             Spacer()
                             Button(role: .destructive) {
