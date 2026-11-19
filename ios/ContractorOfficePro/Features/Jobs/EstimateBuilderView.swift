@@ -11,6 +11,7 @@ struct EstimateBuilderView: View {
     @StateObject private var voice = JobVoiceRecorder()
 
     @State private var notes = ""
+    @State private var notesBeforeRecording = ""
     @State private var dictationLanguage = "en"
     @State private var customerLanguage = "en"
     @State private var items: [EditableEstimateTask] = []
@@ -38,11 +39,15 @@ struct EstimateBuilderView: View {
                     .pickerStyle(.segmented)
                     TextEditor(text: $notes)
                         .frame(minHeight: 110)
+                        .disabled(voice.isRecording)
                         .accessibilityLabel(Text("estimate.voice_notes"))
                     Button {
                         if voice.isRecording {
                             voice.stop()
                         } else {
+                            // Each speech session is incremental. Never overwrite
+                            // earlier notes when a recognizer publishes partial text.
+                            notesBeforeRecording = notes
                             Task { await voice.start(language: dictationLanguage) }
                         }
                     } label: {
@@ -254,7 +259,9 @@ struct EstimateBuilderView: View {
                 }
             }
             .onChange(of: voice.transcript) { _, text in
-                if !text.isEmpty { notes = text }
+                // Partial recognition replaces ONLY this session's segment,
+                // never the earlier dictated/typed work.
+                if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
             }
             .onChange(of: notes) { _, newText in
                 // Keep voice notes available on this device even without a server.
