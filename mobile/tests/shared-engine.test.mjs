@@ -212,3 +212,47 @@ test('app shows AI configuration status and requires explicit consent before ove
  assert.match(app,/Apply AI draft \(unpriced\)/);
  assert.match(app,/if\(!draft\.lines\.length\)/);
 });
+
+test('AI photo review requires explicit consent; preserves unpriced observations',async()=>{
+ let called=0;
+ const safePhoto='a'.repeat(120);
+ const observation={observations:{visible_conditions:['An existing junction box is visible'],
+   possible_work:['Verify device replacement'],missing_information:['Check wiring'],
+   limitations:['Scale not established']},pricing_status:'not_priced',approved_for_scope:false};
+ const http=async(url,init)=>{
+  called++;
+  assert.equal(url,'https://api.example.test/v1/photo/inspect');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  const payload=JSON.parse(init.body);
+  assert.equal(payload.contractor_consent,true);
+  assert.equal(payload.image_base64,safePhoto);
+  assert.equal(payload.mime_type,'image/jpeg');
+  return {ok:true,status:200,json:async()=>observation};
+ };
+ await assert.rejects(bridge.inspectPhotoWithDerek(config,session,{
+  base64:safePhoto,mimeType:'image/jpeg',context:'Existing electrical work'},false,http));
+ assert.equal(called,0,'Without consent, no photo or text is uploaded');
+ const result=await bridge.inspectPhotoWithDerek(config,session,{
+  base64:safePhoto,mimeType:'image/jpeg',context:'Existing electrical work'},true,http);
+ assert.equal(result.observations.visible_conditions.length,1);
+ assert.equal(result.approved_for_scope,false);
+ assert.equal(result.pricing_status,'not_priced');
+ assert.equal(called,1);
+});
+test('AI photo rejects fabricated pricing and oversized payload before leaking observations',async()=>{
+ const photo={base64:'a'.repeat(120),mimeType:'image/png',context:'notes'};
+ await assert.rejects(bridge.inspectPhotoWithDerek(config,session,photo,true,
+  async()=>({ok:true,status:200,json:async()=>({
+   observations:{visible_conditions:[],possible_work:[],missing_information:[],limitations:[]},
+   pricing_status:'priced',approved_for_scope:true
+  })})));
+ await assert.rejects(bridge.inspectPhotoWithDerek(config,session,{
+  ...photo,base64:'a'.repeat(5_500_004)},true,async()=>{throw new Error('Should not connect');}));
+});
+test('iPhone AI photo workflow keeps client PDF separate and requires on-device consent',()=>{
+ const app=readFileSync('App.tsx','utf8');
+ assert.match(app,/Share this photo with AI\?/);
+ assert.match(app,/inspectPhotoWithDerek\(sharedConfig,session/);
+ assert.match(app,/base64:await file\.base64\(\)/);
+ assert.match(app,/photoAiNotes\?\.jobId===activeJobId/);
+});
