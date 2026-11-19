@@ -98,172 +98,8 @@ struct EstimateBuilderView: View {
                 photoSection
                 blueprintSection
 
-                if !items.isEmpty {
-                    Section {
-                        Picker("estimate.customer_language", selection: $customerLanguage) {
-                            Text("English").tag("en")
-                            Text("Español").tag("es")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    ForEach($items) { $item in
-                        Section {
-                            TextField("estimate.description_en", text: $item.descriptionEn, axis: .vertical)
-                            TextField("estimate.description_es", text: $item.descriptionEs, axis: .vertical)
-                            TextField("estimate.location_optional", text: $item.scopeID)
-                            HStack {
-                                TextField("estimate.quantity", text: $item.quantity)
-                                    .keyboardType(.decimalPad)
-                                Picker("estimate.unit", selection: $item.unit) {
-                                    Text("estimate.select_unit").tag("")
-                                    ForEach(Self.units, id: \.self) { unit in
-                                        Text(unit).tag(unit)
-                                    }
-                                }
-                            }
-
-                            let matchingRates = book.filter {
-                                Self.unit($0.unit) == item.unit && UUID(uuidString: $0.id) != nil
-                            }
-                            if !matchingRates.isEmpty {
-                                Picker("estimate.saved_rate", selection: $item.selectedRateID) {
-                                    Text("estimate.manual_cost").tag("")
-                                    ForEach(matchingRates, id: \.id) { rate in
-                                        Text("\(rate.nameEn) — $\(rate.unitPrice)").tag(rate.id)
-                                    }
-                                }
-                            }
-                            if item.selectedRateID.isEmpty {
-                                TextField("estimate.hours_per_unit", text: $item.laborHours)
-                                    .keyboardType(.decimalPad)
-                                TextField("estimate.loaded_rate", text: $item.laborRate)
-                                    .keyboardType(.decimalPad)
-                                TextField("estimate.material_per_unit", text: $item.materialCost)
-                                    .keyboardType(.decimalPad)
-                                TextField("Equipment per unit / Equipo por unidad", text: $item.equipmentCost)
-                                    .keyboardType(.decimalPad)
-                                Picker("estimate.price_source", selection: $item.priceSource) {
-                                    Text("estimate.contractor_rate").tag("contractor_entered")
-                                    Text("estimate.allowance").tag("planning_allowance")
-                                }
-                            }
-                            if item.requiresConfirmation {
-                                Toggle("estimate.confirm_scope", isOn: $item.confirmed)
-                            }
-                        } header: {
-                            Text(item.descriptionEn.isEmpty ? item.taskCode : item.descriptionEn)
-                        } footer: {
-                            Text("estimate.private_costs")
-                        }
-                    }
-
-                    if !unknowns.isEmpty {
-                        Section {
-                            ForEach(unknowns, id: \.self) { missing in
-                                Toggle(isOn: Binding(
-                                    get: { resolvedUnknowns.contains(missing) },
-                                    set: { state in
-                                        if state { resolvedUnknowns.insert(missing) }
-                                        else { resolvedUnknowns.remove(missing) }
-                                        invalidatePrice()
-                                    }
-                                )) {
-                                    Text(missing)
-                                }
-                            }
-                        } header: {
-                            Text("estimate.open_questions")
-                        } footer: {
-                            Text("estimate.confirm_questions")
-                        }
-                    }
-                    if !exclusions.isEmpty {
-                        Section {
-                            ForEach(exclusions, id: \.self) { exclusion in Text(exclusion) }
-                        } header: {
-                            Text("estimate.excluded")
-                        }
-                    }
-
-                    Section {
-                        TextField("estimate.overhead", text: $overhead).keyboardType(.decimalPad)
-                        TextField("estimate.profit", text: $profit).keyboardType(.decimalPad)
-                        TextField("estimate.trip", text: $tripCost).keyboardType(.decimalPad)
-                        Button {
-                            Task { await calculate() }
-                        } label: {
-                            Label("estimate.calculate", systemImage: "equal.square")
-                        }
-                        .disabled(busy || items.contains { !$0.confirmed || $0.unit.isEmpty ||
-                            $0.descriptionEn.trimmingCharacters(in: .whitespacesAndNewlines).count < 3 }
-                            || !Set(unknowns).isSubset(of: resolvedUnknowns))
-                    } header: {
-                        Text("estimate.private_pricing")
-                    }
-                }
-
-                if let calculated = calculation {
-                    Section {
-                        ForEach(calculated.lines.indices, id: \.self) { index in
-                            let item = calculated.lines[index]
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.descriptionEn)
-                                if let total = item.sellingTotal {
-                                    Text("$\(total)").font(.caption).foregroundStyle(.secondary)
-                                }
-                                ForEach(item.missing, id: \.self) { missing in
-                                    Text(missing).foregroundStyle(.red).font(.caption)
-                                }
-                            }
-                        }
-                        ForEach(calculated.missing, id: \.self) { missing in
-                            Text(missing).font(.caption).foregroundStyle(.red)
-                        }
-                        if let total = calculated.sellingTotal,
-                           calculated.status == "ready_for_contractor_review" {
-                            Text("\(String(localized: "estimate.total")) $\(total)")
-                                .font(.headline)
-                            Text("estimate.preliminary").font(.caption).foregroundStyle(.secondary)
-                            Toggle("estimate.approve", isOn: $approved)
-                            Button {
-                                Task { await saveApprovedRates() }
-                            } label: {
-                                Label("estimate.save_rates", systemImage: "square.and.arrow.down")
-                            }
-                            .disabled(busy || !items.contains {
-                                $0.selectedRateID.isEmpty && $0.priceSource == "contractor_entered"
-                            })
-                            if let pdfURL {
-                                ShareLink(item: pdfURL) {
-                                    Label("estimate.share_pdf", systemImage: "square.and.arrow.up")
-                                }
-                            } else {
-                                Button {
-                                    do {
-                                        let generated = try CustomerEstimatePDF.create(
-                                            from: calculated, approved: approved
-                                        )
-                                        // Save to this job before presenting a share action.
-                                        // Neither private notes nor internal costs are persisted as customer lines.
-                                        try workspace.saveApprovedEstimate(
-                                            calculated, for: job, approved: approved
-                                        )
-                                        pdfURL = generated
-                                    } catch {
-                                        message = String(localized: "estimate.pdf_failed")
-                                    }
-                                } label: {
-                                    Label("estimate.make_pdf", systemImage: "doc.richtext")
-                                }
-                                .disabled(!approved)
-                            }
-                        } else {
-                            Text("estimate.incomplete").foregroundStyle(.orange)
-                        }
-                    } header: {
-                        Text("estimate.review")
-                    }
-                }
+                workItemReviewSection
+                customerResultSection
 
                 if busy {
                     Section { ProgressView() }
@@ -466,6 +302,183 @@ struct EstimateBuilderView: View {
                     Text(dictationLanguage == "es"
                          ? "Se guarda localmente. La IA solo analizará una imagen de la primera página si lo autorizas; no calcula mediciones definitivas."
                          : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
+                }
+
+    }
+
+    // Distinct builders reduce Xcode SwiftUI type-check complexity and keep
+    // review/approval isolated from voice and image capture presentation.
+    @ViewBuilder
+    private var workItemReviewSection: some View {
+                if !items.isEmpty {
+                    Section {
+                        Picker("estimate.customer_language", selection: $customerLanguage) {
+                            Text("English").tag("en")
+                            Text("Español").tag("es")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    ForEach($items) { $item in
+                        Section {
+                            TextField("estimate.description_en", text: $item.descriptionEn, axis: .vertical)
+                            TextField("estimate.description_es", text: $item.descriptionEs, axis: .vertical)
+                            TextField("estimate.location_optional", text: $item.scopeID)
+                            HStack {
+                                TextField("estimate.quantity", text: $item.quantity)
+                                    .keyboardType(.decimalPad)
+                                Picker("estimate.unit", selection: $item.unit) {
+                                    Text("estimate.select_unit").tag("")
+                                    ForEach(Self.units, id: \.self) { unit in
+                                        Text(unit).tag(unit)
+                                    }
+                                }
+                            }
+
+                            let matchingRates = book.filter {
+                                Self.unit($0.unit) == item.unit && UUID(uuidString: $0.id) != nil
+                            }
+                            if !matchingRates.isEmpty {
+                                Picker("estimate.saved_rate", selection: $item.selectedRateID) {
+                                    Text("estimate.manual_cost").tag("")
+                                    ForEach(matchingRates, id: \.id) { rate in
+                                        Text("\(rate.nameEn) — $\(rate.unitPrice)").tag(rate.id)
+                                    }
+                                }
+                            }
+                            if item.selectedRateID.isEmpty {
+                                TextField("estimate.hours_per_unit", text: $item.laborHours)
+                                    .keyboardType(.decimalPad)
+                                TextField("estimate.loaded_rate", text: $item.laborRate)
+                                    .keyboardType(.decimalPad)
+                                TextField("estimate.material_per_unit", text: $item.materialCost)
+                                    .keyboardType(.decimalPad)
+                                TextField("Equipment per unit / Equipo por unidad", text: $item.equipmentCost)
+                                    .keyboardType(.decimalPad)
+                                Picker("estimate.price_source", selection: $item.priceSource) {
+                                    Text("estimate.contractor_rate").tag("contractor_entered")
+                                    Text("estimate.allowance").tag("planning_allowance")
+                                }
+                            }
+                            if item.requiresConfirmation {
+                                Toggle("estimate.confirm_scope", isOn: $item.confirmed)
+                            }
+                        } header: {
+                            Text(item.descriptionEn.isEmpty ? item.taskCode : item.descriptionEn)
+                        } footer: {
+                            Text("estimate.private_costs")
+                        }
+                    }
+
+                    if !unknowns.isEmpty {
+                        Section {
+                            ForEach(unknowns, id: \.self) { missing in
+                                Toggle(isOn: Binding(
+                                    get: { resolvedUnknowns.contains(missing) },
+                                    set: { state in
+                                        if state { resolvedUnknowns.insert(missing) }
+                                        else { resolvedUnknowns.remove(missing) }
+                                        invalidatePrice()
+                                    }
+                                )) {
+                                    Text(missing)
+                                }
+                            }
+                        } header: {
+                            Text("estimate.open_questions")
+                        } footer: {
+                            Text("estimate.confirm_questions")
+                        }
+                    }
+                    if !exclusions.isEmpty {
+                        Section {
+                            ForEach(exclusions, id: \.self) { exclusion in Text(exclusion) }
+                        } header: {
+                            Text("estimate.excluded")
+                        }
+                    }
+
+                    Section {
+                        TextField("estimate.overhead", text: $overhead).keyboardType(.decimalPad)
+                        TextField("estimate.profit", text: $profit).keyboardType(.decimalPad)
+                        TextField("estimate.trip", text: $tripCost).keyboardType(.decimalPad)
+                        Button {
+                            Task { await calculate() }
+                        } label: {
+                            Label("estimate.calculate", systemImage: "equal.square")
+                        }
+                        .disabled(busy || items.contains { !$0.confirmed || $0.unit.isEmpty ||
+                            $0.descriptionEn.trimmingCharacters(in: .whitespacesAndNewlines).count < 3 }
+                            || !Set(unknowns).isSubset(of: resolvedUnknowns))
+                    } header: {
+                        Text("estimate.private_pricing")
+                    }
+                }
+
+    }
+
+    @ViewBuilder
+    private var customerResultSection: some View {
+                if let calculated = calculation {
+                    Section {
+                        ForEach(calculated.lines.indices, id: \.self) { index in
+                            let item = calculated.lines[index]
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.descriptionEn)
+                                if let total = item.sellingTotal {
+                                    Text("$\(total)").font(.caption).foregroundStyle(.secondary)
+                                }
+                                ForEach(item.missing, id: \.self) { missing in
+                                    Text(missing).foregroundStyle(.red).font(.caption)
+                                }
+                            }
+                        }
+                        ForEach(calculated.missing, id: \.self) { missing in
+                            Text(missing).font(.caption).foregroundStyle(.red)
+                        }
+                        if let total = calculated.sellingTotal,
+                           calculated.status == "ready_for_contractor_review" {
+                            Text("\(String(localized: "estimate.total")) $\(total)")
+                                .font(.headline)
+                            Text("estimate.preliminary").font(.caption).foregroundStyle(.secondary)
+                            Toggle("estimate.approve", isOn: $approved)
+                            Button {
+                                Task { await saveApprovedRates() }
+                            } label: {
+                                Label("estimate.save_rates", systemImage: "square.and.arrow.down")
+                            }
+                            .disabled(busy || !items.contains {
+                                $0.selectedRateID.isEmpty && $0.priceSource == "contractor_entered"
+                            })
+                            if let pdfURL {
+                                ShareLink(item: pdfURL) {
+                                    Label("estimate.share_pdf", systemImage: "square.and.arrow.up")
+                                }
+                            } else {
+                                Button {
+                                    do {
+                                        let generated = try CustomerEstimatePDF.create(
+                                            from: calculated, approved: approved
+                                        )
+                                        // Save to this job before presenting a share action.
+                                        // Neither private notes nor internal costs are persisted as customer lines.
+                                        try workspace.saveApprovedEstimate(
+                                            calculated, for: job, approved: approved
+                                        )
+                                        pdfURL = generated
+                                    } catch {
+                                        message = String(localized: "estimate.pdf_failed")
+                                    }
+                                } label: {
+                                    Label("estimate.make_pdf", systemImage: "doc.richtext")
+                                }
+                                .disabled(!approved)
+                            }
+                        } else {
+                            Text("estimate.incomplete").foregroundStyle(.orange)
+                        }
+                    } header: {
+                        Text("estimate.review")
+                    }
                 }
 
     }
