@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ContractorOfficePro
 
+@MainActor
 @Suite("Workspace writes")
 struct WorkspaceTests {
     let backend = FakeBackend()
