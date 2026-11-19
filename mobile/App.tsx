@@ -403,14 +403,14 @@ export default function App(){
    // Existing contractor-priced items must not be silently discarded.
    const preview=draft.lines.slice(0,6).map(x=>
     '• '+(project.language==='es'?x.description_es:x.description_en)+
-    ' — '+(x.quantity>0?String(x.quantity):'?')+' '+x.unit).join('\\n');
+    ' — '+(x.quantity>0?String(x.quantity):'?')+' '+x.unit).join('\n');
    Alert.alert(
     tr('Review AI work items (no prices)','Revisar partidas de IA (sin precios)'),
     tr('AI found ','La IA encontró ')+draft.lines.length+
     tr(' work items. All AI rates start at $0 until reviewed.',' partidas. Todos los precios de IA inician en $0 hasta su revisión.')+
-    '\\n\\n'+preview+(draft.lines.length>6?'\\n…':'')+
+    '\n\n'+preview+(draft.lines.length>6?'\n…':'')+
     (project.lines.length
-      ?'\\n\\n'+tr('Applying this replaces the current work items and rates. Cancel to preserve your current estimate.','Aplicar esto reemplaza partidas y precios actuales. Cancela para conservar tu estimado.')
+      ?'\n\n'+tr('Applying this replaces the current work items and rates. Cancel to preserve your current estimate.','Aplicar esto reemplaza partidas y precios actuales. Cancela para conservar tu estimado.')
       :''),
     [{text:tr('Keep current estimate','Conservar estimado'),style:'cancel'},
      {text:tr('Apply AI draft (unpriced)','Aplicar IA (sin precios)'),onPress:apply}]
