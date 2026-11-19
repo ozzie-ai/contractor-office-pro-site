@@ -137,3 +137,27 @@ test('new wiring does not get device replacement rates',()=>{
  assert.equal(suggested.suggested,0);
  assert.ok(suggested.lines.every(x=>x.rate===0));
 });
+
+
+test('five-device dictation: two standard plus three GFCI gets a provisional $625 reviewable amount',()=>{
+ const description='Replace five outlets, two normal outlets and three GFCIs.';
+ const scope=localEstimate(description,'electrical');
+ assert.equal(scope.lines.find(x=>x.id==='local-standard-outlets')?.quantity,2);
+ assert.equal(scope.lines.find(x=>x.id==='local-gfci')?.quantity,3);
+ const draft=suggestPreliminaryPrices('electrical',scope.lines,description);
+ assert.equal(draft.lines.find(x=>x.id==='local-standard-outlets')?.rate,95);
+ assert.equal(draft.lines.find(x=>x.id==='local-gfci')?.rate,145);
+ assert.equal(draft.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
+ assert.equal(estimate.estimateReadiness({lines:draft.lines}).ready,false,'Contractor review remains mandatory');
+ assert.ok(draft.notes.some(x=>x.includes('Confirm wiring')));
+});
+
+test('quick five-device ID variant: two standard and three GFCI receives the same cautious model',()=>{
+ const description='Replace 5 outlets total, 2 standard and 3 GFCI.';
+ const parsed=localEstimate(description,'electrical');
+ assert.equal(parsed.lines.find(x=>x.id==='local-outlets-standard')?.quantity,2);
+ assert.equal(parsed.lines.find(x=>x.id==='local-outlets-gfci')?.quantity,3);
+ const draft=suggestPreliminaryPrices('electrical',parsed.lines,description);
+ assert.equal(draft.lines.reduce((n,x)=>n+x.quantity*x.rate,0),625);
+ assert.equal(estimate.estimateReadiness({lines:draft.lines}).ready,false);
+});
