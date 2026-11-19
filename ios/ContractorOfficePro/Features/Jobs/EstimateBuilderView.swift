@@ -624,6 +624,8 @@ struct EstimateBuilderView: View {
     private func calculate() async {
         busy = true
         message = nil
+        // Never leave a previous total on screen when a new request fails.
+        calculation = nil
         approved = false
         pdfURL = nil
         defer { busy = false }
@@ -783,7 +785,10 @@ private struct EditableEstimateTask: Identifiable, Equatable {
         descriptionEs = source.descriptionEs
         quantity = source.quantity ?? ""
         unit = normalizeUnit(source.unit)
+        // The AI may leave quantity/unit unknown. Such tasks cannot be
+        // treated as automatically confirmed, even if status says included.
         requiresConfirmation = source.status == "allowance_to_confirm"
-        confirmed = source.status != "allowance_to_confirm"
+            || source.quantity == nil || normalizeUnit(source.unit).isEmpty
+        confirmed = !requiresConfirmation
     }
 }
