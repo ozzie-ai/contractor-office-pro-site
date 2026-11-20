@@ -16,7 +16,7 @@ import {readProfile,saveProfile,defaultProfile,BusinessProfile} from './src/busi
 import {findPropertyArea,areaMatchesAddress} from './src/propertyLookup';
 import {cleaningToProject,POST_CONSTRUCTION_TASKS,DEFAULT_POST_CONSTRUCTION_TASKS,recommendedPostConstructionWorkerHours,plannedCleaningWorkerHours,explicitCleaningNumbers,currentCleaningProject} from './src/cleaningEstimate';
 import {Language,Project,Trade,TRADES,EstimateLine,CleaningDetails,CleaningType,CleaningFrequency,JobStatus,JOB_STATUSES,totals,recurringCleaningPrice,money,proposalHtml,estimateReadiness,estimationScopeIssues,itemCostEvidence,priceEvidenceSummary,mapInterpretation} from './src/estimate';
-import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,inspectPhotoWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference,listContractorDirectRates,ContractorDirectRate,exactContractorRateMatches} from './src/sharedEngine';
+import {BetaSession,sharedConfig,isSharedConfigured,sendEmailCode,verifyEmailCode,refreshSession,verifyBackendAccess,bootstrapBusiness,interpretWithDerek,inspectPhotoWithDerek,getAiCapabilities,AiCapabilities,verifyWithDerek,listResearchReferences,ResearchReference,listContractorDirectRates,saveContractorServiceRate,ContractorDirectRate,exactContractorRateMatches} from './src/sharedEngine';
 
 const PROPERTY_LOOKUP_URL=String(Constants.expoConfig?.extra?.propertyLookupUrl||'');
 const PALETTE={ink:'#12244B',accent:'#1F3AA8',accentDark:'#13256F',teal:'#0B8E95',background:'#F3F6FC',line:'#D7DFEF',muted:'#60708C',white:'#fff'};
@@ -305,6 +305,34 @@ export default function App(){
     onPress:()=>setLine(index,{rate:unitCost,
      rateSource:'Contractor-entered saved direct cost — approved for this job',
      priceEvidence:{kind:'contractor_entered',detail:'Explicitly selected contractor pricebook direct unit cost; not a live market reference'}})
+   }]
+  );
+ };
+ const saveApprovedItemRate=(item:EstimateLine)=>{
+  if(!sharedSession||ratebookBusy||item.rate<=0||
+    itemCostEvidence(item).kind!=='contractor_entered')return;
+  Alert.alert(
+   tr('Save this reviewed service cost?','¿Guardar este costo de servicio revisado?'),
+   tr('Save DIRECT unit cost ','Guardar costo DIRECTO unitario ')+money(item.rate)+
+   ' / '+item.unit+
+   tr(' for this complete work item in your private business pricebook. Only save costs you verified for materials, labor and equipment. The app will calculate overhead and profit separately.',' para esta partida completa en el tarifario privado. Guarda solo costos verificados de materiales, mano de obra y equipo. La aplicación agregará gastos generales y utilidad por separado.'),
+   [{text:tr('Cancel','Cancelar'),style:'cancel'},{
+    text:tr('Save business rate','Guardar tarifa de empresa'),
+    onPress:()=>{void(async()=>{
+     setRatebookBusy(true);
+     try{
+      const session=await refreshSession(sharedConfig,sharedSession);
+      setSharedSession(session);
+      const saved=await saveContractorServiceRate(sharedConfig,session,{
+       name_en:item.description_en,name_es:item.description_es,unit:item.unit,
+       unit_cost:item.rate,overheadPct:project.overheadPct,
+       profitPct:project.profitPct,category:project.trade
+      });
+      setContractorRates(prev=>[saved,...prev.filter(x=>x.id!==saved.id)]);
+      setRatebookMessage(tr('Reviewed contractor rate saved to private business pricebook.','Tarifa revisada guardada en el tarifario privado de tu empresa.'));
+     }catch(e){setRatebookMessage(e instanceof Error?e.message:'Unable to save rate.');}
+     finally{setRatebookBusy(false);}
+    })();}
    }]
   );
  };
@@ -825,6 +853,9 @@ export default function App(){
      <View style={styles.row}><View style={{flex:1}}><Input label={tr("Quantity","Cantidad")} value={String(line.quantity||'')} number onChangeText={x=>setLine(i,{quantity:Number(x)||0})}/></View><View style={{flex:1}}><Input label={tr("Unit","Unidad")} value={line.unit} onChangeText={x=>setLine(i,{unit:x})}/></View><View style={{flex:1}}><Input label={tr("Rate ($)","Tarifa ($)")} value={String(line.rate||'')} number onChangeText={x=>setLine(i,{rate:Number(x)||0,rateSource:'Contractor-entered rate / Tarifa ingresada por contratista',priceEvidence:{kind:'contractor_entered',detail:'Contractor entered a rate; retailer source not verified'}})}/></View></View>
      <Text style={styles.rate}>{tr('Amount','Importe')}: {money(line.quantity*line.rate)}</Text>
      {!!line.rateSource&&<Text style={styles.hint}>{tr('Price basis','Base del precio')}: {line.rateSource}</Text>}
+     {sharedEnabled&&!!sharedSession&&project.trade!=='cleaning'&&line.rate>0&&
+      itemCostEvidence(line).kind==='contractor_entered'&&
+      <Action secondary disabled={ratebookBusy} title={tr('Save reviewed cost to my business pricebook','Guardar costo revisado en mi tarifario')} onPress={()=>saveApprovedItemRate(line)}/>}
      <Action title={tr("Remove item","Eliminar partida")} secondary onPress={()=>patch({lines:project.lines.filter(x=>x.id!==line.id)})}/>
      </>}
     </View>)}
