@@ -270,3 +270,34 @@ test('contractor pricebook authentication and exact matching',async()=>{
  assert.equal(bridge.exactContractorRateMatches({...line,description_en:'Install new device',description_es:'Instalar aparato'},rates).length,0);
  assert.equal(bridge.exactContractorRateMatches(line,[{...item,kind:'material'}]).length,0);
 });
+
+test('contractor saves verified whole-service direct unit cost, not markup as another direct cost',async()=>{
+ const item={name_en:'Install verified faucet',name_es:'Instalar grifo verificado',unit:'each',unit_cost:125,overheadPct:10,profitPct:20,category:'plumbing'};
+ const saved=await bridge.saveContractorServiceRate(config,session,item,async(url,init)=>{
+  assert.equal(url,'https://api.example.test/v1/pricebook');
+  assert.equal(init.method,'POST');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  const body=JSON.parse(init.body);
+  assert.equal(body.kind,'other');
+  assert.equal(body.unit_cost,'125.00');
+  assert.equal(body.unit_price,'165.00');
+  assert.equal(body.category,'plumbing');
+  return {ok:true,status:201,json:async()=>({...body,id:'rate-1',source:'contractor_entered'})};
+ });
+ assert.equal(saved.unit_cost,'125.00');
+ assert.equal(saved.unit_price,'165.00');
+});
+test('invalid business direct cost cannot be saved',async()=>{
+ const item={name_en:'Install faucet',name_es:'Instalar grifo',unit:'each',unit_cost:0,overheadPct:10,profitPct:20,category:'plumbing'};
+ let count=0;
+ await assert.rejects(bridge.saveContractorServiceRate(config,session,item,async()=>{count++;return {}; }));
+ assert.equal(count,0);
+ await assert.rejects(bridge.saveContractorServiceRate(config,session,{...item,unit_cost:100,profitPct:-20},async()=>{count++;return {}; }));
+ assert.equal(count,0);
+});
+test('phone exposes save only for contractor-entered item rates with explicit consent',()=>{
+ const app=readFileSync('App.tsx','utf8');
+ assert.match(app,/Save this reviewed service cost\?/);
+ assert.match(app,/itemCostEvidence\(line\)\.kind==='contractor_entered'/);
+ assert.match(app,/saveContractorServiceRate\(sharedConfig,session/);
+});

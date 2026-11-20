@@ -242,6 +242,38 @@ export async function listContractorDirectRates(c:SharedConfig,session:BetaSessi
   throw new Error('Contractor pricebook could not be verified. Current estimate unchanged.');
  return response;
 }
+/** Save a contractor-verified whole-service DIRECT cost to the RLS-backed
+ * company ratebook. This is not an AI or market reference approval.
+ */
+export async function saveContractorServiceRate(c:SharedConfig,session:BetaSession,
+ item:{name_en:string;name_es:string;unit:string;unit_cost:number;overheadPct:number;profitPct:number;category:string},
+ http:Http=fetch):Promise<ContractorDirectRate>{
+ const {name_en,name_es,unit,unit_cost,overheadPct,profitPct,category}=item;
+ if(!name_en.trim()||!name_es.trim()||!unit.trim()||!category.trim()||
+    !Number.isFinite(unit_cost)||unit_cost<=0||
+    !Number.isFinite(overheadPct)||overheadPct<0||overheadPct>100||
+    !Number.isFinite(profitPct)||profitPct<0||profitPct>100)
+  throw new Error('Review the complete direct cost, description and markup before saving.');
+ const selling=unit_cost*(1+overheadPct/100)*(1+profitPct/100);
+ if(!Number.isFinite(selling)||selling<=0)
+  throw new Error('Calculated contractor rate is invalid.');
+ const base=secureBase(c.apiUrl);
+ const payload={kind:'other',name_en:name_en.trim().slice(0,180),
+  name_es:name_es.trim().slice(0,180),unit:unit.trim().slice(0,24),
+  unit_cost:unit_cost.toFixed(2),unit_price:selling.toFixed(2),
+  category:category.slice(0,80)};
+ const saved=await jsonRequest<ContractorDirectRate>(base+'/v1/pricebook',{
+  method:'POST',headers:{Authorization:'Bearer '+session.accessToken},
+  body:JSON.stringify(payload)
+ },http);
+ if(!saved||saved.source!=='contractor_entered'||saved.kind!=='other'||
+    saved.name_en!==payload.name_en||saved.unit!==payload.unit||
+    !Number.isFinite(Number(saved.unit_cost))||
+    Math.abs(Number(saved.unit_cost)-unit_cost)>0.011)
+  throw new Error('Saved rate could not be verified; refresh your pricebook.');
+ return saved;
+}
+
 const rateKey=(s:string)=>s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 const rateUnit=(s:string)=>({
  'ea':'each','unit':'each','each':'each','sf':'sq ft','sqft':'sq ft','sq ft':'sq ft',
