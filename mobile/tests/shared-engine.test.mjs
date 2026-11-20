@@ -256,3 +256,17 @@ test('iPhone AI photo workflow keeps client PDF separate and requires on-device 
  assert.match(app,/base64:await file\.base64\(\)/);
  assert.match(app,/photoAiNotes\?\.jobId===activeJobId/);
 });
+
+test('contractor pricebook authentication and exact matching',async()=>{
+ const item={id:'rate-a',kind:'other',name_en:'Replace GFCI receptacle',name_es:'Reemplazar tomacorriente GFCI',unit:'each',unit_cost:'115.00',unit_price:'151.80',category:'Electrical',source:'contractor_entered'};
+ const rates=await bridge.listContractorDirectRates(config,session,async(url,init)=>{
+  assert.equal(url,'https://api.example.test/v1/pricebook?limit=200');
+  assert.equal(init.headers.Authorization,'Bearer test-jwt');
+  return {ok:true,status:200,json:async()=>[item]};
+ });
+ const line={description_en:'Replace GFCI receptacle',description_es:'Reemplazar tomacorriente GFCI',unit:'each'};
+ assert.equal(bridge.exactContractorRateMatches(line,rates).length,1);
+ assert.equal(bridge.exactContractorRateMatches({...line,unit:'sq ft'},rates).length,0);
+ assert.equal(bridge.exactContractorRateMatches({...line,description_en:'Install new device',description_es:'Instalar aparato'},rates).length,0);
+ assert.equal(bridge.exactContractorRateMatches(line,[{...item,kind:'material'}]).length,0);
+});
