@@ -304,7 +304,7 @@ export default function App(){
     text:tr('Use reviewed rate','Usar tarifa revisada'),
     onPress:()=>setLine(index,{rate:unitCost,
      rateSource:'Contractor-entered saved direct cost — approved for this job',
-     priceEvidence:{kind:'contractor_entered',detail:'Explicitly selected contractor pricebook direct unit cost; not a live market reference'}}
+     priceEvidence:{kind:'contractor_entered',detail:'Explicitly selected contractor pricebook direct unit cost; not a live market reference'}})
    }]
   );
  };
