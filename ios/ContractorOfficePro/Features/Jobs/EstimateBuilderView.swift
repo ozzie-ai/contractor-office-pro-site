@@ -45,6 +45,102 @@ struct EstimateBuilderView: View {
     var body: some View {
         NavigationStack {
             Form {
+                voiceSection
+                photosSection
+                blueprintSection
+                scopeSections
+                reviewSections
+                statusSections
+            }
+            .navigationTitle(Text("estimate.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("estimate.close") { voice.stop(); dismiss() }
+                }
+            }
+            .fileImporter(isPresented: $showBlueprintImporter, allowedContentTypes: [.pdf]) { result in
+                switch result {
+                case .success(let url): importBlueprint(url)
+                case .failure: blueprintMessage = "Blueprint selection failed."
+                }
+            }
+            .confirmationDialog("Send the first blueprint page to AI for review?",
+                                isPresented: $showBlueprintConsent,
+                                titleVisibility: .visible) {
+                Button("Send first blueprint page for AI observations") {
+                    if let blueprintURL { Task { await inspectBlueprintPage(blueprintURL) } }
+                }
+                Button("Keep blueprint private", role: .cancel) {}
+            } message: {
+                Text("Only a raster image of page 1 is uploaded when enabled; the PDF remains private. Printed dimensions and quantities must be independently checked.")
+            }
+            .confirmationDialog("Send this jobsite photo to AI for review?",
+                                isPresented: Binding(
+                                    get: { pendingPhotoInspection != nil },
+                                    set: { if !$0 { pendingPhotoInspection = nil } }
+                                ),
+                                titleVisibility: .visible) {
+                Button("Send selected photo for AI observations") {
+                    if let url = pendingPhotoInspection { Task { await inspectSelectedPhoto(url) } }
+                    pendingPhotoInspection = nil
+                }
+                Button("Keep photo private", role: .cancel) { pendingPhotoInspection = nil }
+            } message: {
+                Text("This uploads only the selected photo to an external AI provider. It may incur usage charges when enabled. All conclusions need verification.")
+            }
+            .onChange(of: photoSelection) { _, selected in
+                Task { await importPhotos(selected) }
+            }
+            .onChange(of: voice.transcript) { _, text in
+                // Partial recognition replaces ONLY this session's segment,
+                // never the earlier dictated/typed work.
+                if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
+            }
+            .onChange(of: notes) { _, newText in
+                guard !restoringDraft else { return }
+                PrivateJobDraftStore.save(newText, jobID: job.id)
+                // New dictation invalidates any previously extracted scope.
+                items = []
+                unknowns = []
+                resolvedUnknowns = []
+                exclusions = []
+                invalidatePrice()
+                persistReview()
+            }
+            .onChange(of: items) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: unknowns) { _, _ in persistReview() }
+            .onChange(of: resolvedUnknowns) { _, _ in persistReview() }
+            .onChange(of: exclusions) { _, _ in persistReview() }
+            .onChange(of: overhead) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
+            .task {
+                restoringDraft = true
+                notes = PrivateJobDraftStore.load(jobID: job.id)
+                if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
+                    items = review.items.map(EditableEstimateTask.init)
+                    unknowns = review.unknowns
+                    resolvedUnknowns = Set(review.resolvedUnknowns)
+                    exclusions = review.exclusions
+                    overhead = review.overhead
+                    profit = review.profit
+                    tripCost = review.tripCost
+                    customerLanguage = review.customerLanguage == "es" ? "es" : "en"
+                }
+                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+                blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
+                await refreshRates()
+                await Task.yield()
+                restoringDraft = false
+            }
+            .onDisappear { voice.stop() }
+        }
+    }
+
+    @ViewBuilder
+    private var voiceSection: some View {
                 Section {
                     Picker("estimate.speech_language", selection: $dictationLanguage) {
                         Text("English").tag("en")
@@ -93,7 +189,10 @@ struct EstimateBuilderView: View {
                 } footer: {
                     Text("estimate.private_notes_notice")
                 }
+    }
 
+    @ViewBuilder
+    private var photosSection: some View {
                 Section {
                     PhotosPicker(selection: $photoSelection, maxSelectionCount: 8,
                                  matching: .images) {
@@ -150,7 +249,10 @@ struct EstimateBuilderView: View {
                          ? "No se envían al servidor ni se incluyen en el presupuesto del cliente."
                          : "Not uploaded to a server or included in the customer's PDF.")
                 }
+    }
 
+    @ViewBuilder
+    private var blueprintSection: some View {
                 Section {
                     Button {
                         showBlueprintImporter = true
@@ -187,7 +289,10 @@ struct EstimateBuilderView: View {
                          ? "Se guarda localmente. La IA solo analizará una imagen de la primera página si lo autorizas; no calcula mediciones definitivas."
                          : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
                 }
+    }
 
+    @ViewBuilder
+    private var scopeSections: some View {
                 if !items.isEmpty {
                     Section {
                         Picker("estimate.customer_language", selection: $customerLanguage) {
@@ -291,7 +396,10 @@ struct EstimateBuilderView: View {
                         Text("estimate.private_pricing")
                     }
                 }
+    }
 
+    @ViewBuilder
+    private var reviewSections: some View {
                 if let calculated = calculation {
                     Section {
                         ForEach(calculated.lines.indices, id: \.self) { index in
@@ -354,99 +462,16 @@ struct EstimateBuilderView: View {
                         Text("estimate.review")
                     }
                 }
+    }
 
+    @ViewBuilder
+    private var statusSections: some View {
                 if busy {
                     Section { ProgressView() }
                 }
                 if let message {
                     Section { Text(message).foregroundStyle(.orange) }
                 }
-            }
-            .navigationTitle(Text("estimate.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("estimate.close") { voice.stop(); dismiss() }
-                }
-            }
-            .fileImporter(isPresented: $showBlueprintImporter, allowedContentTypes: [.pdf]) { result in
-                switch result {
-                case .success(let url): importBlueprint(url)
-                case .failure: blueprintMessage = "Blueprint selection failed."
-                }
-            }
-            .confirmationDialog("Send the first blueprint page to AI for review?",
-                                isPresented: $showBlueprintConsent,
-                                titleVisibility: .visible) {
-                Button("Send first blueprint page for AI observations") {
-                    if let blueprintURL { Task { await inspectBlueprintPage(blueprintURL) } }
-                }
-                Button("Keep blueprint private", role: .cancel) {}
-            } message: {
-                Text("Only a raster image of page 1 is uploaded when enabled; the PDF remains private. Printed dimensions and quantities must be independently checked.")
-            }
-            .confirmationDialog("Send this jobsite photo to AI for review?",
-                                isPresented: Binding(
-                                    get: { pendingPhotoInspection != nil },
-                                    set: { if !$0 { pendingPhotoInspection = nil } }
-                                ),
-                                titleVisibility: .visible) {
-                Button("Send selected photo for AI observations") {
-                    if let url = pendingPhotoInspection { Task { await inspectSelectedPhoto(url) } }
-                    pendingPhotoInspection = nil
-                }
-                Button("Keep photo private", role: .cancel) { pendingPhotoInspection = nil }
-            } message: {
-                Text("This uploads only the selected photo to an external AI provider. It may incur usage charges when enabled. All conclusions need verification.")
-            }
-            .onChange(of: photoSelection) { _, selected in
-                Task { await importPhotos(selected) }
-            }
-            .onChange(of: voice.transcript) { _, text in
-                // Partial recognition replaces ONLY this session's segment,
-                // never the earlier dictated/typed work.
-                if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
-            }
-            .onChange(of: notes) { _, newText in
-                guard !restoringDraft else { return }
-                PrivateJobDraftStore.save(newText, jobID: job.id)
-                // New dictation invalidates any previously extracted scope.
-                items = []
-                unknowns = []
-                resolvedUnknowns = []
-                exclusions = []
-                invalidatePrice()
-                persistReview()
-            }
-            .onChange(of: items) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: unknowns) { _, _ in persistReview() }
-            .onChange(of: resolvedUnknowns) { _, _ in persistReview() }
-            .onChange(of: exclusions) { _, _ in persistReview() }
-            .onChange(of: overhead) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
-            .task {
-                restoringDraft = true
-                notes = PrivateJobDraftStore.load(jobID: job.id)
-                if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
-                    items = review.items.map(EditableEstimateTask.init)
-                    unknowns = review.unknowns
-                    resolvedUnknowns = Set(review.resolvedUnknowns)
-                    exclusions = review.exclusions
-                    overhead = review.overhead
-                    profit = review.profit
-                    tripCost = review.tripCost
-                    customerLanguage = review.customerLanguage == "es" ? "es" : "en"
-                }
-                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
-                blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
-                await refreshRates()
-                await Task.yield()
-                restoringDraft = false
-            }
-            .onDisappear { voice.stop() }
-        }
     }
 
     private static let units = ["each", "job", "sq ft", "linear ft", "cu yd", "hr", "day"]

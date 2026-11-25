@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import ContractorOfficePro
 
-final class PrivateEstimateReviewStoreTests: XCTestCase {
+nonisolated final class PrivateEstimateReviewStoreTests: XCTestCase {
     func testUnapprovedContractorDraftSurvivesSaveAndReload() {
         let id = UUID()
         defer { PrivateEstimateReviewStore.clear(jobID: id) }

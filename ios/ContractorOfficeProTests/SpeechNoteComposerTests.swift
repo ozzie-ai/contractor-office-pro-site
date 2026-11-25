@@ -1,7 +1,7 @@
 import XCTest
 @testable import ContractorOfficePro
 
-final class SpeechNoteComposerTests: XCTestCase {
+nonisolated final class SpeechNoteComposerTests: XCTestCase {
     func testFreshRecording() {
         XCTAssertEqual(SpeechNoteComposer.compose(existing: "", segment: "  Replace two outlets  "), "Replace two outlets")
     }
