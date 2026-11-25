@@ -201,13 +201,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Answer any you can; skip the rest. The AI proposes changes and you choose what to apply."
+            "value": "Tap an answer. Skip any you don't know."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Responde las que puedas; omite las demás. La IA propone cambios y tú eliges qué aplicar."
+            "value": "Toca una respuesta. Salta las que no sepas."
           }
         }
       }
@@ -246,19 +246,36 @@
         }
       }
     },
+    "answers.not_sure": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not sure"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No sé"
+          }
+        }
+      }
+    },
     "answers.open": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Answer questions"
+            "value": "Answer them · takes a minute"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Responder preguntas"
+            "value": "Responder · toma un minuto"
           }
         }
       }
@@ -269,13 +286,30 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your answer (type or dictate)"
+            "value": "Type your answer"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tu respuesta (escribe o dicta)"
+            "value": "Escribe tu respuesta"
+          }
+        }
+      }
+    },
+    "answers.progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$(answered)lld of %2$(total)lld answered"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$(answered)lld de %2$(total)lld respondidas"
           }
         }
       }
@@ -293,6 +327,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cambios propuestos"
+          }
+        }
+      }
+    },
+    "answers.something_else": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Something else"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otra cosa"
           }
         }
       }
@@ -337,13 +388,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Answer the AI"
+            "value": "Quick questions"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Responde a la IA"
+            "value": "Preguntas rápidas"
           }
         }
       }
@@ -1317,6 +1368,23 @@
         }
       }
     },
+    "common.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        }
+      }
+    },
     "common.edit": {
       "extractionState": "manual",
       "localizations": {
@@ -1415,6 +1483,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "IA"
+          }
+        }
+      }
+    },
+    "estimate.badge.ai_ballpark": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI ballpark · check"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estimado IA · revisar"
           }
         }
       }
@@ -1867,13 +1952,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Questions from the AI"
+            "value": "A few quick questions"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Preguntas de la IA"
+            "value": "Unas preguntas rápidas"
           }
         }
       }
@@ -2680,6 +2765,57 @@
           "stringUnit": {
             "state": "translated",
             "value": "Español"
+          }
+        }
+      }
+    },
+    "line.ai_ballpark_hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Based on typical local labor and material costs, plus your markup. Change it, or tap below if it looks right."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basado en costos típicos de mano de obra y materiales en tu zona, más tu margen. Cámbialo, o toca abajo si está bien."
+          }
+        }
+      }
+    },
+    "line.ai_ballpark_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The AI estimated this price"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La IA estimó este precio"
+          }
+        }
+      }
+    },
+    "line.confirm_price": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This price looks right"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este precio está bien"
           }
         }
       }
@@ -3721,6 +3857,149 @@
         }
       }
     },
+    "photos.add_title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add photos (optional)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agrega fotos (opcional)"
+          }
+        }
+      }
+    },
+    "photos.ai_will_use": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The AI will also look at %1$(count)lld job photo."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "The AI will also look at %1$(count)lld job photos."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "La IA también verá %1$(count)lld foto del trabajo."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "La IA también verá %1$(count)lld fotos del trabajo."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "photos.choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose photos"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegir fotos"
+          }
+        }
+      }
+    },
+    "photos.header": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fotos"
+          }
+        }
+      }
+    },
+    "photos.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photos help the AI understand the job. They stay private and never go on the customer's estimate."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las fotos ayudan a la IA a entender el trabajo. Son privadas y nunca aparecen en el presupuesto del cliente."
+          }
+        }
+      }
+    },
+    "photos.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar foto"
+          }
+        }
+      }
+    },
+    "photos.take": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take photo"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tomar foto"
+          }
+        }
+      }
+    },
     "pick.after_construction": {
       "extractionState": "manual",
       "localizations": {
@@ -4622,6 +4901,47 @@
         }
       }
     },
+    "send.ai_prices": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld price is an AI ballpark. Give it a quick check before sending."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld prices are AI ballparks. Give them a quick check before sending."
+                }
+              }
+            }
+          }
+        },
+        "es": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld precio es un estimado de la IA. Revísalo antes de enviar."
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%1$(count)lld precios son estimados de la IA. Revísalos antes de enviar."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "send.blocked_empty": {
       "extractionState": "manual",
       "localizations": {
@@ -4778,13 +5098,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your private notes and the AI's questions are never included."
+            "value": "Your private notes, job photos and the AI's questions are never included."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tus notas privadas y las preguntas de la IA nunca se incluyen."
+            "value": "Tus notas privadas, las fotos del trabajo y las preguntas de la IA nunca se incluyen."
           }
         }
       }

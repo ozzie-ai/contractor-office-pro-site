@@ -2,6 +2,23 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "NSCameraUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Take photos of the job so the AI can see it. Photos stay private on your iPhone."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toma fotos del trabajo para que la IA lo vea. Las fotos se quedan privadas en tu iPhone."
+          }
+        }
+      }
+    },
     "NSMicrophoneUsageDescription": {
       "extractionState": "manual",
       "localizations": {

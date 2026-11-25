@@ -11,17 +11,19 @@ from fastapi import Depends, FastAPI, File, Form, Header, UploadFile
 
 from .ai import Interpreter, OpenAIInterpreter, OpenAITranscriber, Transcriber
 from .auth import Authenticator, JWKSKeyProvider, SupabaseMemberDirectory
-from .catalog import CATALOG
+from .catalog import BY_CODE, CATALOG
 from .config import Settings
-from .pricing import PricingRepository, SupabasePricingRepository, price_tasks
+from .pricing import PricingRepository, SupabasePricingRepository, apply_ballpark, ballpark_requests, price_tasks
 from .errors import ApiError, install_error_handlers
 from .ratelimit import RateLimiter
 from .schemas import ErrorResponse as ErrorModel
+from .schemas import InterpretationResult, RefinementResult
 from .schemas import (InterpretRequest, InterpretResponse, Member, PriceBookEntry, PriceBookResponse, PriceRequest,
                       PriceResponse, PriceTaskInput, RefineRequest, RefineResponse, TranscribeResponse,
                       MaterialsRequest, MaterialsResponse)
 
 AUDIO_TYPES = {"audio/m4a", "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac"}
+log = logging.getLogger("cop.api")
 ERRORS = {code: {"model": ErrorModel} for code in (400, 401, 403, 429, 502, 504)}
 
 
@@ -81,13 +83,13 @@ def create_app(services: Services | None = None) -> FastAPI:
     async def interpret(request: InterpretRequest, member: Annotated[Member, Depends(current_member)]) -> InterpretResponse:
         validate_images(request)
         svc.limiter.check(member.user_id)
-        return InterpretResponse(interpretation=await svc.interpreter.interpret(request))
+        return InterpretResponse(interpretation=InterpretationResult.of(await svc.interpreter.interpret(request)))
 
     @app.post("/v1/refine", response_model=RefineResponse, responses=ERRORS, tags=["ai"],
               summary="Turn the contractor's answers to the AI's questions into proposed estimate changes")
     async def refine(request: RefineRequest, member: Annotated[Member, Depends(current_member)]) -> RefineResponse:
         svc.limiter.check(member.user_id)
-        return RefineResponse(changes=await svc.interpreter.refine(request))
+        return RefineResponse(changes=RefinementResult.of(await svc.interpreter.refine(request)))
 
     @app.post("/v1/materials", response_model=MaterialsResponse, responses=ERRORS, tags=["ai"],
               summary="Draft a bill of materials (materials only, no prices) from an estimate's lines")
@@ -115,11 +117,23 @@ def create_app(services: Services | None = None) -> FastAPI:
         return TranscribeResponse(transcript=text)
 
     @app.post("/v1/estimate/price", response_model=PriceResponse, responses=ERRORS, tags=["pricing"],
-              summary="Price work items: your price book, then regional references; never AI")
+              summary="Price work items: your price book, then regional references, then (opt-in) an AI ballpark")
     async def price(request: PriceRequest, member: Annotated[Member, Depends(current_member)]) -> PriceResponse:
         codes = {t.task_code for t in request.tasks if t.task_code}
         inputs = await svc.pricing.inputs(member.org_id, codes, request.region_code)
-        return price_tasks(request.tasks, inputs)
+        priced = price_tasks(request.tasks, inputs)
+        missing = ballpark_requests(priced)
+        if request.ai_ballpark and missing:
+            trades = {BY_CODE[t.task_code].trade for t in request.tasks if t.task_code in BY_CODE}
+            try:
+                svc.limiter.check(member.user_id)
+                ballpark = await svc.interpreter.ballpark(missing, priced.region_code, next(iter(trades)) if len(trades) == 1 else None)
+            except ApiError as exc:
+                # The deterministic prices still stand; the unpriced lines just stay "needs price".
+                log.warning("ballpark skipped: %s", exc.code)
+            else:
+                priced = apply_ballpark(priced, ballpark, inputs.org)
+        return priced
 
     @app.get("/v1/pricebook", response_model=PriceBookResponse, responses=ERRORS, tags=["pricing"],
              summary="Catalog with your prices and the reference price for your region")

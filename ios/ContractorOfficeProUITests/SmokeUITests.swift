@@ -65,9 +65,9 @@ final class SmokeUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 10))
         snap("10a-estimate-top")
-        let needsPrice = element(in: app, labeled: "Needs price")
-        for _ in 0..<4 where !needsPrice.exists { app.swipeUp() }
-        XCTAssertTrue(needsPrice.exists)
+        let ballpark = element(in: app, labeled: "AI ballpark")
+        for _ in 0..<4 where !ballpark.exists { app.swipeUp() }
+        XCTAssertTrue(ballpark.exists, "unpriced lines get a labeled AI ballpark")
         XCTAssertTrue(element(in: app, labeled: "Reference · preliminary").exists)
         snap("10-estimate")
 
@@ -91,21 +91,24 @@ final class SmokeUITests: XCTestCase {
         app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         app.staticTexts["Bathroom remodel"].tap()
+        XCTAssertTrue(app.buttons["New estimate with AI"].waitForExistence(timeout: 5))
         app.buttons["New estimate with AI"].tap()
         let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
         XCTAssertTrue(notes.waitForExistence(timeout: 5))
         notes.typeText("Cambiar panel de 100 a 200 amperios y circuito de 40A para cargador.")
         app.buttons["Draft estimate"].tap()
 
-        let answerButton = app.buttons["Answer questions"]
+        let answerButton = app.buttons["answer-questions"]
         XCTAssertTrue(answerButton.waitForExistence(timeout: 10))
         answerButton.tap()
-        let first = app.textFields["answer-0"].exists ? app.textFields["answer-0"] : app.textViews["answer-0"]
-        XCTAssertTrue(first.waitForExistence(timeout: 5))
-        first.tap()
-        first.typeText("Yes, the customer bought the charger. The run is 85 feet.")
+        let yes = app.buttons["answer-0-Yes"]
+        XCTAssertTrue(yes.waitForExistence(timeout: 5), "questions come with tap answers")
+        XCTAssertTrue(app.buttons["answer-0-not-sure"].exists && app.buttons["answer-0-other"].exists)
+        yes.tap()
+        app.buttons["answer-1-85 ft"].tap()
+        XCTAssertTrue(element(in: app, labeled: "2 of 2 answered").waitForExistence(timeout: 2))
         snap("13-answer-questions")
-        app.buttons["Update estimate"].tap()
+        app.buttons["answers-update"].tap()
 
         let apply = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Apply'")).firstMatch
         XCTAssertTrue(apply.waitForExistence(timeout: 10))
@@ -124,6 +127,7 @@ final class SmokeUITests: XCTestCase {
         app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         app.staticTexts["Bathroom remodel"].tap()
+        XCTAssertTrue(app.buttons["New estimate with AI"].waitForExistence(timeout: 5))
         app.buttons["New estimate with AI"].tap()
         let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
         XCTAssertTrue(notes.waitForExistence(timeout: 5))
@@ -167,6 +171,7 @@ final class SmokeUITests: XCTestCase {
         app.buttons["Continue"].tap()
 
         XCTAssertTrue(app.buttons["pick-Panel upgrade"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["photo-choose"].exists, "photos can be added in the flow")
         app.buttons["pick-Panel upgrade"].tap()
         app.buttons["pick-EV charger"].tap()
         XCTAssertEqual(app.textFields["quick-notes"].value as? String ?? app.textViews["quick-notes"].value as? String,
@@ -176,22 +181,18 @@ final class SmokeUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 15), "estimate opens after drafting")
         snap("22-estimate-with-send")
-        app.buttons["send-to-customer"].tap()
-        XCTAssertTrue(element(in: app, labeled: "still need a price").waitForExistence(timeout: 5), "blocked in plain words")
-        snap("23-send-blocked")
-        app.buttons["Fix it now"].tap()
+        // One-tap "looks right" on an AI ballpark.
+        let circuit = app.buttons.containing(NSPredicate(format: "label CONTAINS 'New 40A double-pole circuit'")).firstMatch
+        for _ in 0..<4 where !circuit.isHittable { app.swipeUp() }
+        circuit.tap()
+        let confirm = app.buttons["line-confirm-price"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        snap("23-ballpark-line")
+        confirm.tap()
 
-        for label in ["New 40A double-pole circuit", "Wire run to the EV charger"] {
-            let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
-            for _ in 0..<4 where !row.isHittable { app.swipeUp() }
-            row.tap()
-            let price = app.textFields["line-unit-price"]
-            XCTAssertTrue(price.waitForExistence(timeout: 5))
-            price.tap(); price.typeText("40")
-            app.buttons["Save"].tap()
-        }
         app.buttons["send-to-customer"].tap()
-        XCTAssertTrue(app.buttons["send-es"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["send-es"].waitForExistence(timeout: 5), "AI ballparks don't block sending")
+        XCTAssertTrue(element(in: app, labeled: "AI ballpark").exists, "but the contractor is reminded to check them")
         snap("24-send-ready")
         app.buttons["send-es"].tap()
         let shareSheet = app.otherElements["ActivityListView"]

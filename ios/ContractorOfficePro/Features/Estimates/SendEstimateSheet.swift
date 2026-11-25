@@ -21,6 +21,18 @@ struct SendEstimateSheet: View {
                 case .ready:
                     Text(.sendTitle).headingStyle(.title)
                     Text(.sendSubtitle).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    let guesses = EstimateReadiness.unconfirmedAIPrices(lines)
+                    if guesses > 0 {
+                        Label { Text(.sendAiPrices(count: guesses)).fixedSize(horizontal: false, vertical: true) } icon: {
+                            Image(systemName: "sparkles")
+                        }
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(Theme.violet)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Theme.violet.opacity(0.1), in: .rect(cornerRadius: 12))
+                        .accessibilityIdentifier("send-ai-warning")
+                    }
                     languageButton(.en, title: .sendEnglish)
                     languageButton(.es, title: .sendSpanish)
                     Label { Text(.sendPrivacy).fixedSize(horizontal: false, vertical: true) } icon: { Image(systemName: "lock.fill") }

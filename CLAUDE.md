@@ -30,6 +30,8 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
    shows where its number came from (contractor price, reference source, or unverified fallback).
 2. **LLMs interpret; code computes.** The model extracts tasks, quantities, specs, exclusions and open questions. It
    never produces prices, totals, taxes or deposit amounts. Missing quantities stay `null`; never invent them.
+   Exception (ADR 0006): for lines with no contractor or reference price, the model may estimate cost *inputs*
+   (labor hours, local labor rate, material cost); code computes an "AI ballpark" price, labeled and preliminary.
 3. **No invented price confidence.** Unverified or stale prices are labeled preliminary. No rate is silently filled in.
 4. **Private stays private.** Transcripts, dictation, private notes and worksite photos never appear in customer-facing
    output or in error responses/logs sent to clients.
@@ -72,6 +74,11 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
   `ios/Config/Config.xcconfig`. Live app↔backend test: start the backend, then `TEST_RUNNER_LIVE_BACKEND=1 xcodebuild ... test`.
 - SwiftData is at `SchemaV3` (V3 added MaterialItem); `SchemaV1` holds frozen copies of models changed in V2. Never edit a shipped schema version.
 - Bill of materials: AI drafts materials (never prices); Shop links open store searches (no scraping: no open retailer APIs).
+- Colors: warm olive palette in `Theme` (cream canvas, olive accent; sage on olive-black in dark mode). Use Theme tokens,
+  never raw black/white, and `primaryActionStyle()` for big buttons (label uses `Theme.onAccent`).
+- AI questions are `OpenQuestion` (question + 2–4 tap choices) stored as JSON in `Estimate.openQuestions`; the UI adds
+  "Not sure" and "Something else". Job photos: `PhotoStore` (on device only, ≤2048 px; ≤1024 px to the AI, max 6) +
+  `Media` rows; never on customer PDFs.
 
 ## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and

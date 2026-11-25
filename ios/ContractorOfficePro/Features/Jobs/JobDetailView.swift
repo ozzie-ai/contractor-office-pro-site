@@ -8,6 +8,7 @@ struct JobDetailView: View {
     @Query private var jobs: [Job]
     @Query private var clients: [Client]
     @Query private var estimates: [Estimate]
+    @Query private var photos: [Media]
     @State private var editor: JobEditorRequest?
     @State private var draftingEstimate = false
     @State private var openedEstimate: UUID?
@@ -19,6 +20,9 @@ struct JobDetailView: View {
         _clients = Query()
         _estimates = Query(filter: #Predicate<Estimate> { $0.jobId == jobID && $0.deletedAt == nil },
                            sort: \Estimate.createdAt, order: .reverse)
+        let photo = Media.Kind.photo.rawValue
+        _photos = Query(filter: #Predicate<Media> { $0.jobId == jobID && $0.kindRaw == photo && $0.deletedAt == nil },
+                        sort: \Media.capturedAt)
     }
 
     private var job: Job? { jobs.first }
@@ -84,6 +88,7 @@ struct JobDetailView: View {
             } header: {
                 Text(.estimatesHeader)
             }
+            JobPhotosSection(job: job, photos: photos)
             if let start = job.scheduledStart {
                 Section {
                     LabeledContent { Text(start, format: .dateTime.weekday().month().day().hour().minute()) } label: {

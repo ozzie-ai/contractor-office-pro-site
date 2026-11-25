@@ -13,6 +13,11 @@ nonisolated enum EstimateReadiness: Equatable {
         let quantities = lines.filter(\.needsQuantity).count
         return prices + quantities == 0 ? .ready : .missing(prices: prices, quantities: quantities)
     }
+
+    /// AI ballpark prices the contractor hasn't checked yet. Sending is allowed, with a reminder.
+    @MainActor static func unconfirmedAIPrices(_ lines: [LineItem]) -> Int {
+        lines.filter(\.isAIBallpark).count
+    }
 }
 
 /// Customer-facing PDF (built on the team's CustomerEstimatePDF renderer). Allowlist only: business details,

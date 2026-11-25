@@ -71,7 +71,7 @@ final class Workspace {
         estimate.internalNotes = notes.nilIfBlank
         let i = draft.interpretation
         estimate.exclusions = (i.excludedWork + i.futureWork).joined(separator: "\n").nilIfBlank
-        estimate.openQuestions = i.unknownDetails.joined(separator: "\n").nilIfBlank
+        estimate.openQuestions = OpenQuestion.encode(i.openQuestions)
         let lines = draft.pricing.lines.enumerated().map { index, priced in
             makeLine(from: priced, in: estimate, position: index)
         }
@@ -100,7 +100,7 @@ final class Workspace {
         let existing = Set((estimate.exclusions ?? "").split(separator: "\n").map(String.init))
         let newExclusions = proposal.exclusions.filter { !existing.contains($0) }
         estimate.exclusions = ((estimate.exclusions.map { [$0] } ?? []) + newExclusions).joined(separator: "\n").nilIfBlank
-        estimate.openQuestions = proposal.remainingQuestions.joined(separator: "\n").nilIfBlank
+        estimate.openQuestions = OpenQuestion.encode(proposal.remainingQuestions)
         let qa = proposal.answers.map { "Q: \($0.question)\nA: \($0.answer)" }.joined(separator: "\n")
         estimate.internalNotes = [estimate.internalNotes, qa].compactMap { $0?.nilIfBlank }.joined(separator: "\n\n")
         recalculate(estimate, lines: self.lines(for: estimate))
@@ -116,7 +116,9 @@ final class Workspace {
         line.taskCode = priced.taskCode
         line.priceSource = LineItem.PriceSource(rawValue: priced.priceSource) ?? .none
         line.preliminary = priced.preliminary
-        line.priceNote = [priced.sourceName, priced.appliesTo, priced.note].compactMap { $0?.nilIfBlank }
+        // The AI ballpark note already starts with its source name; don't repeat it.
+        let source = priced.note.map { note in priced.sourceName.map { note.hasPrefix($0) } ?? false } == true ? nil : priced.sourceName
+        line.priceNote = [source, priced.appliesTo, priced.note].compactMap { $0?.nilIfBlank }
             .joined(separator: " · ").nilIfBlank
         return line
     }
@@ -174,7 +176,8 @@ final class Workspace {
     /// One-step job creation for the guided flow: optional new client, a job named after the trade, then the AI draft.
     @discardableResult
     func createQuickEstimate(trade: Trade, client existing: Client?, newClientName: String?, newClientPhone: String?,
-                             notes: String, language: AppLanguage, draft: EstimateDraft) throws -> Estimate {
+                             notes: String, language: AppLanguage, photos: [Data] = [],
+                             draft: EstimateDraft) throws -> Estimate {
         var client = existing
         if client == nil, let name = newClientName?.nilIfBlank {
             var clientDraft = ClientDraft()
@@ -188,6 +191,7 @@ final class Workspace {
         jobDraft.title = client.map { "\(tradeName) · \($0.name)" } ?? tradeName
         jobDraft.status = .estimating
         let job = try save(jobDraft)
+        for photo in photos { try addPhoto(photo, to: job) }
         return try createEstimate(for: job, notes: notes, language: language, draft: draft)
     }
 
@@ -229,6 +233,49 @@ final class Workspace {
         try context.save()
         sync.syncSoon()
         return line
+    }
+
+    /// One tap "this price looks right" on an AI ballpark line. Remembered in the price book when it has a task code.
+    func confirmPrice(of line: LineItem, in estimate: Estimate) throws {
+        line.preliminary = false
+        if let code = line.taskCode {
+            rememberPriceInBook(taskCode: code, unitPrice: line.unitPrice, unit: line.unit, name: line.descriptionEn)
+            line.priceSource = .contractor
+            line.priceNote = String(localized: .estimatePriceFromBook)
+        } else {
+            line.priceSource = .manual
+            line.priceNote = nil
+        }
+        line.touch()
+        recalculate(estimate, lines: lines(for: estimate))
+        try context.save()
+        sync.syncSoon()
+    }
+
+    // MARK: Photos (kept on the phone; never on customer documents)
+
+    func photos(for job: Job) -> [Media] {
+        let id = job.id
+        let photo = Media.Kind.photo.rawValue
+        let descriptor = FetchDescriptor<Media>(
+            predicate: #Predicate { $0.jobId == id && $0.kindRaw == photo && $0.deletedAt == nil },
+            sortBy: [SortDescriptor(\.capturedAt)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Saves already-downscaled JPEG data (PhotoStore.prepare) as a job photo.
+    @discardableResult
+    func addPhoto(_ jpeg: Data, to job: Job, store: PhotoStore = .shared) throws -> Media {
+        let name = try store.save(jpeg)
+        let media = insert(Media(orgId: orgID, jobId: job.id, kind: .photo, localFileName: name))
+        try commit(media)
+        return media
+    }
+
+    func delete(_ photo: Media, store: PhotoStore = .shared) throws {
+        if let name = photo.localFileName { store.remove(name) }
+        photo.softDelete()
+        try commit(photo, touch: false)
     }
 
     func delete(_ line: LineItem, from estimate: Estimate) throws {

@@ -12,7 +12,7 @@ nonisolated struct RefinementProposal: Sendable {
     let adds: [PricedLineDTO]
     let updates: [LineUpdateDTO]
     let exclusions: [String]
-    let remainingQuestions: [String]
+    let remainingQuestions: [OpenQuestion]
 
     var isEmpty: Bool { adds.isEmpty && updates.isEmpty && exclusions.isEmpty }
 }
@@ -31,7 +31,7 @@ enum EstimateRefining {
         let priced = changes.add.isEmpty ? [] : try await service.price(PriceRequestBody(tasks: changes.add)).lines
         return RefinementProposal(answers: answers, adds: priced,
                                   updates: changes.update.filter { lines.indices.contains($0.ref) },
-                                  exclusions: changes.exclusions, remainingQuestions: changes.remainingQuestions)
+                                  exclusions: changes.exclusions, remainingQuestions: changes.openQuestions)
     }
 }
 
@@ -53,11 +53,14 @@ enum MaterialsDrafting {
 enum EstimateDrafting {
     enum Phase: Equatable { case reading, pricing }
 
-    static func draft(notes: String, language: AppLanguage, trade: Trade? = nil, service: any EstimateService,
+    /// `images`: job photos already downscaled for the AI (see PhotoStore.aiImage); at most 6 are sent.
+    static func draft(notes: String, language: AppLanguage, trade: Trade? = nil,
+                      images: [InterpretRequestBody.ImageBody] = [], service: any EstimateService,
                       onPhase: (Phase) -> Void = { _ in }) async throws -> EstimateDraft {
         onPhase(.reading)
         let interpretation = try await service.interpret(
-            InterpretRequestBody(description: notes, language: language.rawValue, tradeHint: trade?.rawValue)).interpretation
+            InterpretRequestBody(description: notes, language: language.rawValue, tradeHint: trade?.rawValue,
+                                 images: Array(images.prefix(6)))).interpretation
         guard !interpretation.tasks.isEmpty else { throw BackendError.nothingFound }
         onPhase(.pricing)
         let pricing = try await service.price(PriceRequestBody(tasks: interpretation.tasks))

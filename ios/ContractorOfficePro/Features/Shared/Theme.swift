@@ -1,20 +1,23 @@
 import SwiftUI
 import UIKit
 
-/// Monochrome, Vercel-inspired palette. Light: near-white canvas, black accent. Dark: pure black canvas, white accent.
+/// Warm olive palette: friendly, earthy, easy on the eyes outdoors. Light: cream canvas, deep olive accent.
+/// Dark: olive-black canvas, soft sage accent. Contrast of text on canvas/surface and of onAccent on accent ≥ 4.5:1.
 /// nonisolated: SwiftUI may resolve colors off the main thread.
 nonisolated enum Theme {
-    static let canvas = Color(light: 0xFAFAFA, dark: 0x000000)
-    static let surface = Color(light: 0xFFFFFF, dark: 0x0A0A0A)
-    static let border = Color(light: 0xEAEAEA, dark: 0x262626)
-    static let muted = Color(light: 0x666666, dark: 0x8F8F8F)
-    static let accent = Color(light: 0x0A0A0A, dark: 0xFAFAFA)
-    static let onAccent = Color(light: 0xFFFFFF, dark: 0x000000)
-    static let success = Color(light: 0x0E9F6E, dark: 0x3DD68C)
-    static let warning = Color(light: 0xB45309, dark: 0xF5A524)
-    static let danger = Color(light: 0xDC2626, dark: 0xFF6166)
-    static let info = Color(light: 0x0B63F6, dark: 0x52A8FF)
-    static let violet = Color(light: 0x7C3AED, dark: 0xA78BFA)
+    static let canvas = Color(light: 0xF4F1E6, dark: 0x13160F)
+    static let surface = Color(light: 0xFFFDF6, dark: 0x1D2118)
+    static let border = Color(light: 0xE0DBC8, dark: 0x30362A)
+    static let muted = Color(light: 0x66644F, dark: 0xA6AA94)
+    static let accent = Color(light: 0x556B2F, dark: 0xB7C88A)
+    static let onAccent = Color(light: 0xFFFFFF, dark: 0x13160F)
+    /// Soft olive wash for selected chips and highlights.
+    static let accentSoft = Color(light: 0xE5EAD2, dark: 0x2A3320)
+    static let success = Color(light: 0x2F7D4F, dark: 0x6FD39A)
+    static let warning = Color(light: 0xA35A08, dark: 0xF2B24C)
+    static let danger = Color(light: 0xC0392B, dark: 0xFF7A6E)
+    static let info = Color(light: 0x2C6A8F, dark: 0x7FBFE3)
+    static let violet = Color(light: 0x7A4FB5, dark: 0xBFA2EE)
 }
 
 nonisolated extension Color {
@@ -40,7 +43,7 @@ extension View {
         modifier(PrimaryActionStyle())
     }
 
-    /// Tight, Vercel-style heading tracking.
+    /// Tight heading tracking.
     func headingStyle(_ font: Font = .title2) -> some View {
         self.font(font.weight(.semibold)).tracking(-0.4)
     }
@@ -59,8 +62,8 @@ private struct ThemedList: ViewModifier {
     }
 }
 
-/// The accent flips between black (light) and white (dark), so the label must use the opposite color;
-/// the system default label color is white, which vanished on the white dark-mode button.
+/// The accent is dark olive in light mode and light sage in dark mode, so the label must use onAccent;
+/// the system default label color is white, which vanished on the light dark-mode button.
 private struct PrimaryActionStyle: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {

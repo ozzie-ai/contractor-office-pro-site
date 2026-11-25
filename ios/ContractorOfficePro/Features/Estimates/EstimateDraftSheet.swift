@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 /// Describe the work → AI drafts line items → pricing fills in what it can → a draft estimate opens.
@@ -12,12 +13,16 @@ struct EstimateDraftSheet: View {
     @State private var phase: EstimateDrafting.Phase?
     @State private var failure: BackendError?
     @FocusState private var notesFocused: Bool
+    @Query private var photos: [Media]
 
     init(job: Job, defaultLanguage: AppLanguage, onCreated: @escaping (UUID) -> Void) {
         self.job = job
         self.defaultLanguage = defaultLanguage
         self.onCreated = onCreated
         _language = State(initialValue: defaultLanguage)
+        let jobID = job.id, photo = Media.Kind.photo.rawValue
+        _photos = Query(filter: #Predicate<Media> { $0.jobId == jobID && $0.kindRaw == photo && $0.deletedAt == nil },
+                        sort: \Media.capturedAt)
     }
 
     private var canDraft: Bool { phase == nil && notes.trimmed.count >= 10 && workspace.estimateService != nil }
@@ -33,7 +38,12 @@ struct EstimateDraftSheet: View {
                 } header: {
                     Text(.estimateDraftNotesHeader)
                 } footer: {
-                    Label { Text(.estimateDraftDictateHint) } icon: { Image(systemName: "mic") }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label { Text(.estimateDraftDictateHint) } icon: { Image(systemName: "mic") }
+                        if !photos.isEmpty {
+                            Label { Text(.photosAiWillUse(count: min(photos.count, 6))) } icon: { Image(systemName: "photo") }
+                        }
+                    }
                 }
                 Section {
                     Picker(selection: $language) {
@@ -98,7 +108,10 @@ struct EstimateDraftSheet: View {
         Task {
             defer { phase = nil }
             do {
-                let result = try await EstimateDrafting.draft(notes: notes, language: language, service: service) { phase = $0 }
+                // The most recent photos (the AI looks at up to 6).
+                let images = photos.suffix(6).compactMap { $0.localFileName.flatMap(PhotoStore.shared.aiImage(named:)) }
+                let result = try await EstimateDrafting.draft(notes: notes, language: language, images: images,
+                                                              service: service) { phase = $0 }
                 let estimate = try workspace.createEstimate(for: job, notes: notes, language: language, draft: result)
                 dismiss()
                 onCreated(estimate.id)

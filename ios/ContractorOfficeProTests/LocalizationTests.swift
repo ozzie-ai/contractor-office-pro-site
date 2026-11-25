@@ -39,6 +39,13 @@ struct LocalizationTests {
         #expect(String.localizedStringWithFormat(format, count) == expected)
     }
 
+    @Test func legacyAndJSONQuestionsBothDecode() {
+        #expect(OpenQuestion.decode("Where?\nHow far?").map(\.question) == ["Where?", "How far?"])
+        let stored = OpenQuestion.encode([OpenQuestion(question: "Panel inside?", choices: ["Yes", "No"]), OpenQuestion(question: " ")])
+        #expect(OpenQuestion.decode(stored) == [OpenQuestion(question: "Panel inside?", choices: ["Yes", "No"])])
+        #expect(OpenQuestion.encode([]) == nil && OpenQuestion.decode(nil).isEmpty)
+    }
+
     private static func isTranslated(_ localization: Any?) -> Bool {
         guard let localization = localization as? [String: Any] else { return false }
         if let unit = localization["stringUnit"] as? [String: Any] { return isTranslatedUnit(unit) }

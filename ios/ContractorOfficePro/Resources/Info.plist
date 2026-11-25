@@ -34,6 +34,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Take photos of the job so the AI can see it. Photos stay private on your iPhone.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lets you describe the job by voice. Audio stays on your iPhone.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

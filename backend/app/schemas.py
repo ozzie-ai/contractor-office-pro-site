@@ -44,8 +44,17 @@ class WorkItem(BaseModel):
         description="stated = said in the notes; photo = seen in a photo; inferred = implied, must be confirmed.")
 
 
+class FriendlyQuestion(BaseModel):
+    """A question the contractor answers with one tap."""
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(description="One short, plain-words question about one thing (max ~12 words).")
+    choices: list[str] = Field(description="2-4 short tap answers (1-4 words each), most likely first. "
+                                           "Never 'Not sure' or 'Other': the app adds those.")
+
+
 class Interpretation(BaseModel):
-    """Same shape as the team's pilot `interpretation`, plus task_code and evidence on each task."""
+    """What the model returns. Same shape as the team's pilot `interpretation` (plus task_code/evidence),
+    except questions carry tap-to-answer choices; `unknown_details` is derived from them in the response."""
     model_config = ConfigDict(extra="forbid")
     trade: Trade
     project_summary_en: str
@@ -53,13 +62,21 @@ class Interpretation(BaseModel):
     tasks: list[WorkItem]
     excluded_work: list[str]
     future_work: list[str]
-    unknown_details: list[str] = Field(description="Short questions for the contractor about missing details.")
+    questions: list[FriendlyQuestion] = Field(description="At most 4 questions about details needed to price or do the work.")
     confidence_notes: list[str]
+
+
+class InterpretationResult(Interpretation):
+    unknown_details: list[str] = Field(description="The questions' text (kept for older clients).")
+
+    @classmethod
+    def of(cls, i: Interpretation) -> "InterpretationResult":
+        return cls(**i.model_dump(), unknown_details=[q.question for q in i.questions])
 
 
 class InterpretResponse(BaseModel):
     version: Literal[1] = 1
-    interpretation: Interpretation
+    interpretation: InterpretationResult
     pricing_status: Literal["not_priced"] = "not_priced"
     note: str = "AI draft. Review every task, quantity and specification before pricing."
 
@@ -102,12 +119,20 @@ class Refinement(BaseModel):
     add: list[WorkItem] = Field(description="New tasks revealed by the answers that are not already on the estimate.")
     update: list[LineUpdate] = Field(description="Quantity/unit changes to existing lines, by ref.")
     exclusions: list[str] = Field(description="New excluded or future work stated in the answers.")
-    remaining_questions: list[str] = Field(description="Original questions still unanswered plus any essential new ones.")
+    remaining: list[FriendlyQuestion] = Field(description="Original questions still unanswered plus any essential new ones.")
+
+
+class RefinementResult(Refinement):
+    remaining_questions: list[str] = Field(description="The remaining questions' text (kept for older clients).")
+
+    @classmethod
+    def of(cls, r: Refinement) -> "RefinementResult":
+        return cls(**r.model_dump(), remaining_questions=[q.question for q in r.remaining])
 
 
 class RefineResponse(BaseModel):
     version: Literal[1] = 1
-    changes: Refinement
+    changes: RefinementResult
     pricing_status: Literal["not_priced"] = "not_priced"
 
 
@@ -165,6 +190,34 @@ class PriceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tasks: list[PriceTaskInput] = Field(min_length=1, max_length=100)
     region_code: str | None = Field(default=None, description="Override the business's pricing region.")
+    ai_ballpark: bool = Field(default=False, description=(
+        "For lines with no contractor or reference price, let the AI estimate cost inputs (labor hours, local labor "
+        "rate, material cost). Code computes the price with the business's markup and labels it preliminary."))
+
+
+class BallparkLine(BaseModel):
+    """A line with no price, sent to the model for a cost-input estimate."""
+    ref: int
+    task_code: str | None
+    description_en: str
+    unit: str | None
+
+
+class BallparkItem(BaseModel):
+    """Cost INPUTS for one unit of a line. The model never returns a price; code builds one from these."""
+    model_config = ConfigDict(extra="forbid")
+    ref: int
+    labor_hours_per_unit: float = Field(description="Typical crew hours for ONE unit of the line's unit.")
+    labor_rate_per_hour: float = Field(description="Typical hourly labor cost for this trade in the region, "
+                                                   "wage plus payroll burden, before overhead and profit.")
+    material_cost_per_unit: float = Field(description="Typical contractor cost of materials for one unit, before markup; 0 if none.")
+    equipment_cost_per_unit: float = Field(description="Rental/equipment cost for one unit; usually 0.")
+    basis_en: str = Field(description="Very short assumption, e.g. '~8 h for 2 people; 200A panel ~$450'.")
+
+
+class Ballpark(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[BallparkItem]
 
 
 class PricedLine(BaseModel):
@@ -175,8 +228,8 @@ class PricedLine(BaseModel):
     unit: str | None
     unit_price: Decimal | None
     line_total: Decimal | None
-    price_source: Literal["contractor", "reference", "none"]
-    basis: Literal["contractor_price", "cost_build_up", "benchmark_bid", "none"]
+    price_source: Literal["contractor", "reference", "ai_estimate", "none"]
+    basis: Literal["contractor_price", "cost_build_up", "benchmark_bid", "ai_ballpark", "none"]
     preliminary: bool
     confidence: str
     source_name: str | None

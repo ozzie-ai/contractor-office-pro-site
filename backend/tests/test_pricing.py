@@ -4,6 +4,7 @@ from decimal import Decimal
 import pytest
 
 from app.admin import validate_rows
+from app.errors import ApiError
 from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs, price_tasks
 from app.schemas import PriceTaskInput
 
@@ -146,3 +147,50 @@ def test_price_accepts_tasks_with_omitted_null_fields(client, auth_headers):
     lines = r.json()["lines"]
     assert lines[0]["task_code"] is None and lines[0]["needs"] == ["price", "quantity"]
     assert lines[1]["unit_price"] == "2100.00"
+
+
+# MARK: AI ballpark (the model gives cost inputs; code computes the price)
+
+BALLPARK_BODY = {"tasks": [{"task_code": "ELEC.PANEL.UPGRADE", "description_en": "Panel 200A", "quantity": 1, "unit": "job"},
+                           {"task_code": "ELEC.CIRCUIT.NEW", "description_en": "New 40A circuit", "quantity": 2, "unit": "each"},
+                           {"description_en": "Patch drywall"}],
+                 "ai_ballpark": True}
+
+
+def test_ballpark_fills_only_unpriced_lines_with_code_computed_prices(client, auth_headers, fakes):
+    data = client.post("/v1/estimate/price", json=BALLPARK_BODY, headers=auth_headers).json()
+    panel, circuit, drywall = data["lines"]
+    assert panel["price_source"] == "reference" and panel["unit_price"] == "2100.00", "references are never replaced"
+    # 6 h × $80 + $150 = $630 direct × 1.10 overhead × 1.10 profit = $762.30; × 2 = $1524.60
+    assert (circuit["price_source"], circuit["basis"], circuit["unit_price"], circuit["line_total"]) == \
+        ("ai_estimate", "ai_ballpark", "762.30", "1524.60")
+    assert circuit["preliminary"] is True and circuit["confidence"] == "low" and circuit["needs"] == []
+    assert circuit["source_name"] == "AI ballpark" and "Check this price" in circuit["note"]
+    assert drywall["price_source"] == "none" and drywall["needs"] == ["price", "quantity"], "out-of-bounds inputs are dropped"
+    assert data["subtotal"] == "3624.60" and data["preliminary"] is True
+    lines, region, trade = fakes["interpreter"].ballpark_calls[0]
+    assert [l.ref for l in lines] == [1, 2] and region == "US-CA-LA" and trade == "electrical"
+
+
+def test_ballpark_is_opt_in_for_older_clients(client, auth_headers, fakes):
+    data = client.post("/v1/estimate/price", json={**BALLPARK_BODY, "ai_ballpark": False}, headers=auth_headers).json()
+    assert data["lines"][1]["needs"] == ["price"] and not hasattr(fakes["interpreter"], "ballpark_calls")
+
+
+def test_ballpark_failure_still_returns_deterministic_prices(client, auth_headers, fakes):
+    fakes["interpreter"].ballpark_error = ApiError(504, "ai_timeout", "slow")
+    r = client.post("/v1/estimate/price", json=BALLPARK_BODY, headers=auth_headers)
+    assert r.status_code == 200
+    assert r.json()["lines"][0]["unit_price"] == "2100.00" and r.json()["lines"][1]["needs"] == ["price"]
+
+
+def test_ballpark_never_overwrites_and_rejects_bad_inputs():
+    from app.pricing import apply_ballpark
+    from app.schemas import Ballpark, BallparkItem
+    r = one([task("ELEC.GFCI", 1), task(None, 1)], [obs(bid=Decimal("150"))])
+    item = lambda ref, **kw: BallparkItem(ref=ref, **{"labor_hours_per_unit": 1, "labor_rate_per_hour": 50,
+                                                      "material_cost_per_unit": 10, "equipment_cost_per_unit": 0,
+                                                      "basis_en": "x", **kw})
+    out = apply_ballpark(r, Ballpark(items=[item(0), item(1, material_cost_per_unit=-5), item(7)]), ORG)
+    assert out.lines[0].price_source == "reference" and out.lines[0].unit_price == Decimal("150.00")
+    assert out.lines[1].price_source == "none", "negative material cost is rejected"

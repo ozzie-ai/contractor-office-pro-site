@@ -16,7 +16,7 @@ struct ThemeTests {
             light.getWhite(&lw, alpha: nil)
             return (dw, lw)
         }.value
-        #expect(resolved.0 < 0.05, "dark canvas is black")
-        #expect(resolved.1 > 0.95, "light canvas is near-white")
+        #expect(resolved.0 < 0.12, "dark canvas is olive-black")
+        #expect(resolved.1 > 0.9, "light canvas is cream")
     }
 }

@@ -65,7 +65,7 @@ final class Estimate: Syncable {
     var internalNotes: String?
     /// Customer-facing exclusions and future work, one per line.
     var exclusions: String?
-    /// Private: questions the AI couldn't answer from the notes.
+    /// Private: questions the AI couldn't answer from the notes (JSON of `OpenQuestion`, or legacy one per line).
     var openQuestions: String?
     var createdAt: Date
     var updatedAt: Date
@@ -116,7 +116,7 @@ final class LineItem: Syncable {
     var taxable: Bool
     var sourceRaw: String
     var taskCode: String?
-    /// Where the unit price came from: contractor / reference / manual / none.
+    /// Where the unit price came from: contractor / reference / ai_estimate / manual / none.
     var priceSourceRaw: String = "manual"
     var priceNote: String?
     var preliminary: Bool = false
@@ -131,7 +131,8 @@ final class LineItem: Syncable {
         set { sourceRaw = newValue.rawValue }
     }
 
-    enum PriceSource: String, Codable, CaseIterable, Sendable { case contractor, reference, manual, none }
+    /// `.aiEstimate`: an AI ballpark (code-computed from AI cost inputs). Preliminary until the contractor confirms it.
+    enum PriceSource: String, Codable, CaseIterable, Sendable { case contractor, reference, aiEstimate = "ai_estimate", manual, none }
 
     var priceSource: PriceSource {
         get { PriceSource(rawValue: priceSourceRaw) ?? .manual }
@@ -139,6 +140,7 @@ final class LineItem: Syncable {
     }
 
     var needsPrice: Bool { priceSource == .none }
+    var isAIBallpark: Bool { priceSource == .aiEstimate }
     var needsQuantity: Bool { qty == 0 }
     var lineTotal: Decimal { EstimateCalculator.lineTotal(qty: qty, unitPrice: unitPrice) }
 

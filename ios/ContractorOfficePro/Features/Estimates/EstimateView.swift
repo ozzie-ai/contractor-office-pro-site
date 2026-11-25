@@ -54,15 +54,22 @@ struct EstimateView: View {
                         .foregroundStyle(Theme.warning)
                 }
             }
-            if let questions = estimate.openQuestions {
+            let questions = OpenQuestion.decode(estimate.openQuestions)
+            if !questions.isEmpty {
                 Section {
-                    ForEach(questions.split(separator: "\n").map(String.init), id: \.self) { question in
-                        Label { Text(question) } icon: { Image(systemName: "questionmark.bubble") }
+                    ForEach(questions, id: \.self) { question in
+                        Label { Text(question.question) } icon: { Image(systemName: "questionmark.bubble") }
+                            .foregroundStyle(.secondary)
                     }
                     Button { answeringQuestions = true } label: {
-                        Label { Text(.answersOpen) } icon: { Image(systemName: "sparkles") }
-                            .font(.body.weight(.semibold))
+                        Label { Text(.answersOpen) } icon: { Image(systemName: "hand.tap.fill") }
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 52)
                     }
+                    .primaryActionStyle()
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                    .accessibilityIdentifier("answer-questions")
                 } header: {
                     Text(.estimateQuestionsHeader)
                 } footer: {
@@ -221,7 +228,7 @@ struct LineRow: View {
             }
             HStack(spacing: 6) {
                 PriceBadge(line: line)
-                if line.source == .ai {
+                if line.source == .ai && !line.isAIBallpark {
                     Pill(title: .estimateBadgeAi, color: Theme.violet, systemImage: "sparkles")
                 }
             }
@@ -240,6 +247,7 @@ struct PriceBadge: View {
             switch line.priceSource {
             case .contractor: badge(.estimateBadgeYourPrice, "checkmark.seal.fill", Theme.success)
             case .reference: badge(line.preliminary ? .estimateBadgeReferencePreliminary : .estimateBadgeReference, "book", Theme.warning)
+            case .aiEstimate: Pill(title: .estimateBadgeAiBallpark, color: Theme.violet, systemImage: "sparkles")
             case .manual: badge(.estimateBadgeEdited, "pencil", Theme.info)
             case .none: badge(.estimateBadgeNeedsPrice, "exclamationmark.circle.fill", Theme.danger)
             }

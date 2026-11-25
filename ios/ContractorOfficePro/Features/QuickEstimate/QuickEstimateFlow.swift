@@ -21,6 +21,8 @@ struct QuickEstimateFlow: View {
     @State private var language: AppLanguage = .en
     @State private var phase: EstimateDrafting.Phase?
     @State private var failure: BackendError?
+    /// Photos taken in the flow; saved to the job once it exists.
+    @State private var photos: [PendingPhoto] = []
 
     var body: some View {
         NavigationStack {
@@ -155,6 +157,17 @@ struct QuickEstimateFlow: View {
                 QuickPickChips(picks: trade.quickPicks) { phrase in notes = NoteComposer.append(phrase, to: notes) }
             }
             VoiceNotesField(notes: $notes, language: language)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(.photosAddTitle).font(.headline)
+                if !photos.isEmpty {
+                    PhotoStrip(photos: photos.map { PhotoThumb(id: $0.id, image: $0.thumbnail) }) { id in
+                        photos.removeAll { $0.id == id }
+                    }
+                }
+                PhotoAddButtons(remaining: 6 - photos.count) { added in
+                    withAnimation(.snappy) { photos += added.map(PendingPhoto.init) }
+                }
+            }
             Picker(selection: $language) {
                 ForEach(AppLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
             } label: { Text(.estimateDraftLanguage) }
@@ -208,16 +221,30 @@ struct QuickEstimateFlow: View {
         Task {
             defer { phase = nil }
             do {
-                let draft = try await EstimateDrafting.draft(notes: notes, language: language, trade: trade, service: service) { phase = $0 }
+                let images = photos.compactMap { PhotoStore.aiImage(from: $0.data) }
+                let draft = try await EstimateDrafting.draft(notes: notes, language: language, trade: trade,
+                                                             images: images, service: service) { phase = $0 }
                 let estimate = try workspace.createQuickEstimate(
                     trade: trade, client: client, newClientName: addingClient ? newName : nil,
-                    newClientPhone: addingClient ? newPhone : nil, notes: notes, language: language, draft: draft)
+                    newClientPhone: addingClient ? newPhone : nil, notes: notes, language: language,
+                    photos: photos.map(\.data), draft: draft)
                 dismiss()
                 onCreated(estimate.id)
             } catch {
                 failure = error as? BackendError ?? .invalidResponse
             }
         }
+    }
+}
+
+struct PendingPhoto: Identifiable {
+    let id = UUID()
+    let data: Data
+    let thumbnail: UIImage
+
+    init(_ data: Data) {
+        self.data = data
+        thumbnail = UIImage(data: data).map { PhotoStore.downscaled($0, maxSide: 240) } ?? UIImage()
     }
 }
 

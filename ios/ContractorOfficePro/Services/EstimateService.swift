@@ -34,7 +34,11 @@ nonisolated struct InterpretationDTO: Decodable, Sendable {
     var excludedWork: [String]
     var futureWork: [String]
     var unknownDetails: [String]
+    /// Questions with tap-to-answer choices (newer servers). Falls back to `unknownDetails`.
+    var questions: [OpenQuestion]?
     var confidenceNotes: [String]
+
+    var openQuestions: [OpenQuestion] { questions ?? unknownDetails.map { OpenQuestion(question: $0) } }
 }
 
 nonisolated struct WorkTaskDTO: Codable, Sendable {
@@ -51,6 +55,8 @@ nonisolated struct WorkTaskDTO: Codable, Sendable {
 
 nonisolated struct PriceRequestBody: Encodable, Sendable {
     var tasks: [WorkTaskDTO]
+    /// Let the AI ballpark lines that have no contractor or reference price (code computes the price).
+    var aiBallpark: Bool = true
 }
 
 nonisolated struct RefineRequestBody: Encodable, Sendable {
@@ -82,6 +88,9 @@ nonisolated struct RefinementDTO: Decodable, Sendable {
     var update: [LineUpdateDTO]
     var exclusions: [String]
     var remainingQuestions: [String]
+    var remaining: [OpenQuestion]?
+
+    var openQuestions: [OpenQuestion] { remaining ?? remainingQuestions.map { OpenQuestion(question: $0) } }
 }
 
 nonisolated struct LineUpdateDTO: Decodable, Sendable, Equatable {
