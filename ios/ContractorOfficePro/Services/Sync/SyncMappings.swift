@@ -278,6 +278,42 @@ nonisolated extension Expense: SyncRecord {
     }
 }
 
+nonisolated extension StockItem: SyncRecord {
+    static let table = "stock_items"
+    var fields: Row {
+        ["name_en": J.s(nameEn), "name_es": J.s(nameEs), "category": J.s(category), "qty": J.dec(qty), "unit": J.s(unit),
+         "specifications": J.s(specifications), "search_query": J.s(searchQuery),
+         "source_estimate_id": J.u(sourceEstimateId), "note": J.s(note)]
+    }
+    func applyFields(_ r: Row) {
+        nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es") ?? ""; category = r.string("category") ?? category
+        qty = r.decimal("qty") ?? 0; unit = r.string("unit") ?? unit; specifications = r.string("specifications")
+        searchQuery = r.string("search_query") ?? searchQuery; sourceEstimateId = r.uuid("source_estimate_id"); note = r.string("note")
+    }
+    static func make(_ r: Row) -> StockItem? {
+        guard let b = base(r), let name = r.string("name_en") else { return nil }
+        let m = StockItem(id: b.id, orgId: b.org, nameEn: name, now: b.created); m.apply(r); return m
+    }
+}
+
+nonisolated extension Tool: SyncRecord {
+    static let table = "tools"
+    var fields: Row {
+        ["name_en": J.s(nameEn), "name_es": J.s(nameEs), "category": J.s(category), "brand": J.s(brand),
+         "model": J.s(model), "serial_number": J.s(serialNumber), "holder": J.s(holder), "notes": J.s(notes)]
+    }
+    func applyFields(_ r: Row) {
+        nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es") ?? ""; category = r.string("category") ?? category
+        brand = r.string("brand"); model = r.string("model"); serialNumber = r.string("serial_number")
+        holder = r.string("holder"); notes = r.string("notes")
+        // photoFileName is device-only and never overwritten by the server.
+    }
+    static func make(_ r: Row) -> Tool? {
+        guard let b = base(r), let name = r.string("name_en") else { return nil }
+        let m = Tool(id: b.id, orgId: b.org, nameEn: name, now: b.created); m.apply(r); return m
+    }
+}
+
 nonisolated extension Media: SyncRecord {
     static let table = "media"
     var fields: Row {

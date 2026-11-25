@@ -72,7 +72,10 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
 - TestFlight: `ios/scripts/testflight.sh` (team 986GMWGB5V; archives unsigned Release, export signs with Apple Distribution and uploads).
 - Local backend runs on port **8787** (8000 is used by another project on this Mac). App reads `BACKEND_URL` from
   `ios/Config/Config.xcconfig`. Live app↔backend test: start the backend, then `TEST_RUNNER_LIVE_BACKEND=1 xcodebuild ... test`.
-- SwiftData is at `SchemaV3` (V3 added MaterialItem); `SchemaV1` holds frozen copies of models changed in V2. Never edit a shipped schema version.
+- SwiftData is at `SchemaV4` (V3 added MaterialItem; V4 added StockItem + Tool); `SchemaV1` holds frozen copies of models changed in V2. Never edit a shipped schema version.
+- Truck tab: leftovers (`StockItem`, saved from a materials list with None/A little/Half/Most/All buttons; offered on later
+  lists via `StockMatcher`, which never matches different sizes) and tools (`Tool`; bulk add from photos via
+  `/v1/tools/identify`, 5 photos per call; photo device-only; "who has it" holder).
 - Bill of materials: AI drafts materials (never prices); Shop links open store searches (no scraping: no open retailer APIs).
 - Colors: warm olive palette in `Theme` (cream canvas, olive accent; sage on olive-black in dark mode). Use Theme tokens,
   never raw black/white, and `primaryActionStyle()` for big buttons (label uses `Theme.onAccent`).

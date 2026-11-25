@@ -17,7 +17,8 @@ from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs
 from app.ratelimit import RateLimiter
 from app.schemas import (Ballpark, BallparkItem, FriendlyQuestion, Interpretation, InterpretRequest, LineUpdate, Member,
                          Refinement, RefineRequest, WorkItem)
-from app.ai import enforce_materials, enforce_refinement
+from app.ai import enforce_materials, enforce_refinement, enforce_tools
+from app.schemas import IdentifiedTool, ToolsList
 from app.schemas import Material, MaterialsList, MaterialsRequest
 
 SUPABASE = "https://example.supabase.co"
@@ -104,6 +105,19 @@ class FakeInterpreter:
                                             equipment_cost_per_unit=0, basis_en="~6 h; materials ~$150") for l in lines[:1]]
                         + [BallparkItem(ref=l.ref, labor_hours_per_unit=2, labor_rate_per_hour=9999, material_cost_per_unit=0,
                                         equipment_cost_per_unit=0, basis_en="bad rate") for l in lines[1:2]])
+
+
+    async def identify_tools(self, request):
+        self.tool_requests = getattr(self, "tool_requests", []) + [request]
+        if self.error:
+            raise self.error
+        tool = lambda **kw: IdentifiedTool(**{"name_es": "", "brand": None, "model": None, "serial_number": None,
+                                               "category": "power_tool", "quantity": 1, "note_en": "", **kw})
+        return enforce_tools(ToolsList(tools=[
+            tool(photo_index=0, name_en="  Cordless   drill ", name_es="Taladro inalámbrico", brand="DeWalt", serial_number="  "),
+            tool(photo_index=0, name_en="Tape measure", category="measuring", quantity=0),
+            tool(photo_index=7, name_en="Ghost tool"),
+            tool(photo_index=0, name_en="   ")]), len(request.images))
 
 
 class FakePricing:

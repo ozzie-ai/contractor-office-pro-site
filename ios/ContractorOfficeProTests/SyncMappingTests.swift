@@ -106,7 +106,23 @@ struct SyncMappingTests {
         #expect(e2.internalNotes == "private" && e2.exclusions == "Subpanel" && e2.openQuestions == "Where?")
     }
 
-    @Test func mediaKeepsDeviceOnlyFileName() {
+    @Test func stockAndToolsTravelButToolPhotosStayOnDevice() throws {
+        let stock = StockItem(orgId: UUID(), nameEn: "8 AWG THHN wire", category: "electrical", qty: Decimal(string: "42.5")!, unit: "ft")
+        stock.sourceEstimateId = UUID(); stock.specifications = "8 AWG"
+        let s2 = try #require(StockItem.make(try throughJSON(stock.row())))
+        #expect(s2.qty == Decimal(string: "42.5") && s2.unit == "ft" && s2.sourceEstimateId == stock.sourceEstimateId && s2.specifications == "8 AWG")
+
+        let tool = Tool(orgId: UUID(), nameEn: "Cordless drill", category: "power_tool")
+        tool.brand = "DeWalt"; tool.serialNumber = "SN123"; tool.holder = "Carlos"; tool.photoFileName = "drill.jpg"
+        let row = tool.row()
+        #expect(row["photo_file_name"] == nil, "photos never sync")
+        let t2 = try #require(Tool.make(try throughJSON(row)))
+        #expect(t2.brand == "DeWalt" && t2.serialNumber == "SN123" && t2.holder == "Carlos" && t2.photoFileName == nil)
+        tool.apply(row)
+        #expect(tool.photoFileName == "drill.jpg", "a server row never clears the local photo")
+    }
+
+        @Test func mediaKeepsDeviceOnlyFileName() {
         let media = Media(orgId: UUID(), jobId: UUID(), kind: .voice, localFileName: "abc.m4a")
         #expect(media.row()["local_file_name"] == nil, "device-only fields never go to the server")
 

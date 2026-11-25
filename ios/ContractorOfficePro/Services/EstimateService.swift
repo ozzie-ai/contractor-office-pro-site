@@ -6,6 +6,7 @@ protocol EstimateService: Sendable {
     func price(_ request: PriceRequestBody) async throws -> PriceResponseDTO
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO
     func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO
+    func identifyTools(_ request: ToolsRequestBody) async throws -> ToolsResponseDTO
 }
 
 // MARK: - Wire types (snake_case on the wire; see backend/app/schemas.py)
@@ -129,6 +130,31 @@ nonisolated struct MaterialDTO: Decodable, Sendable {
     var noteEn: String
 }
 
+nonisolated struct ToolsRequestBody: Encodable, Sendable {
+    var images: [InterpretRequestBody.ImageBody]
+    var language: String?
+}
+
+nonisolated struct ToolsResponseDTO: Decodable, Sendable {
+    var result: ToolsListDTO
+}
+
+nonisolated struct ToolsListDTO: Decodable, Sendable {
+    var tools: [IdentifiedToolDTO]
+}
+
+nonisolated struct IdentifiedToolDTO: Decodable, Sendable, Equatable {
+    var photoIndex: Int
+    var nameEn: String
+    var nameEs: String
+    var brand: String?
+    var model: String?
+    var serialNumber: String?
+    var category: String
+    var quantity: Int
+    var noteEn: String
+}
+
 /// Decimals arrive as JSON strings ("2100.00") so cents stay exact.
 nonisolated struct DecimalValue: Decodable, Sendable, Equatable {
     let value: Decimal
@@ -241,6 +267,10 @@ nonisolated struct BackendClient: EstimateService {
 
     func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO {
         try await post("v1/materials", body: request)
+    }
+
+    func identifyTools(_ request: ToolsRequestBody) async throws -> ToolsResponseDTO {
+        try await post("v1/tools/identify", body: request)
     }
 
     private func post<Body: Encodable, Response: Decodable>(_ path: String, body: Body) async throws -> Response {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AppTab: Hashable { case jobs, clients, settings }
+enum AppTab: Hashable { case jobs, clients, truck, settings }
 
 /// Pushed destinations, shared by every tab's NavigationStack.
 enum AppRoute: Hashable {
@@ -87,6 +87,13 @@ struct MainTabView: View {
                 }
             } label: {
                 Label { Text(.tabClients) } icon: { Image(systemName: "person.2") }
+            }
+            Tab(value: AppTab.truck) {
+                NavigationStack {
+                    TruckView()
+                }
+            } label: {
+                Label { Text(.tabTruck) } icon: { Image(systemName: "truck.box") }
             }
             Tab(value: AppTab.settings) {
                 NavigationStack {
