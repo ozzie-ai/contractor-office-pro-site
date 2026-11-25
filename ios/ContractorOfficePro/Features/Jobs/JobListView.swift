@@ -9,6 +9,8 @@ struct JobListView: View {
     private var clients: [Client]
     @State private var filter: JobFilter = .active
     @State private var editor: JobEditorRequest?
+    @State private var quickEstimate = false
+    @State private var openedEstimate: UUID?
 
     private var sections: [JobSection] { JobSection.make(from: jobs, filter: filter) }
     private var clientNames: [UUID: String] { Dictionary(uniqueKeysWithValues: clients.map { ($0.id, $0.name) }) }
@@ -16,7 +18,7 @@ struct JobListView: View {
     var body: some View {
         List {
             Section {
-                DashboardHeader(memberID: workspace.memberID)
+                DashboardHeader(memberID: workspace.memberID) { quickEstimate = true }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets())
             }
@@ -45,7 +47,7 @@ struct JobListView: View {
         }
         .refreshable { await workspace.sync.syncNow() }
         .overlay {
-            if sections.isEmpty { emptyState.padding(.top, 180) }
+            if sections.isEmpty { emptyState.padding(.top, 220) }
         }
         .themedList()
         .navigationTitle(Text(.jobsTitle))
@@ -59,6 +61,11 @@ struct JobListView: View {
         .sheet(item: $editor) { request in
             JobEditor(request: request)
         }
+        .fullScreenCover(isPresented: $quickEstimate) {
+            QuickEstimateFlow { openedEstimate = $0 }
+        }
+        .navigationDestination(item: $openedEstimate) { EstimateView(estimateID: $0) }
+        .sensoryFeedback(.success, trigger: openedEstimate) { _, new in new != nil }
     }
 
     @ViewBuilder
@@ -70,7 +77,7 @@ struct JobListView: View {
             } description: {
                 Text(.jobsEmptyMessage)
             } actions: {
-                Button { editor = JobEditorRequest() } label: { Text(.jobsNew) }
+                Button { quickEstimate = true } label: { Text(.homeNewEstimate) }
                     .primaryActionStyle()
             }
         case .done:

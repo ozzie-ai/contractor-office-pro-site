@@ -53,6 +53,8 @@ targets:
         CFBundleLocalizations: [en, es]
         # Only standard HTTPS (exempt), so TestFlight doesn't ask the export-compliance question each upload.
         ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: Lets you describe the job by voice. Audio stays on your iPhone.
+        NSSpeechRecognitionUsageDescription: Turns what you say into job notes, on your iPhone.
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

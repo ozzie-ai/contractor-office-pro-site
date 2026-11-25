@@ -148,6 +148,59 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testGuidedNewEstimateAndSend() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        snap("18-home")
+        app.buttons["home-new-estimate"].tap()
+        XCTAssertTrue(app.buttons["trade-electrical"].waitForExistence(timeout: 5))
+        snap("19-what-kind")
+        app.buttons["trade-electrical"].tap()
+
+        XCTAssertTrue(app.buttons["New client"].waitForExistence(timeout: 5))
+        snap("20-who-for")
+        app.buttons["New client"].tap()
+        let name = app.textFields["Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 3))
+        name.tap(); name.typeText("Rosa Martínez")
+        app.buttons["Continue"].tap()
+
+        XCTAssertTrue(app.buttons["pick-Panel upgrade"].waitForExistence(timeout: 5))
+        app.buttons["pick-Panel upgrade"].tap()
+        app.buttons["pick-EV charger"].tap()
+        XCTAssertEqual(app.textFields["quick-notes"].value as? String ?? app.textViews["quick-notes"].value as? String,
+                       "Panel upgrade, EV charger")
+        snap("21-tell-me")
+        app.buttons["make-estimate"].tap()
+
+        XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 15), "estimate opens after drafting")
+        snap("22-estimate-with-send")
+        app.buttons["send-to-customer"].tap()
+        XCTAssertTrue(element(in: app, labeled: "still need a price").waitForExistence(timeout: 5), "blocked in plain words")
+        snap("23-send-blocked")
+        app.buttons["Fix it now"].tap()
+
+        for label in ["New 40A double-pole circuit", "Wire run to the EV charger"] {
+            let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
+            for _ in 0..<4 where !row.isHittable { app.swipeUp() }
+            row.tap()
+            let price = app.textFields["line-unit-price"]
+            XCTAssertTrue(price.waitForExistence(timeout: 5))
+            price.tap(); price.typeText("40")
+            app.buttons["Save"].tap()
+        }
+        app.buttons["send-to-customer"].tap()
+        XCTAssertTrue(app.buttons["send-es"].waitForExistence(timeout: 5))
+        snap("24-send-ready")
+        app.buttons["send-es"].tap()
+        let shareSheet = app.otherElements["ActivityListView"]
+        XCTAssertTrue(shareSheet.waitForExistence(timeout: 8) || app.navigationBars["UIActivityContentView"].waitForExistence(timeout: 2),
+                      "share sheet with the Spanish PDF opens")
+        snap("25-share-sheet")
+    }
+
+    @MainActor
     func testSplashSettlesIntoTheApp() {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

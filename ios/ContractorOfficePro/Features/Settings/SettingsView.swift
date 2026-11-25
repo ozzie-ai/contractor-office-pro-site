@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Environment(Workspace.self) private var workspace
     @Query private var organizations: [Organization]
     @State private var editingBusiness = false
+    @AppStorage("biggerText") private var biggerText = false
 
     private var version: String {
         let info = Bundle.main.infoDictionary
@@ -38,6 +39,15 @@ struct SettingsView: View {
                     Text(.settingsSectionBusiness)
                 }
                 .sheet(isPresented: $editingBusiness) { BusinessEditor(organization: org) }
+            }
+            Section {
+                Toggle(isOn: $biggerText) {
+                    Label { Text(.settingsBiggerText) } icon: { Image(systemName: "textformat.size") }
+                }
+            } header: {
+                Text(.settingsSectionDisplay)
+            } footer: {
+                Text(.settingsBiggerTextHint)
             }
             Section {
                 SyncStatusView(sync: workspace.sync)

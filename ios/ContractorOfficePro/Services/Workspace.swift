@@ -171,6 +171,33 @@ final class Workspace {
         try commit(item, touch: false)
     }
 
+    /// One-step job creation for the guided flow: optional new client, a job named after the trade, then the AI draft.
+    @discardableResult
+    func createQuickEstimate(trade: Trade, client existing: Client?, newClientName: String?, newClientPhone: String?,
+                             notes: String, language: AppLanguage, draft: EstimateDraft) throws -> Estimate {
+        var client = existing
+        if client == nil, let name = newClientName?.nilIfBlank {
+            var clientDraft = ClientDraft()
+            clientDraft.name = name
+            clientDraft.phone = newClientPhone ?? ""
+            clientDraft.preferredLanguage = language
+            client = try save(clientDraft)
+        }
+        var jobDraft = JobDraft(clientID: client?.id, address: client?.address)
+        let tradeName = String(localized: trade.title)
+        jobDraft.title = client.map { "\(tradeName) · \($0.name)" } ?? tradeName
+        jobDraft.status = .estimating
+        let job = try save(jobDraft)
+        return try createEstimate(for: job, notes: notes, language: language, draft: draft)
+    }
+
+    func markSent(_ estimate: Estimate, language: AppLanguage, now: Date = .now) throws {
+        estimate.status = .sent
+        estimate.sentAt = now
+        estimate.language = language
+        try commit(estimate)
+    }
+
     @discardableResult
     func createBlankEstimate(for job: Job) throws -> Estimate {
         let estimate = insert(Estimate(orgId: orgID, jobId: job.id, language: organization?.defaultLanguage ?? .en))

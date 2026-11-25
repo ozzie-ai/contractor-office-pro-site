@@ -34,6 +34,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lets you describe the job by voice. Audio stays on your iPhone.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns what you say into job notes, on your iPhone.</string>
 	<key>SupabaseAnonKey</key>
 	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>SupabaseURL</key>

@@ -10,6 +10,9 @@ struct EstimateView: View {
     @State private var buildingMaterials = false
     @State private var materialsFailure: BackendError?
     @State private var openMaterials: UUID?
+    @State private var sending = false
+    @Query private var jobs: [Job]
+    @Query private var clients: [Client]
     @State private var editor: LineEditorRequest?
     @State private var answeringQuestions = false
     @State private var confirmingDelete = false
@@ -20,6 +23,8 @@ struct EstimateView: View {
         _lines = Query(filter: #Predicate<LineItem> { $0.estimateId == estimateID && $0.deletedAt == nil },
                        sort: \LineItem.position)
         _materials = Query(filter: #Predicate<MaterialItem> { $0.estimateId == estimateID && $0.deletedAt == nil })
+        _jobs = Query()
+        _clients = Query()
     }
 
     var body: some View {
@@ -36,6 +41,12 @@ struct EstimateView: View {
         let needsAttention = lines.contains { $0.preliminary || $0.needsPrice || $0.needsQuantity }
         return List {
             Section {
+                if estimate.status == .sent, let sentAt = estimate.sentAt {
+                    Label { Text(.sendSentOn(date: sentAt.formatted(date: .abbreviated, time: .shortened))) } icon: {
+                        Image(systemName: "checkmark.seal.fill").foregroundStyle(Theme.success)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
                 TotalsView(estimate: estimate)
                 if needsAttention {
                     Label { Text(.estimatePreliminaryBanner) } icon: { Image(systemName: "exclamationmark.triangle.fill") }
@@ -126,6 +137,22 @@ struct EstimateView: View {
         .sheet(item: $editor) { LineEditor(request: $0, estimate: estimate) }
         .sheet(isPresented: $answeringQuestions) { AnswerQuestionsSheet(estimate: estimate, lines: lines) }
         .navigationDestination(item: $openMaterials) { MaterialsView(estimateID: $0) }
+        .safeAreaInset(edge: .bottom) {
+            Button { sending = true } label: {
+                Label { Text(estimate.status == .sent ? .sendAgain : .sendToCustomer) } icon: { Image(systemName: "paperplane.fill") }
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 56)
+            }
+            .primaryActionStyle()
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+            .accessibilityIdentifier("send-to-customer")
+        }
+        .sheet(isPresented: $sending) {
+            let job = jobs.first { $0.id == estimate.jobId }
+            SendEstimateSheet(estimate: estimate, lines: lines, job: job,
+                              client: job?.clientId.flatMap { id in clients.first { $0.id == id } })
+        }
         .overlay { if buildingMaterials { AIGlow().transition(.opacity) } }
         .animation(.smooth(duration: 0.4), value: buildingMaterials)
         .sensoryFeedback(.success, trigger: lines.count)

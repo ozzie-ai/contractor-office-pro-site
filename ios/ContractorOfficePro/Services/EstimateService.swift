@@ -13,6 +13,7 @@ protocol EstimateService: Sendable {
 nonisolated struct InterpretRequestBody: Encodable, Sendable {
     var description: String
     var language: String?
+    var tradeHint: String?
     var images: [ImageBody] = []
 
     struct ImageBody: Encodable, Sendable {

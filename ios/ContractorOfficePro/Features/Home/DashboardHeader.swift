@@ -1,14 +1,16 @@
 import SwiftData
 import SwiftUI
 
-/// Greeting + live stats at the top of Jobs. Numbers roll when they change.
+/// Home header for less technical users: greeting, one big "New estimate" button, and one plain
+/// attention line only when something needs doing.
 struct DashboardHeader: View {
-    @Query(filter: #Predicate<Job> { $0.deletedAt == nil }) private var jobs: [Job]
     @Query(filter: #Predicate<Estimate> { $0.deletedAt == nil }) private var estimates: [Estimate]
     @Query(filter: #Predicate<LineItem> { $0.deletedAt == nil && $0.priceSourceRaw == "none" }) private var unpriced: [LineItem]
     @Query private var members: [Member]
+    let onNewEstimate: () -> Void
 
-    init(memberID: UUID) {
+    init(memberID: UUID, onNewEstimate: @escaping () -> Void) {
+        self.onNewEstimate = onNewEstimate
         _members = Query(filter: #Predicate<Member> { $0.id == memberID })
     }
 
@@ -16,15 +18,9 @@ struct DashboardHeader: View {
         members.first?.displayName.split(separator: " ").first.map(String.init) ?? ""
     }
 
-    private var activeJobs: Int { jobs.filter { JobFilter.active.statuses.contains($0.status) }.count }
-
-    private var openValue: Decimal {
-        estimates.filter { $0.status == .draft || $0.status == .sent }.reduce(0) { $0 + $1.total }
-    }
-
-    private var linesNeedingPrice: Int {
+    private var estimatesNeedingPrices: Int {
         let drafts = Set(estimates.filter { $0.status == .draft }.map(\.id))
-        return unpriced.filter { drafts.contains($0.estimateId) }.count
+        return Set(unpriced.map(\.estimateId).filter { drafts.contains($0) }).count
     }
 
     private var greeting: LocalizedStringResource {
@@ -36,54 +32,34 @@ struct DashboardHeader: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(greeting).headingStyle(.title3)
-                Text(Date.now, format: .dateTime.weekday(.wide).month(.wide).day())
-                    .font(.subheadline).foregroundStyle(Theme.muted)
+        VStack(alignment: .leading, spacing: 14) {
+            Text(greeting).headingStyle(.title2)
+            Button(action: onNewEstimate) {
+                HStack(spacing: 14) {
+                    Image(systemName: "mic.fill")
+                        .font(.title2.weight(.semibold))
+                        .frame(width: 52, height: 52)
+                        .background(Theme.onAccent.opacity(0.15), in: .circle)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(.homeNewEstimate).font(.title2.weight(.bold))
+                        Text(.homeNewEstimateHint).font(.subheadline).opacity(0.75)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.headline)
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity)
             }
-            HStack(spacing: 10) {
-                StatTile(label: .homeStatActive) {
-                    Text(activeJobs, format: .number).contentTransition(.numericText(value: Double(activeJobs)))
+            .primaryActionStyle()
+            .accessibilityIdentifier("home-new-estimate")
+            if estimatesNeedingPrices > 0 {
+                Label { Text(.homeNeedPrices(count: estimatesNeedingPrices)) } icon: {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.warning)
                 }
-                StatTile(label: .homeStatOpenEstimates) {
-                    Text(openValue, format: .currency(code: "USD").notation(.compactName))
-                        .contentTransition(.numericText())
-                }
-                StatTile(label: .homeStatNeedsPrice, tint: linesNeedingPrice > 0 ? Theme.danger : nil) {
-                    Text(linesNeedingPrice, format: .number).contentTransition(.numericText(value: Double(linesNeedingPrice)))
-                }
+                .font(.subheadline.weight(.medium))
             }
-            .animation(.snappy, value: activeJobs)
-            .animation(.snappy, value: openValue)
-            .animation(.snappy, value: linesNeedingPrice)
         }
         .padding(.vertical, 4)
-    }
-}
-
-private struct StatTile<Value: View>: View {
-    let label: LocalizedStringResource
-    var tint: Color?
-    @ViewBuilder let value: Value
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            value
-                .font(.title2.weight(.semibold))
-                .fontDesign(.monospaced)
-                .foregroundStyle(tint ?? .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(Theme.muted)
-                .lineLimit(2, reservesSpace: true)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: .rect(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.border))
-        .accessibilityElement(children: .combine)
     }
 }
