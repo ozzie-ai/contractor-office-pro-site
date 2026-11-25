@@ -6,6 +6,7 @@ typealias Row = [String: AnyJSON]
 
 /// Timestamp/date conversions for the wire format. FormatStyles are Sendable, so no unsafe statics.
 nonisolated enum SyncDate {
+    // Floor division so pre-1970 dates still format correctly.
     private static let fractional = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let whole = Date.ISO8601FormatStyle()
     private static let day = Date.ISO8601FormatStyle(timeZone: .current).year().month().day().dateSeparator(.dash)
@@ -17,7 +18,13 @@ nonisolated enum SyncDate {
         return (try? fractional.parse(s)) ?? (try? whole.parse(s))
     }
 
-    static func format(_ date: Date) -> String { fractional.format(date) }
+    /// Rounds to the nearest millisecond (the formatter alone truncates, which could shift LWW stamps by 1 ms).
+    static func format(_ date: Date) -> String {
+        let ms = Int64((date.timeIntervalSince1970 * 1000).rounded())
+        let seconds = Date(timeIntervalSince1970: TimeInterval(ms.quotient(dividingBy: 1000)))
+        let base = whole.format(seconds)   // "2026-11-12T20:15:30Z"
+        return String(base.dropLast()) + String(format: ".%03lldZ", ms.remainder(dividingBy: 1000))
+    }
     static func parseDay(_ raw: String) -> Date? { try? day.parse(String(raw.prefix(10))) }
     static func formatDay(_ date: Date) -> String { day.format(date) }
 }
@@ -70,4 +77,9 @@ nonisolated enum J {
     static func i(_ v: Int) -> AnyJSON { .integer(v) }
     static func d(_ v: Double?) -> AnyJSON { v.map { .double($0) } ?? .null }
     static func dec(_ v: Decimal?) -> AnyJSON { v.map { .string(NSDecimalNumber(decimal: $0).stringValue) } ?? .null }
+}
+
+private nonisolated extension Int64 {
+    func quotient(dividingBy d: Int64) -> Int64 { self >= 0 ? self / d : (self - d + 1) / d }
+    func remainder(dividingBy d: Int64) -> Int64 { self - quotient(dividingBy: d) * d }
 }

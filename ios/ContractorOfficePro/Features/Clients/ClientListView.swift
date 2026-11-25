@@ -22,6 +22,7 @@ struct ClientListView: View {
 
 /// Separate view so the @Query is rebuilt when the search text changes.
 private struct ClientList: View {
+    @Environment(Workspace.self) private var workspace
     @Query private var clients: [Client]
     let search: String
     let onAdd: () -> Void
@@ -40,7 +41,10 @@ private struct ClientList: View {
             NavigationLink(value: AppRoute.client(client.id)) {
                 ClientRow(client: client)
             }
+            .zoomSource(.client(client.id))
         }
+        .refreshable { await workspace.sync.syncNow() }
+        .themedList()
         .overlay {
             if clients.isEmpty {
                 if search.trimmed.isEmpty {
@@ -49,7 +53,7 @@ private struct ClientList: View {
                     } description: {
                         Text(.clientsEmptyMessage)
                     } actions: {
-                        Button(action: onAdd) { Text(.clientsNew) }.buttonStyle(.borderedProminent)
+                        Button(action: onAdd) { Text(.clientsNew) }.primaryActionStyle()
                     }
                 } else {
                     ContentUnavailableView.search(text: search)
@@ -65,25 +69,27 @@ struct ClientRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Text(client.name).font(.headline)
+                Text(client.name).font(.body.weight(.semibold)).tracking(-0.2)
                 if let phone = client.phone {
-                    Text(phone).font(.subheadline).foregroundStyle(.secondary)
+                    Text(phone).font(.subheadline).fontDesign(.monospaced).foregroundStyle(Theme.muted)
                 }
             }
             Spacer()
             if client.preferredLanguage == .es {
                 Text(verbatim: "ES")
-                    .font(.caption.bold())
+                    .font(.caption2.weight(.semibold)).fontDesign(.monospaced)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.tint.opacity(0.15), in: .capsule)
+                    .overlay(Capsule().strokeBorder(Theme.border))
                     .accessibilityLabel(Text(.languageEs))
             }
         }
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.ready(withSamples: true)
     return RootView().environment(session).modelContainer(container)
 }
+#endif

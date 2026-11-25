@@ -66,6 +66,12 @@ Do not build later items (payments, scheduling, SMS, QuickBooks) unless asked.
   demo mode. Live server test: `TEST_RUNNER_LIVE_SUPABASE=1 xcodebuild ... test`.
 - Writes go through `Workspace` (stamps, saves, schedules sync). Editors edit a draft; Cancel discards.
 - Demo mode (DEBUG): launch with `-demo` for sample data on a fake server, never the real account.
+- Wrap every `#Preview` in `#if DEBUG` (fixtures are DEBUG-only); check Release still builds before uploads.
+- TestFlight: `ios/scripts/testflight.sh` (team 986GMWGB5V; archives unsigned Release, export signs with Apple Distribution and uploads).
+- Local backend runs on port **8787** (8000 is used by another project on this Mac). App reads `BACKEND_URL` from
+  `ios/Config/Config.xcconfig`. Live app↔backend test: start the backend, then `TEST_RUNNER_LIVE_BACKEND=1 xcodebuild ... test`.
+- SwiftData is at `SchemaV3` (V3 added MaterialItem); `SchemaV1` holds frozen copies of models changed in V2. Never edit a shipped schema version.
+- Bill of materials: AI drafts materials (never prices); Shop links open store searches (no scraping: no open retailer APIs).
 
 ## API conventions (contract with the iOS app)
 - Versioned paths: `/v1/...`. Auth: `Authorization: Bearer <Supabase access token>`; the server verifies it and

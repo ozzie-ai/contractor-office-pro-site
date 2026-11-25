@@ -38,8 +38,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.derekflores.contractorofficepro
+        DEVELOPMENT_TEAM: 986GMWGB5V
+        CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     info:
       path: ContractorOfficePro/Resources/Info.plist
       properties:
@@ -48,10 +51,16 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, es]
-        UILaunchScreen: {}
+        # Only standard HTTPS (exempt), so TestFlight doesn't ask the export-compliance question each upload.
+        ITSAppUsesNonExemptEncryption: false
+        UILaunchScreen:
+          UIColorName: LaunchBackground
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        BackendURL: $(BACKEND_URL)
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
   ContractorOfficeProTests:
     type: bundle.unit-test
     platform: iOS

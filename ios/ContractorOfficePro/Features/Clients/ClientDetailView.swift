@@ -74,6 +74,7 @@ struct ClientDetailView: View {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
             }
         }
+        .themedList()
         .navigationTitle(client.name)
         .toolbar {
             Button { clientEditor = ClientEditorRequest(client: client) } label: { Text(.commonEdit) }
@@ -88,6 +89,17 @@ struct ClientDetailView: View {
             Text(.clientDeleteMessage)
         }
         .alert(Text(.errorSaveFailed), isPresented: $saveFailed) {}
+    }
+}
+
+/// Secondary action: regular Liquid Glass on iOS 26, bordered before.
+private struct SecondaryActionStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26, *) {
+            content.buttonStyle(.glass)
+        } else {
+            content.buttonStyle(.bordered)
+        }
     }
 }
 
@@ -115,7 +127,7 @@ private struct ContactActions: View {
                             }
                             .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .modifier(SecondaryActionStyle())
                         .disabled(url == nil)
                     }
                 }

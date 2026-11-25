@@ -148,12 +148,13 @@ nonisolated extension PriceBookItem: SyncRecord {
     var fields: Row {
         ["kind": J.s(kindRaw), "name_en": J.s(nameEn), "name_es": J.s(nameEs), "unit": J.s(unit),
          "unit_cost": J.dec(unitCost), "unit_price": J.dec(unitPrice), "markup_pct": J.dec(markupPct),
-         "category": J.s(category)]
+         "category": J.s(category), "task_code": J.s(taskCode)]
     }
     func applyFields(_ r: Row) {
         kindRaw = r.string("kind") ?? kindRaw; nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es")
         unit = r.string("unit") ?? unit; unitCost = r.decimal("unit_cost") ?? unitCost
         unitPrice = r.decimal("unit_price") ?? unitPrice; markupPct = r.decimal("markup_pct"); category = r.string("category")
+        taskCode = r.string("task_code")
     }
     static func make(_ r: Row) -> PriceBookItem? {
         guard let b = base(r), let name = r.string("name_en") else { return nil }
@@ -166,13 +167,15 @@ nonisolated extension Estimate: SyncRecord {
     var fields: Row {
         ["job_id": J.u(jobId), "number": J.s(number), "status": J.s(statusRaw), "language": J.s(languageRaw),
          "subtotal": J.dec(subtotal), "tax": J.dec(tax), "total": J.dec(total),
-         "deposit_amount": J.dec(depositAmount), "sent_at": J.t(sentAt), "accepted_at": J.t(acceptedAt)]
+         "deposit_amount": J.dec(depositAmount), "sent_at": J.t(sentAt), "accepted_at": J.t(acceptedAt),
+         "internal_notes": J.s(internalNotes), "exclusions": J.s(exclusions), "open_questions": J.s(openQuestions)]
     }
     func applyFields(_ r: Row) {
         jobId = r.uuid("job_id") ?? jobId; number = r.string("number"); statusRaw = r.string("status") ?? statusRaw
         languageRaw = r.string("language") ?? languageRaw; subtotal = r.decimal("subtotal") ?? 0
         tax = r.decimal("tax") ?? 0; total = r.decimal("total") ?? 0; depositAmount = r.decimal("deposit_amount")
         sentAt = r.date("sent_at"); acceptedAt = r.date("accepted_at")
+        internalNotes = r.string("internal_notes"); exclusions = r.string("exclusions"); openQuestions = r.string("open_questions")
     }
     static func make(_ r: Row) -> Estimate? {
         guard let b = base(r), let job = r.uuid("job_id") else { return nil }
@@ -185,7 +188,9 @@ nonisolated extension LineItem: SyncRecord {
     var fields: Row {
         ["estimate_id": J.u(estimateId), "price_book_item_id": J.u(priceBookItemId), "position": J.i(position),
          "description_en": J.s(descriptionEn), "description_es": J.s(descriptionEs), "qty": J.dec(qty),
-         "unit": J.s(unit), "unit_price": J.dec(unitPrice), "taxable": J.b(taxable), "source": J.s(sourceRaw)]
+         "unit": J.s(unit), "unit_price": J.dec(unitPrice), "taxable": J.b(taxable), "source": J.s(sourceRaw),
+         "task_code": J.s(taskCode), "price_source": J.s(priceSourceRaw), "price_note": J.s(priceNote),
+         "preliminary": J.b(preliminary)]
     }
     func applyFields(_ r: Row) {
         estimateId = r.uuid("estimate_id") ?? estimateId; priceBookItemId = r.uuid("price_book_item_id")
@@ -193,10 +198,32 @@ nonisolated extension LineItem: SyncRecord {
         descriptionEs = r.string("description_es") ?? ""; qty = r.decimal("qty") ?? 1; unit = r.string("unit") ?? "ea"
         unitPrice = r.decimal("unit_price") ?? 0; taxable = r.bool("taxable") ?? true
         sourceRaw = r.string("source") ?? sourceRaw
+        taskCode = r.string("task_code"); priceSourceRaw = r.string("price_source") ?? priceSourceRaw
+        priceNote = r.string("price_note"); preliminary = r.bool("preliminary") ?? false
     }
     static func make(_ r: Row) -> LineItem? {
         guard let b = base(r), let est = r.uuid("estimate_id") else { return nil }
         let l = LineItem(id: b.id, orgId: b.org, estimateId: est, now: b.created); l.apply(r); return l
+    }
+}
+
+nonisolated extension MaterialItem: SyncRecord {
+    static let table = "material_items"
+    var fields: Row {
+        ["estimate_id": J.u(estimateId), "position": J.i(position), "name_en": J.s(nameEn), "name_es": J.s(nameEs),
+         "category": J.s(category), "qty": J.dec(qty), "unit": J.s(unit), "specifications": J.s(specifications),
+         "search_query": J.s(searchQuery), "evidence": J.s(evidenceRaw), "note": J.s(note), "purchased": J.b(purchased)]
+    }
+    func applyFields(_ r: Row) {
+        estimateId = r.uuid("estimate_id") ?? estimateId; position = r.int("position") ?? 0
+        nameEn = r.string("name_en") ?? nameEn; nameEs = r.string("name_es") ?? ""
+        category = r.string("category") ?? category; qty = r.decimal("qty") ?? 0; unit = r.string("unit") ?? unit
+        specifications = r.string("specifications"); searchQuery = r.string("search_query") ?? searchQuery
+        evidenceRaw = r.string("evidence") ?? evidenceRaw; note = r.string("note"); purchased = r.bool("purchased") ?? false
+    }
+    static func make(_ r: Row) -> MaterialItem? {
+        guard let b = base(r), let est = r.uuid("estimate_id"), let name = r.string("name_en") else { return nil }
+        let m = MaterialItem(id: b.id, orgId: b.org, estimateId: est, nameEn: name, now: b.created); m.apply(r); return m
     }
 }
 

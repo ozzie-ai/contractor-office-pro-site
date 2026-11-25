@@ -7,13 +7,18 @@ struct JobDetailView: View {
     @Environment(\.openURL) private var openURL
     @Query private var jobs: [Job]
     @Query private var clients: [Client]
+    @Query private var estimates: [Estimate]
     @State private var editor: JobEditorRequest?
+    @State private var draftingEstimate = false
+    @State private var openedEstimate: UUID?
     @State private var confirmingDelete = false
     @State private var saveFailed = false
 
     init(jobID: UUID) {
         _jobs = Query(filter: #Predicate<Job> { $0.id == jobID && $0.deletedAt == nil })
         _clients = Query()
+        _estimates = Query(filter: #Predicate<Estimate> { $0.jobId == jobID && $0.deletedAt == nil },
+                           sort: \Estimate.createdAt, order: .reverse)
     }
 
     private var job: Job? { jobs.first }
@@ -52,6 +57,33 @@ struct JobDetailView: View {
                     }
                 }
             }
+            Section {
+                ForEach(estimates) { estimate in
+                    NavigationLink(value: AppRoute.estimate(estimate.id)) {
+                        LabeledContent {
+                            MoneyText(amount: estimate.total)
+                        } label: {
+                            Text(.estimateRowTitle(date: estimate.createdAt.formatted(date: .abbreviated, time: .omitted)))
+                        }
+                    }
+                }
+                Button { draftingEstimate = true } label: {
+                    Label { Text(.estimateNewWithAi) } icon: { Image(systemName: "sparkles") }
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                }
+                .primaryActionStyle()
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                Button {
+                    if let estimate = try? workspace.createBlankEstimate(for: job) { openedEstimate = estimate.id }
+                } label: {
+                    Label { Text(.estimateNewBlank) } icon: { Image(systemName: "doc.badge.plus") }
+                }
+            } header: {
+                Text(.estimatesHeader)
+            }
             if let start = job.scheduledStart {
                 Section {
                     LabeledContent { Text(start, format: .dateTime.weekday().month().day().hour().minute()) } label: {
@@ -73,12 +105,19 @@ struct JobDetailView: View {
                 Button(role: .destructive) { confirmingDelete = true } label: { Text(.commonDelete) }
             }
         }
+        .themedList()
         .navigationTitle(job.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             Button { editor = JobEditorRequest(job: job) } label: { Text(.commonEdit) }
         }
         .sheet(item: $editor) { JobEditor(request: $0) }
+        .sheet(isPresented: $draftingEstimate) {
+            EstimateDraftSheet(job: job, defaultLanguage: client?.preferredLanguage ?? .en) { openedEstimate = $0 }
+        }
+        .navigationDestination(item: $openedEstimate) { EstimateView(estimateID: $0) }
+        .sensoryFeedback(.success, trigger: openedEstimate) { _, new in new != nil }
+        .sensoryFeedback(.selection, trigger: job.status)
         .confirmationDialog(Text(.jobDeleteConfirm), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(role: .destructive) {
                 if (try? workspace.delete(job)) != nil { dismiss() } else { saveFailed = true }

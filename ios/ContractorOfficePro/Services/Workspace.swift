@@ -8,13 +8,22 @@ final class Workspace {
     let orgID: UUID
     let memberID: UUID
     let sync: SyncEngine
+    /// AI + pricing backend; nil when BACKEND_URL isn't configured.
+    let estimateService: (any EstimateService)?
     private let context: ModelContext
 
-    init(orgID: UUID, memberID: UUID, context: ModelContext, sync: SyncEngine) {
+    init(orgID: UUID, memberID: UUID, context: ModelContext, sync: SyncEngine,
+         estimateService: (any EstimateService)? = nil) {
         self.orgID = orgID
         self.memberID = memberID
         self.context = context
         self.sync = sync
+        self.estimateService = estimateService
+    }
+
+    var organization: Organization? {
+        let id = orgID
+        return try? context.fetch(FetchDescriptor<Organization>(predicate: #Predicate { $0.id == id })).first
     }
 
     // MARK: Clients
@@ -51,6 +60,177 @@ final class Workspace {
     func delete(_ job: Job) throws {
         job.softDelete()
         try commit(job, touch: false)
+    }
+
+    // MARK: Estimates
+
+    /// Turns an AI draft into a local draft estimate. The contractor reviews everything before it goes anywhere.
+    @discardableResult
+    func createEstimate(for job: Job, notes: String, language: AppLanguage, draft: EstimateDraft) throws -> Estimate {
+        let estimate = insert(Estimate(orgId: orgID, jobId: job.id, language: language))
+        estimate.internalNotes = notes.nilIfBlank
+        let i = draft.interpretation
+        estimate.exclusions = (i.excludedWork + i.futureWork).joined(separator: "\n").nilIfBlank
+        estimate.openQuestions = i.unknownDetails.joined(separator: "\n").nilIfBlank
+        let lines = draft.pricing.lines.enumerated().map { index, priced in
+            makeLine(from: priced, in: estimate, position: index)
+        }
+        if job.status == .lead { job.status = .estimating; job.touch() }
+        recalculate(estimate, lines: lines)
+        try context.save()
+        sync.syncSoon()
+        return estimate
+    }
+
+    /// Applies the contractor-approved subset of a refinement: new lines, quantity updates, exclusions,
+    /// the remaining questions, and the Q&A appended to the private notes.
+    func apply(_ proposal: RefinementProposal, to estimate: Estimate, lines: [LineItem],
+               addIndexes: Set<Int>, updateIndexes: Set<Int>) throws {
+        var position = (lines.map(\.position).max() ?? -1) + 1
+        for (index, priced) in proposal.adds.enumerated() where addIndexes.contains(index) {
+            _ = makeLine(from: priced, in: estimate, position: position)
+            position += 1
+        }
+        for (index, update) in proposal.updates.enumerated() where updateIndexes.contains(index) && lines.indices.contains(update.ref) {
+            let line = lines[update.ref]
+            if let quantity = update.quantity { line.qty = Decimal(string: String(quantity)) ?? Decimal(quantity) }
+            if let unit = update.unit?.nilIfBlank { line.unit = unit }
+            line.touch()
+        }
+        let existing = Set((estimate.exclusions ?? "").split(separator: "\n").map(String.init))
+        let newExclusions = proposal.exclusions.filter { !existing.contains($0) }
+        estimate.exclusions = ((estimate.exclusions.map { [$0] } ?? []) + newExclusions).joined(separator: "\n").nilIfBlank
+        estimate.openQuestions = proposal.remainingQuestions.joined(separator: "\n").nilIfBlank
+        let qa = proposal.answers.map { "Q: \($0.question)\nA: \($0.answer)" }.joined(separator: "\n")
+        estimate.internalNotes = [estimate.internalNotes, qa].compactMap { $0?.nilIfBlank }.joined(separator: "\n\n")
+        recalculate(estimate, lines: self.lines(for: estimate))
+        try context.save()
+        sync.syncSoon()
+    }
+
+    private func makeLine(from priced: PricedLineDTO, in estimate: Estimate, position: Int) -> LineItem {
+        let line = insert(LineItem(orgId: orgID, estimateId: estimate.id, position: position,
+                                   descriptionEn: priced.descriptionEn, descriptionEs: priced.descriptionEs,
+                                   qty: priced.quantity?.value ?? 0, unit: priced.unit ?? "ea",
+                                   unitPrice: priced.unitPrice?.value ?? 0, source: .ai))
+        line.taskCode = priced.taskCode
+        line.priceSource = LineItem.PriceSource(rawValue: priced.priceSource) ?? .none
+        line.preliminary = priced.preliminary
+        line.priceNote = [priced.sourceName, priced.appliesTo, priced.note].compactMap { $0?.nilIfBlank }
+            .joined(separator: " · ").nilIfBlank
+        return line
+    }
+
+    // MARK: Materials
+
+    func materials(for estimate: Estimate) -> [MaterialItem] {
+        let id = estimate.id
+        let descriptor = FetchDescriptor<MaterialItem>(predicate: #Predicate { $0.estimateId == id && $0.deletedAt == nil },
+                                                       sortBy: [SortDescriptor(\.position)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Replaces the AI draft list. Items already marked purchased (and manual additions) are kept.
+    func replaceMaterials(of estimate: Estimate, with list: MaterialsListDTO) throws {
+        let existing = materials(for: estimate)
+        let kept = existing.filter { $0.purchased || $0.evidence == .manual }
+        for item in existing where !kept.contains(where: { $0.id == item.id }) { item.softDelete() }
+        let keptNames = Set(kept.map { $0.nameEn.lowercased() })
+        var position = (kept.map(\.position).max() ?? -1) + 1
+        for material in list.materials where !keptNames.contains(material.nameEn.lowercased()) {
+            let item = insert(MaterialItem(orgId: orgID, estimateId: estimate.id, position: position,
+                                           nameEn: material.nameEn, nameEs: material.nameEs, category: material.category,
+                                           qty: material.quantity.flatMap { Decimal(string: String($0)) } ?? 0,
+                                           unit: material.unit ?? "each", searchQuery: material.searchQuery,
+                                           evidence: material.evidence == "stated" ? .stated : .inferred))
+            item.specifications = material.specifications.joined(separator: "\n").nilIfBlank
+            item.note = material.noteEn.nilIfBlank
+            position += 1
+        }
+        try context.save()
+        sync.syncSoon()
+    }
+
+    func togglePurchased(_ item: MaterialItem) throws {
+        item.purchased.toggle()
+        try commit(item)
+    }
+
+    @discardableResult
+    func save(_ draft: MaterialDraft, to item: MaterialItem?, in estimate: Estimate) throws -> MaterialItem {
+        let item = item ?? insert(MaterialItem(orgId: orgID, estimateId: estimate.id,
+                                               position: (materials(for: estimate).map(\.position).max() ?? -1) + 1,
+                                               nameEn: draft.nameEn.trimmed))
+        draft.apply(to: item)
+        try commit(item)
+        return item
+    }
+
+    func delete(_ item: MaterialItem) throws {
+        item.softDelete()
+        try commit(item, touch: false)
+    }
+
+    @discardableResult
+    func createBlankEstimate(for job: Job) throws -> Estimate {
+        let estimate = insert(Estimate(orgId: orgID, jobId: job.id, language: organization?.defaultLanguage ?? .en))
+        try commit(estimate)
+        return estimate
+    }
+
+    func lines(for estimate: Estimate) -> [LineItem] {
+        let id = estimate.id
+        let descriptor = FetchDescriptor<LineItem>(predicate: #Predicate { $0.estimateId == id && $0.deletedAt == nil },
+                                                   sortBy: [SortDescriptor(\.position)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Saves a line (new when `line` is nil). Optionally remembers the price in the price book for its task.
+    @discardableResult
+    func save(_ draft: LineDraft, to line: LineItem?, in estimate: Estimate, rememberPrice: Bool = false) throws -> LineItem {
+        let line = line ?? insert(LineItem(orgId: orgID, estimateId: estimate.id,
+                                           position: (lines(for: estimate).map(\.position).max() ?? -1) + 1))
+        draft.apply(to: line)
+        if rememberPrice, let code = line.taskCode {
+            rememberPriceInBook(taskCode: code, unitPrice: line.unitPrice, unit: line.unit, name: line.descriptionEn)
+            line.priceSource = .contractor
+            line.preliminary = false
+            line.priceNote = String(localized: .estimatePriceFromBook)
+        }
+        line.touch()
+        recalculate(estimate, lines: lines(for: estimate))
+        try context.save()
+        sync.syncSoon()
+        return line
+    }
+
+    func delete(_ line: LineItem, from estimate: Estimate) throws {
+        line.softDelete()
+        recalculate(estimate, lines: lines(for: estimate))
+        try context.save()
+        sync.syncSoon()
+    }
+
+    func delete(_ estimate: Estimate) throws {
+        for line in lines(for: estimate) { line.softDelete() }
+        estimate.softDelete()
+        try context.save()
+        sync.syncSoon()
+    }
+
+    private func recalculate(_ estimate: Estimate, lines: [LineItem]) {
+        EstimateCalculator.apply(to: estimate, lineItems: lines, taxRate: organization?.taxRate ?? 0)
+    }
+
+    private func rememberPriceInBook(taskCode: String, unitPrice: Decimal, unit: String, name: String) {
+        let org = orgID
+        let existing = try? context.fetch(FetchDescriptor<PriceBookItem>(
+            predicate: #Predicate { $0.orgId == org && $0.taskCode == taskCode && $0.deletedAt == nil })).first
+        let item = existing ?? insert(PriceBookItem(orgId: orgID, kind: .other, nameEn: name, unit: unit))
+        item.taskCode = taskCode
+        item.unitPrice = unitPrice
+        item.unit = unit
+        item.touch()
     }
 
     // MARK: Business

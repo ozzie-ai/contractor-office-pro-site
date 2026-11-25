@@ -20,7 +20,7 @@ struct SettingsView: View {
                     LabeledContent { Text(org.name) } label: { Text(.businessFieldName) }
                     LabeledContent {
                         Text(org.cslbLicense ?? String(localized: .businessNotSet))
-                            .foregroundStyle(org.cslbLicense == nil ? .orange : .primary)
+                            .foregroundStyle(org.cslbLicense == nil ? Theme.warning : .primary)
                     } label: {
                         Text(.businessFieldCslb)
                     }
@@ -28,7 +28,7 @@ struct SettingsView: View {
                     InfoRow(label: .businessFieldEmail, value: org.email)
                     InfoRow(label: .businessFieldAddress, value: org.address)
                     LabeledContent {
-                        Text(org.taxRate, format: .percent.precision(.fractionLength(0...3)))
+                        Text(org.taxRate, format: .percent.precision(.fractionLength(0...3))).fontDesign(.monospaced)
                     } label: {
                         Text(.businessFieldTax)
                     }
@@ -57,6 +57,7 @@ struct SettingsView: View {
                 Text(.settingsSectionAbout)
             }
         }
+        .themedList()
         .navigationTitle(Text(.settingsTitle))
     }
 }
@@ -111,6 +112,7 @@ struct BusinessEditor: View {
                     if draft.taxRate == nil { Text(.businessErrorTax).foregroundStyle(.red) }
                 }
             }
+            .themedList()
             .navigationTitle(Text(.businessEdit))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -172,7 +174,9 @@ struct SyncStatusView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.ready(withSamples: true)
     return RootView().environment(session).modelContainer(container)
 }
+#endif

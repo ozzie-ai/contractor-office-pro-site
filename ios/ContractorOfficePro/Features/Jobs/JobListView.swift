@@ -2,6 +2,7 @@ import SwiftData
 import SwiftUI
 
 struct JobListView: View {
+    @Environment(Workspace.self) private var workspace
     @Query(filter: #Predicate<Job> { $0.deletedAt == nil }, sort: \Job.updatedAt, order: .reverse)
     private var jobs: [Job]
     @Query(filter: #Predicate<Client> { $0.deletedAt == nil })
@@ -14,6 +15,11 @@ struct JobListView: View {
 
     var body: some View {
         List {
+            Section {
+                DashboardHeader(memberID: workspace.memberID)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+            }
             Section {
                 Picker(selection: $filter) {
                     ForEach(JobFilter.allCases) { Text($0.title).tag($0) }
@@ -30,15 +36,18 @@ struct JobListView: View {
                         NavigationLink(value: AppRoute.job(job.id)) {
                             JobRow(job: job, clientName: job.clientId.flatMap { clientNames[$0] })
                         }
+                        .zoomSource(.job(job.id))
                     }
                 } header: {
                     StatusBadge(status: section.status)
                 }
             }
         }
+        .refreshable { await workspace.sync.syncNow() }
         .overlay {
-            if sections.isEmpty { emptyState }
+            if sections.isEmpty { emptyState.padding(.top, 180) }
         }
+        .themedList()
         .navigationTitle(Text(.jobsTitle))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -62,7 +71,7 @@ struct JobListView: View {
                 Text(.jobsEmptyMessage)
             } actions: {
                 Button { editor = JobEditorRequest() } label: { Text(.jobsNew) }
-                    .buttonStyle(.borderedProminent)
+                    .primaryActionStyle()
             }
         case .done:
             ContentUnavailableView {
@@ -78,28 +87,26 @@ struct JobRow: View {
 
     var body: some View {
         VStack(alignment: .leading) {
-            Text(job.title).font(.headline)
+            Text(job.title).font(.body.weight(.semibold)).tracking(-0.2)
             if let clientName {
                 Text(clientName).font(.subheadline)
             }
             if let address = job.address {
-                Text(address).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                Text(address).font(.subheadline).foregroundStyle(Theme.muted).lineLimit(1)
             }
             if let start = job.scheduledStart {
-                Label {
-                    Text(start, format: .dateTime.weekday().month().day().hour().minute())
-                } icon: {
-                    Image(systemName: "calendar")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(start, format: .dateTime.weekday().month().day().hour().minute())
+                    .font(.caption).fontDesign(.monospaced)
+                    .foregroundStyle(Theme.muted)
             }
         }
         .padding(.vertical, 2)
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.ready(withSamples: true)
     return RootView().environment(session).modelContainer(container)
 }
+#endif

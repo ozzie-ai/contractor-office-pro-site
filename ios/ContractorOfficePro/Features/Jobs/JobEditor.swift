@@ -62,6 +62,7 @@ struct JobEditor: View {
                     Text(.jobSectionNotes)
                 }
             }
+            .themedList()
             .navigationTitle(Text(request.job == nil ? .jobsNew : .jobsEdit))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

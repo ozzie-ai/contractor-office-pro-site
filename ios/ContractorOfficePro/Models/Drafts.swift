@@ -134,6 +134,76 @@ struct OrganizationDraft: Equatable {
     }
 }
 
+struct LineDraft: Equatable {
+    var descriptionEn = ""
+    var descriptionEs = ""
+    var qty: Decimal = 1
+    var unit = "ea"
+    var unitPrice: Decimal = 0
+    private var originalPrice: Decimal?
+
+    init() {}
+
+    init(_ line: LineItem) {
+        descriptionEn = line.descriptionEn
+        descriptionEs = line.descriptionEs
+        qty = line.qty
+        unit = line.unit
+        unitPrice = line.unitPrice
+        originalPrice = line.unitPrice
+    }
+
+    var priceChanged: Bool { originalPrice != unitPrice }
+    var isValid: Bool { !descriptionEn.trimmed.isEmpty && qty >= 0 && unitPrice >= 0 }
+
+    func apply(to line: LineItem) {
+        line.descriptionEn = descriptionEn.trimmed
+        line.descriptionEs = descriptionEs.trimmed
+        line.qty = qty
+        line.unit = unit.trimmed.isEmpty ? "ea" : unit.trimmed
+        if line.unitPrice != unitPrice || originalPrice == nil {
+            // The contractor set this price: it is no longer a reference figure.
+            line.unitPrice = unitPrice
+            line.priceSource = unitPrice > 0 ? .manual : .none
+            line.preliminary = false
+            line.priceNote = nil
+        }
+    }
+}
+
+struct MaterialDraft: Equatable {
+    var nameEn = ""
+    var nameEs = ""
+    var qty: Decimal = 1
+    var unit = "each"
+    var specifications = ""
+    var searchQuery = ""
+
+    init() {}
+
+    init(_ item: MaterialItem) {
+        nameEn = item.nameEn
+        nameEs = item.nameEs
+        qty = item.qty
+        unit = item.unit
+        specifications = item.specifications ?? ""
+        searchQuery = item.searchQuery
+    }
+
+    var isValid: Bool { !nameEn.trimmed.isEmpty && qty >= 0 }
+
+    func apply(to item: MaterialItem) {
+        let changed = item.nameEn != nameEn.trimmed || item.qty != qty || item.unit != unit.trimmed
+        item.nameEn = nameEn.trimmed
+        item.nameEs = nameEs.trimmed
+        item.qty = qty
+        item.unit = unit.trimmed.isEmpty ? "each" : unit.trimmed
+        item.specifications = specifications.nilIfBlank
+        item.searchQuery = searchQuery.trimmed.isEmpty ? nameEn.trimmed : searchQuery.trimmed
+        if changed { item.evidence = .manual }   // the contractor confirmed it
+    }
+}
+
 nonisolated extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
     var nilIfBlank: String? { trimmed.isEmpty ? nil : trimmed }

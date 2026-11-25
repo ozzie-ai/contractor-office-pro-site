@@ -14,5 +14,11 @@ nonisolated enum AppConfig {
         return key
     }
 
+    /// FastAPI service for AI drafts and pricing; nil when not configured.
+    static var backendURL: URL? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "BackendURL") as? String, !raw.isEmpty else { return nil }
+        return URL(string: raw)
+    }
+
     static var isBackendConfigured: Bool { supabaseURL != nil && supabaseAnonKey != nil }
 }

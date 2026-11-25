@@ -24,8 +24,8 @@ enum PreviewData {
         container.mainContext.insert(org)
         container.mainContext.insert(owner)
         if withSamples { insertSamples(into: container.mainContext, orgID: org.id, ownerID: owner.id) }
-        let backend = FakeBackend(signedInUser: userID)
-        let session = SessionStore(account: backend, transport: backend,
+        let backend = FakeBackend(signedInUser: userID, aiDelay: .seconds(1.5))
+        let session = SessionStore(account: backend, transport: backend, estimateService: backend,
                                    context: container.mainContext, defaults: ephemeralDefaults())
         return (container, session)
     }

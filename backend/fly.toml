@@ -1,0 +1,28 @@
+# Fly.io config. Deploy: cd backend && fly deploy
+app = "contractorofficepro-api"
+primary_region = "lax"   # Los Angeles
+
+[build]
+
+[env]
+  OPENAI_MODEL = "gpt-6-luna"
+  OPENAI_TRANSCRIBE_MODEL = "gpt-transcribe"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"    # sleeps when idle (cheap); wakes on the next request in ~1–2 s
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"

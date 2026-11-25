@@ -54,6 +54,38 @@ struct LiveSyncTests {
     }
 }
 
+/// App ↔ real backend ↔ real Supabase. Start the backend first, then:
+/// TEST_RUNNER_LIVE_BACKEND=1 xcodebuild ... test   (uses BACKEND_URL from Config.xcconfig; a few OpenAI calls)
+@Suite("Live backend", .serialized,
+       .enabled(if: ProcessInfo.processInfo.environment["LIVE_BACKEND"] == "1" && AppConfig.backendURL != nil))
+struct LiveBackendTests {
+    @Test(.timeLimit(.minutes(2)))
+    func draftsAndPricesAnEstimateThroughTheRealBackend() async throws {
+        let client = SupabaseClient(
+            supabaseURL: try #require(AppConfig.supabaseURL), supabaseKey: try #require(AppConfig.supabaseAnonKey),
+            options: .init(auth: .init(storage: MemoryAuthStorage(), emitLocalSessionAsInitialSession: true)))
+        let context = ModelContext(try AppSchema.makeContainer(inMemory: true))
+        let service = BackendClient(baseURL: try #require(AppConfig.backendURL),
+                                    accessToken: { try await client.auth.session.accessToken })
+        let session = SessionStore(account: SupabaseAccountClient(client: client), transport: SupabaseSyncTransport(client: client),
+                                   estimateService: service, context: context, defaults: PreviewData.ephemeralDefaults())
+        await session.start()
+        try await session.createOrganization(name: "LIVE TEST Backend", ownerName: "Test", language: .es)
+        let workspace = try #require(session.workspace)
+        let job = try workspace.save({ var d = JobDraft(); d.title = "Panel"; return d }())
+
+        let notes = "Cambiar el panel de 100 a 200 amperios, transferir 20 circuitos existentes y dejar un breaker de 100 amperios para un subpanel futuro."
+        let draft = try await EstimateDrafting.draft(notes: notes, language: .es, service: service)
+        let estimate = try workspace.createEstimate(for: job, notes: notes, language: .es, draft: draft)
+        let lines = workspace.lines(for: estimate)
+
+        #expect(lines.contains { $0.taskCode == "ELEC.PANEL.UPGRADE" && $0.priceSource == .reference && $0.unitPrice == 2100 })
+        #expect(lines.contains { $0.taskCode == "ELEC.CIRCUIT.TRANSFER" && $0.qty == 20 })
+        #expect(estimate.subtotal >= 2100)
+        #expect(estimate.exclusions?.isEmpty == false, "future subpanel is excluded")
+    }
+}
+
 /// In-memory auth session storage for tests. Lock-protected state, no @unchecked Sendable.
 nonisolated final class MemoryAuthStorage: AuthLocalStorage, Sendable {
     private let items = OSAllocatedUnfairLock(initialState: [String: Data]())

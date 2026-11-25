@@ -25,12 +25,12 @@ extension Job.Status {
 
     var tint: Color {
         switch self {
-        case .lead: .purple
-        case .estimating: .orange
-        case .scheduled: .blue
-        case .inProgress: .green
-        case .completed: .secondary
-        case .cancelled: .secondary
+        case .lead: Theme.violet
+        case .estimating: Theme.warning
+        case .scheduled: Theme.info
+        case .inProgress: Theme.success
+        case .completed: Theme.muted
+        case .cancelled: Theme.muted
         }
     }
 }
@@ -68,9 +68,7 @@ struct StatusBadge: View {
     let status: Job.Status
 
     var body: some View {
-        Label { Text(status.title) } icon: { Image(systemName: status.systemImage) }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(status.tint)
+        Pill(title: status.title, color: status.tint)
     }
 }
 

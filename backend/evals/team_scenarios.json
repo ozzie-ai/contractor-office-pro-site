@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "created": "2026-11-06",
+  "purpose": "Non-identifying contractor speech regression cases. No real customer names or addresses.",
+  "cases": [
+    {
+      "id": "ELEC-001",
+      "trade": "electrical",
+      "voice": "Instalar un cargador de carro eléctrico; correr 100 pies de cable, breaker de 40 amperios, reemplazar dos breakers dañados de 20 amperios y cambiar un tomacorriente por GFCI.",
+      "expected": {
+        "run": 100,
+        "breaker": 40,
+        "current": null,
+        "damagedCount": 2,
+        "oldAmps": 20,
+        "gfciCount": 1
+      },
+      "notes": "Circuit breaker 40 A is distinct from EVSE continuous charging current."
+    },
+    {
+      "id": "ELEC-002",
+      "trade": "electrical",
+      "voice": "Cargador de 32 amperios con breaker de 40 amperios, 80 pies de cable, reemplazar tres breakers dañados de 15 amperios.",
+      "expected": {
+        "run": 80,
+        "breaker": 40,
+        "current": 32,
+        "damagedCount": 3,
+        "oldAmps": 15
+      },
+      "notes": "Independent charger rating and breaker rating."
+    },
+    {
+      "id": "ELEC-003",
+      "trade": "electrical",
+      "voice": "Instalar un cargador eléctrico con breaker de 40 amperios, correr 100 pies y cambiar un outlet por GFCI.",
+      "expected": {
+        "run": 100,
+        "breaker": 40,
+        "current": null,
+        "damagedCount": 0,
+        "gfciCount": 1
+      },
+      "notes": "No damaged breaker replacements should be inferred."
+    },
+    {
+      "id": "PANEL-001",
+      "trade": "electrical",
+      "voice": "Upgrade del panel principal de 100 amperios a 200 amperios; transferir 20 circuitos a un panel de 22 circuitos, instalar breaker de 100 amperios reservado para el ADU. El alimentador y subpanel se harán después.",
+      "expected": {
+        "oldService": 100,
+        "newService": 200,
+        "existingCircuits": 20,
+        "newCircuits": 22,
+        "aduBreaker": 100,
+        "scope": "breaker-only"
+      },
+      "notes": "Feeder and subpanel are excluded future work, not missing quantities."
+    },
+    {
+      "id": "MIXED-001",
+      "trade": "electrical",
+      "voice": "Vamos a instalar un nuevo cargador de carro eléctrico, correr 100 pies de alambre, instalar un breaker de 40 amperios doble de 220 voltios y hacer upgrade del panel de 100 a 200 amperios, remover el viejo que tiene 20 breakers, 20 circuitos, reemplazarlos por la misma cantidad y agregar el circuito EV de 40 amperios doble.",
+      "expected": {
+        "old": 100,
+        "now": 200,
+        "existing": 20,
+        "circuits": 21,
+        "adu": null,
+        "ev": true,
+        "evRun": 100,
+        "evBreaker": 40
+      },
+      "notes": "One quote combining panel replacement and EV charging installation. EV breaker priced exactly once; no ADU scope. The 21 count is planned installed circuits, not the panel's slot rating."
+    },
+    {
+      "id": "MIXED-002",
+      "trade": "electrical",
+      "voice": "Okay vamos a reemplazar el Breakers panel existente que es de 100 amperios por uno nuevo de 200 amperios actualmente tiene 20 circuitos los cuales los vamos a reemplazar por otros 20 circuitos nuevos más le vamos a agregar un circuito doble de 40 amperios Breaker para alimentar el un cargador de carro eléctrico que va a estar Aproximadamente a 100 pies del panel también vamos a dejar otro Breaker listo de 100 amperios doble para posteriormente en un nuevo trabajo no en este alimentar un su panel en este no lo vamos a hacer Solamente vamos a dejar el Breaker de 100 amperios listo para usarse en posteriores trabajos",
+      "expected": {
+        "old": 100,
+        "now": 200,
+        "existing": 20,
+        "circuits": 21,
+        "adu": 100,
+        "ev": true,
+        "reservedFuture": true,
+        "evRun": 100,
+        "evBreaker": 40,
+        "evCurrent": null
+      },
+      "notes": "Panel upgrade 100A to 200A. Twenty existing circuits transferred; one EV 40A breaker and 100-foot run. Separate 100A double-pole breaker reserved for future subpanel only; NO subpanel or feeder work now; price both breakers once."
+    }
+  ]
+}

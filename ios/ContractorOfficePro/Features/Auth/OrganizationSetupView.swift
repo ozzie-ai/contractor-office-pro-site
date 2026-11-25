@@ -44,6 +44,7 @@ struct OrganizationSetupView: View {
                 .disabled(!canContinue)
             }
         }
+        .themedList()
     }
 
     private func submit() {
@@ -60,7 +61,9 @@ struct OrganizationSetupView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     let (container, session) = PreviewData.firstLaunch()
     return RootView().environment(session).modelContainer(container)
 }
+#endif

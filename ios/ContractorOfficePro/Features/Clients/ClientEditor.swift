@@ -63,6 +63,7 @@ struct ClientEditor: View {
                         .lineLimit(3...8)
                 }
             }
+            .themedList()
             .navigationTitle(Text(request.client == nil ? .clientsNew : .clientsEdit))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
