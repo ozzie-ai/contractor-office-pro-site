@@ -151,6 +151,9 @@ private struct EmptyService: EstimateService {
     func materials(_ request: MaterialsRequestBody) async throws -> MaterialsResponseDTO {
         MaterialsResponseDTO(materialsList: MaterialsListDTO(materials: [], assumptions: [], questions: []))
     }
+    func identifyTools(_ request: ToolsRequestBody) async throws -> ToolsResponseDTO {
+        ToolsResponseDTO(result: ToolsListDTO(tools: []))
+    }
 }
 
 @Suite("Bill of materials")
@@ -376,6 +379,24 @@ struct MigrationV3Tests {
         v3.insert(MaterialItem(orgId: orgID, estimateId: estimateID, nameEn: "Load center"))
         try v3.save()
         #expect(try v3.fetchCount(FetchDescriptor<MaterialItem>()) == 1)
+    }
+
+    @Test func v3StoreUpgradesToV4WithStockAndTools() throws {
+        let url = URL.temporaryDirectory.appending(path: "v3-\(UUID().uuidString).store")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let orgID = UUID()
+        do {
+            let v3 = try ModelContainer(for: Schema(versionedSchema: SchemaV3.self), configurations: ModelConfiguration(url: url))
+            let context = ModelContext(v3)
+            context.insert(MaterialItem(orgId: orgID, estimateId: UUID(), nameEn: "Load center"))
+            try context.save()
+        }
+        let v4 = ModelContext(try AppSchema.makeContainer(url: url))
+        #expect(try v4.fetchCount(FetchDescriptor<MaterialItem>()) == 1)
+        v4.insert(StockItem(orgId: orgID, nameEn: "8 AWG THHN wire", qty: 40, unit: "ft"))
+        v4.insert(Tool(orgId: orgID, nameEn: "Cordless drill"))
+        try v4.save()
+        #expect(try v4.fetchCount(FetchDescriptor<StockItem>()) == 1 && v4.fetchCount(FetchDescriptor<Tool>()) == 1)
     }
 }
 

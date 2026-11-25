@@ -34,6 +34,11 @@ struct LiveSyncTests {
         let estimate = Estimate(orgId: orgID, jobId: job.id)
         line.estimateId = estimate.id
         phone1.insert(estimate); phone1.insert(line)
+        let leftover = StockItem(orgId: orgID, nameEn: "8 AWG THHN wire", qty: 85, unit: "ft")
+        leftover.sourceEstimateId = estimate.id
+        let tool = Tool(orgId: orgID, nameEn: "Cordless drill", category: "power_tool")
+        tool.holder = "Carlos"; tool.photoFileName = "local-only.jpg"
+        phone1.insert(leftover); phone1.insert(tool)
         let sync1 = SyncEngine(transport: transport, context: phone1, orgID: orgID, defaults: PreviewData.ephemeralDefaults())
         await sync1.syncNow()
         #expect(sync1.status == .idle)
@@ -45,6 +50,9 @@ struct LiveSyncTests {
         let copy = try #require(try phone2.fetch(FetchDescriptor<Client>()).first { $0.id == customer.id })
         #expect(try phone2.fetch(FetchDescriptor<LineItem>()).first?.unitPrice == Decimal(string: "2100.00"))
         #expect(try phone2.fetch(FetchDescriptor<Organization>()).first?.name == "LIVE TEST Flores")
+        #expect(try phone2.fetch(FetchDescriptor<StockItem>()).first?.qty == 85)
+        let toolCopy = try #require(try phone2.fetch(FetchDescriptor<Tool>()).first)
+        #expect(toolCopy.holder == "Carlos" && toolCopy.photoFileName == nil, "tool syncs; its photo stays on phone 1")
 
         customer.phone = "111"; customer.touch(now: .now.addingTimeInterval(-30))
         copy.phone = "222"; copy.touch()

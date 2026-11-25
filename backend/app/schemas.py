@@ -270,6 +270,40 @@ class PriceBookResponse(BaseModel):
     entries: list[PriceBookEntry]
 
 
+ToolCategory = Literal["power_tool", "hand_tool", "cutting", "measuring", "tester", "ladder", "plumbing_tool",
+                       "safety", "storage", "other"]
+
+
+class ToolsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    images: list[ImageInput] = Field(min_length=1, max_length=10, description="Photos of tools (several per photo is fine).")
+    language: Language | None = None
+
+
+class IdentifiedTool(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    photo_index: int = Field(description="0-based index of the photo the tool is in.")
+    name_en: str = Field(description="Plain name, e.g. 'Cordless drill', 'Fish tape', '6 ft step ladder'.")
+    name_es: str
+    brand: str | None = Field(description="Only if clearly visible; else null.")
+    model: str | None = Field(description="Only if clearly readable; else null.")
+    serial_number: str | None = Field(description="Only if clearly readable on a label; else null. Never guess.")
+    category: ToolCategory
+    quantity: int = Field(description="How many identical units are visible.")
+    note_en: str = Field(description="Short note if unsure (e.g. 'could be an impact driver'); empty if none.")
+
+
+class ToolsList(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tools: list[IdentifiedTool]
+
+
+class ToolsResponse(BaseModel):
+    version: Literal[1] = 1
+    result: ToolsList
+    note: str = "AI draft. Check names before saving. Serial numbers are only filled when readable."
+
+
 class TranscribeResponse(BaseModel):
     transcript: str
 

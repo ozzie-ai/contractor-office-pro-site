@@ -182,6 +182,25 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
         ], assumptions: ["Copper conductors"], questions: ["What size conduit?"]))
     }
 
+    private(set) var toolPhotosSeen = 0
+
+    /// Two tools in the first photo, one per later photo.
+    func identifyTools(_ request: ToolsRequestBody) async throws -> ToolsResponseDTO {
+        if offline { throw BackendError.offline }
+        if aiDelay > .zero { try await Task.sleep(for: aiDelay) }
+        toolPhotosSeen += request.images.count
+        func tool(_ index: Int, _ en: String, _ es: String, _ category: String, brand: String? = nil, qty: Int = 1) -> IdentifiedToolDTO {
+            IdentifiedToolDTO(photoIndex: index, nameEn: en, nameEs: es, brand: brand, model: nil, serialNumber: nil,
+                              category: category, quantity: qty, noteEn: "")
+        }
+        var tools = [tool(0, "Cordless drill", "Taladro inalámbrico", "power_tool", brand: "DeWalt"),
+                     tool(0, "Voltage tester", "Probador de voltaje", "tester", qty: 2)]
+        let extra = [("Fish tape", "Guía pasacables", "hand_tool"), ("6 ft step ladder", "Escalera de tijera de 6 pies", "ladder"),
+                     ("Circular saw", "Sierra circular", "power_tool")]
+        for index in 1..<request.images.count { let e = extra[(index - 1) % extra.count]; tools.append(tool(index, e.0, e.1, e.2)) }
+        return ToolsResponseDTO(result: ToolsListDTO(tools: tools))
+    }
+
     func refine(_ request: RefineRequestBody) async throws -> RefineResponseDTO {
         if offline { throw BackendError.offline }
         if aiDelay > .zero { try await Task.sleep(for: aiDelay) }

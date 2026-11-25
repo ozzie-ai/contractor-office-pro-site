@@ -307,6 +307,134 @@ final class Workspace {
         item.touch()
     }
 
+    // MARK: Truck stock (leftovers)
+
+    func stock() -> [StockItem] {
+        let org = orgID
+        let descriptor = FetchDescriptor<StockItem>(predicate: #Predicate { $0.orgId == org && $0.deletedAt == nil },
+                                                    sortBy: [SortDescriptor(\.nameEn)])
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    /// Saves what's left after a job. `amounts` maps material id → quantity left (in the material's unit).
+    /// Matching items already on the truck are topped up instead of duplicated. Returns how many items were saved.
+    @discardableResult
+    func saveLeftovers(_ amounts: [UUID: Decimal], from items: [MaterialItem], estimate: Estimate) throws -> Int {
+        var onTruck = stock()
+        var saved = 0
+        for item in items {
+            guard let amount = amounts[item.id], amount > 0 else { continue }
+            if let existing = onTruck.first(where: { StockMatcher.isSame(item.nameEn, item.unit, as: $0) }) {
+                existing.qty += amount
+                existing.sourceEstimateId = estimate.id
+                existing.touch()
+            } else {
+                let stock = insert(StockItem(orgId: orgID, nameEn: item.nameEn, nameEs: item.nameEs, category: item.category,
+                                             qty: amount, unit: item.unit, searchQuery: item.searchQuery))
+                stock.specifications = item.specifications
+                stock.sourceEstimateId = estimate.id
+                onTruck.append(stock)
+            }
+            saved += 1
+        }
+        try context.save()
+        sync.syncSoon()
+        return saved
+    }
+
+    /// Takes a material from the truck instead of buying it: marks it bought and subtracts what it needs.
+    func use(_ stock: StockItem, for material: MaterialItem) throws {
+        let needed = material.qty > 0 ? material.qty : stock.qty
+        stock.qty = max(0, stock.qty - needed)
+        if stock.qty == 0 { stock.softDelete() } else { stock.touch() }
+        if !material.purchased {
+            material.purchased = true
+            material.note = [material.note, String(localized: .truckUsedFromTruck)].compactMap { $0?.nilIfBlank }.joined(separator: " · ")
+            material.touch()
+        }
+        try context.save()
+        sync.syncSoon()
+    }
+
+    @discardableResult
+    func save(_ draft: StockDraft, to item: StockItem?) throws -> StockItem {
+        let item = item ?? insert(StockItem(orgId: orgID, nameEn: draft.nameEn.trimmed))
+        draft.apply(to: item)
+        try commit(item)
+        return item
+    }
+
+    func delete(_ item: StockItem) throws {
+        item.softDelete()
+        try commit(item, touch: false)
+    }
+
+    // MARK: Tools
+
+    func tools() -> [Tool] {
+        let org = orgID
+        return (try? context.fetch(FetchDescriptor<Tool>(predicate: #Predicate { $0.orgId == org && $0.deletedAt == nil },
+                                                         sortBy: [SortDescriptor(\.nameEn)]))) ?? []
+    }
+
+    /// Adds tools the contractor approved from the AI's list. Each photo is stored once and shared by its tools;
+    /// a quantity of 3 adds three tools (each can be lent out separately).
+    @discardableResult
+    func addTools(_ picks: [ToolPick], photos: [Data], store: PhotoStore = .shared) throws -> [Tool] {
+        var savedPhotos: [Int: String] = [:]
+        var added: [Tool] = []
+        for pick in picks {
+            if savedPhotos[pick.photoIndex] == nil, photos.indices.contains(pick.photoIndex) {
+                savedPhotos[pick.photoIndex] = try store.save(photos[pick.photoIndex])
+            }
+            for _ in 0..<min(max(pick.quantity, 1), 50) {
+                let tool = insert(Tool(orgId: orgID, nameEn: pick.nameEn.trimmed, nameEs: pick.nameEs.trimmed, category: pick.category))
+                tool.brand = pick.brand?.nilIfBlank
+                tool.model = pick.model?.nilIfBlank
+                tool.serialNumber = pick.serialNumber?.nilIfBlank
+                tool.photoFileName = savedPhotos[pick.photoIndex]
+                added.append(tool)
+            }
+        }
+        try context.save()
+        sync.syncSoon()
+        return added
+    }
+
+    @discardableResult
+    func save(_ draft: ToolDraft, to tool: Tool?, photo: Data? = nil, store: PhotoStore = .shared) throws -> Tool {
+        let tool = tool ?? insert(Tool(orgId: orgID, nameEn: draft.nameEn.trimmed))
+        draft.apply(to: tool)
+        if let photo {
+            let old = tool.photoFileName
+            tool.photoFileName = try store.save(photo)
+            if let old { removeToolPhotoIfUnused(old, store: store) }
+        }
+        try commit(tool)
+        return tool
+    }
+
+    func setHolder(_ holder: String?, for tool: Tool) throws {
+        tool.holder = holder?.nilIfBlank
+        try commit(tool)
+    }
+
+    func delete(_ tool: Tool, store: PhotoStore = .shared) throws {
+        tool.softDelete()
+        try commit(tool, touch: false)
+        if let name = tool.photoFileName { removeToolPhotoIfUnused(name, store: store) }
+    }
+
+    /// People/places tools have been lent to, most used first, for one-tap "who has it".
+    func toolHolders() -> [String] {
+        let counts = Dictionary(grouping: tools().compactMap(\.holder), by: { $0 }).mapValues(\.count)
+        return counts.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.map(\.key)
+    }
+
+    private func removeToolPhotoIfUnused(_ name: String, store: PhotoStore) {
+        if !tools().contains(where: { $0.photoFileName == name }) { store.remove(name) }
+    }
+
     // MARK: Business
 
     func save(_ draft: OrganizationDraft, to organization: Organization) throws {

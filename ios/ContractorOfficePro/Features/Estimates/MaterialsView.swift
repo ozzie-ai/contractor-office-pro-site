@@ -6,7 +6,9 @@ struct MaterialsView: View {
     @Environment(Workspace.self) private var workspace
     @Query private var estimates: [Estimate]
     @Query private var items: [MaterialItem]
+    @Query(filter: #Predicate<StockItem> { $0.deletedAt == nil }) private var stock: [StockItem]
     @State private var editor: MaterialEditorRequest?
+    @State private var savingLeftovers = false
     @State private var saveFailed = false
 
     init(estimateID: UUID) {
@@ -49,9 +51,14 @@ struct MaterialsView: View {
             ForEach(groups, id: \.category) { group in
                 Section {
                     ForEach(group.items) { item in
-                        MaterialRow(item: item,
+                        let onTruck = item.purchased ? nil : StockMatcher.match(for: item, in: stock)
+                        MaterialRow(item: item, onTruck: onTruck,
                                     onToggle: { do { try workspace.togglePurchased(item) } catch { saveFailed = true } },
-                                    onEdit: { editor = MaterialEditorRequest(item: item) })
+                                    onEdit: { editor = MaterialEditorRequest(item: item) },
+                                    onUseFromTruck: {
+                                        guard let onTruck else { return }
+                                        do { try workspace.use(onTruck, for: item) } catch { saveFailed = true }
+                                    })
                             .swipeActions {
                                 Button(role: .destructive) {
                                     do { try workspace.delete(item) } catch { saveFailed = true }
@@ -67,6 +74,21 @@ struct MaterialsView: View {
                     Label { Text(.materialsAdd) } icon: { Image(systemName: "plus") }
                 }
             }
+            if !items.isEmpty {
+                Section {
+                    Button { savingLeftovers = true } label: {
+                        Label { Text(.leftoversOpen) } icon: { Image(systemName: "shippingbox.fill") }
+                            .font(.title3.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .primaryActionStyle()
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                    .accessibilityIdentifier("leftovers-open")
+                } footer: {
+                    Text(.leftoversOpenHint)
+                }
+            }
         }
         .themedList()
         .animation(.snappy, value: boughtCount)
@@ -79,6 +101,9 @@ struct MaterialsView: View {
                 }
                 .disabled(items.isEmpty)
             }
+        }
+        .sheet(isPresented: $savingLeftovers) {
+            if let estimate = estimates.first { LeftoversSheet(estimate: estimate, items: items) }
         }
         .sheet(item: $editor) { request in
             if let estimate = estimates.first { MaterialEditor(request: request, estimate: estimate) }
@@ -109,8 +134,10 @@ enum MaterialCategory {
 struct MaterialRow: View {
     @Environment(\.openURL) private var openURL
     let item: MaterialItem
+    var onTruck: StockItem?
     let onToggle: () -> Void
     let onEdit: () -> Void
+    var onUseFromTruck: () -> Void = {}
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -158,6 +185,24 @@ struct MaterialRow: View {
                             .font(.caption.weight(.semibold))
                     }
                     .accessibilityIdentifier("shop-\(item.nameEn)")
+                }
+                if let onTruck {
+                    HStack(spacing: 8) {
+                        Label { Text(.truckYouHave(amount: "\(onTruck.qty.formatted()) \(onTruck.unit)")) } icon: {
+                            Image(systemName: "shippingbox.fill")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.success)
+                        Spacer()
+                        Button(action: onUseFromTruck) {
+                            Text(.truckUseIt).font(.caption.weight(.bold)).padding(.horizontal, 12).padding(.vertical, 6)
+                                .foregroundStyle(Theme.onAccent).background(Theme.success, in: .capsule)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("use-from-truck-\(item.nameEn)")
+                    }
+                    .padding(8)
+                    .background(Theme.success.opacity(0.1), in: .rect(cornerRadius: 10))
                 }
                 if let note = item.note {
                     Text(note).font(.caption2).foregroundStyle(Theme.muted)

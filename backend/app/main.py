@@ -20,7 +20,7 @@ from .schemas import ErrorResponse as ErrorModel
 from .schemas import InterpretationResult, RefinementResult
 from .schemas import (InterpretRequest, InterpretResponse, Member, PriceBookEntry, PriceBookResponse, PriceRequest,
                       PriceResponse, PriceTaskInput, RefineRequest, RefineResponse, TranscribeResponse,
-                      MaterialsRequest, MaterialsResponse)
+                      MaterialsRequest, MaterialsResponse, ToolsRequest, ToolsResponse)
 
 AUDIO_TYPES = {"audio/m4a", "audio/mp4", "audio/x-m4a", "audio/mpeg", "audio/wav", "audio/x-wav", "audio/webm", "audio/aac"}
 log = logging.getLogger("cop.api")
@@ -65,7 +65,7 @@ def create_app(services: Services | None = None) -> FastAPI:
     async def current_member(authorization: Annotated[str | None, Header()] = None) -> Member:
         return await svc.auth.member(authorization)
 
-    def validate_images(request: InterpretRequest) -> None:
+    def validate_images(request: InterpretRequest | ToolsRequest) -> None:
         for image in request.images:
             try:
                 size = len(base64.b64decode(image.data_base64, validate=True))
@@ -96,6 +96,13 @@ def create_app(services: Services | None = None) -> FastAPI:
     async def materials(request: MaterialsRequest, member: Annotated[Member, Depends(current_member)]) -> MaterialsResponse:
         svc.limiter.check(member.user_id)
         return MaterialsResponse(materials_list=await svc.interpreter.materials(request))
+
+    @app.post("/v1/tools/identify", response_model=ToolsResponse, responses=ERRORS, tags=["ai"],
+              summary="List the tools seen in photos (for the contractor's tool inventory)")
+    async def identify_tools(request: ToolsRequest, member: Annotated[Member, Depends(current_member)]) -> ToolsResponse:
+        validate_images(request)
+        svc.limiter.check(member.user_id)
+        return ToolsResponse(result=await svc.interpreter.identify_tools(request))
 
     @app.post("/v1/transcribe", response_model=TranscribeResponse, responses=ERRORS, tags=["ai"],
               summary="Transcribe a voice memo (EN/ES)")

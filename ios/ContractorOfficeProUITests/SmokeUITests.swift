@@ -152,6 +152,62 @@ final class SmokeUITests: XCTestCase {
     }
 
     @MainActor
+    func testLeftoversAndTools() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        app.staticTexts["Bathroom remodel"].tap()
+        XCTAssertTrue(app.buttons["New estimate with AI"].waitForExistence(timeout: 5))
+        app.buttons["New estimate with AI"].tap()
+        let notes = app.textViews["draft-notes"].exists ? app.textViews["draft-notes"] : app.textFields["draft-notes"]
+        XCTAssertTrue(notes.waitForExistence(timeout: 5))
+        notes.typeText("Cambiar panel de 100 a 200 amperios y circuito de 40A para cargador.")
+        app.buttons["Draft estimate"].tap()
+        XCTAssertTrue(app.staticTexts["estimate-total"].waitForExistence(timeout: 10))
+        let build = app.buttons["Build materials list with AI"]
+        for _ in 0..<5 where !build.isHittable { app.swipeUp() }
+        build.tap()
+        XCTAssertTrue(element(in: app, labeled: "8 AWG THHN copper wire").waitForExistence(timeout: 10))
+
+        // Job done: save what's left.
+        let open = app.buttons["leftovers-open"]
+        for _ in 0..<5 where !open.isHittable { app.swipeUp() }
+        open.tap()
+        let half = app.buttons["leftover-8 AWG THHN copper wire-half"]
+        XCTAssertTrue(half.waitForExistence(timeout: 5))
+        half.tap()
+        XCTAssertTrue(element(in: app, labeled: "About 85 ft left").exists)
+        snap("26-leftovers")
+        app.buttons["leftovers-save"].tap()
+
+        // The same list now offers it from the truck.
+        let use = app.buttons["use-from-truck-8 AWG THHN copper wire"]
+        for _ in 0..<5 where !use.exists { app.swipeDown() }
+        XCTAssertTrue(use.waitForExistence(timeout: 5), "leftover offered on the materials list")
+        snap("27-on-your-truck")
+
+        app.tabBars.buttons["Truck"].tap()
+        XCTAssertTrue(element(in: app, labeled: "8 AWG THHN copper wire").waitForExistence(timeout: 5))
+        snap("28-truck-leftovers")
+
+        app.segmentedControls.buttons["Tools"].tap()
+        XCTAssertTrue(app.buttons["tools-add-photos"].waitForExistence(timeout: 5))
+        snap("29-tools-empty")
+        app.buttons["Add a tool"].tap()
+        let name = app.textFields["Name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText("Hammer drill")
+        app.buttons["Someone else"].tap()
+        let holder = app.textFields["tool-holder"]
+        XCTAssertTrue(holder.waitForExistence(timeout: 3))
+        holder.tap(); holder.typeText("Carlos")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(element(in: app, labeled: "Hammer drill").waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, labeled: "Carlos").exists, "who has it shows on the card")
+        snap("30-tools")
+    }
+
+        @MainActor
     func testGuidedNewEstimateAndSend() {
         let app = XCUIApplication()
         app.launchArguments = ["-demo", "-noSplash", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]

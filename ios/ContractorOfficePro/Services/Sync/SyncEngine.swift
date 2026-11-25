@@ -25,7 +25,7 @@ final class SyncEngine {
     /// Push order respects foreign keys.
     private static let order: [any SyncRecord.Type] = [
         Organization.self, Member.self, Client.self, Job.self, TimeEntry.self, PriceBookItem.self,
-        Estimate.self, LineItem.self, MaterialItem.self, Receipt.self, ReceiptLineItem.self, Expense.self, Media.self,
+        Estimate.self, LineItem.self, MaterialItem.self, StockItem.self, Tool.self, Receipt.self, ReceiptLineItem.self, Expense.self, Media.self,
     ]
     private static let pageSize = 500
     /// Re-read a few seconds before the cursor so a slow concurrent write isn't skipped. Applying is idempotent.
