@@ -161,7 +161,8 @@ struct LineDraft: Equatable {
         line.descriptionEs = descriptionEs.trimmed
         line.qty = qty
         line.unit = unit.trimmed.isEmpty ? "ea" : unit.trimmed
-        if line.unitPrice != unitPrice || originalPrice == nil {
+        // Saving an AI ballpark line, changed or not, means the contractor checked it.
+        if line.unitPrice != unitPrice || originalPrice == nil || line.priceSource == .aiEstimate {
             // The contractor set this price: it is no longer a reference figure.
             line.unitPrice = unitPrice
             line.priceSource = unitPrice > 0 ? .manual : .none

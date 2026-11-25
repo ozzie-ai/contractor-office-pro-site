@@ -93,7 +93,12 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
     // MARK: EstimateService (canned, deterministic: modeled on the team's MIXED-002 scenario)
 
     private(set) var interpretCalls = 0
+    private(set) var lastInterpretImages = 0
     var contractorPrices: [String: Decimal] = [:]
+    /// Simulates a server whose AI ballpark is unavailable (lines stay "needs price").
+    var ballparkAvailable = true
+
+    func setBallparkAvailable(_ value: Bool) { ballparkAvailable = value }
 
     func setContractorPrice(_ price: Decimal, for code: String) { contractorPrices[code] = price }
 
@@ -101,6 +106,7 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
         if offline { throw BackendError.offline }
         if aiDelay > .zero { try await Task.sleep(for: aiDelay) }
         interpretCalls += 1
+        lastInterpretImages = request.images.count
         func task(_ code: String?, _ en: String, _ es: String, _ qty: Double?, _ unit: String?) -> WorkTaskDTO {
             WorkTaskDTO(taskCode: code, category: "electrical", descriptionEn: en, descriptionEs: es, quantity: qty,
                         unit: unit, specifications: [], status: "included_now", evidence: "stated")
@@ -117,7 +123,9 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
                 task("ELEC.BREAKER.ONLY", "100A double-pole breaker reserved for a future subpanel", "Breaker bipolar de 100A reservado para un subpanel futuro", 1, "each"),
             ],
             excludedWork: ["Subpanel and feeder installation"], futureWork: ["Feed a future subpanel from the reserved 100A breaker"],
-            unknownDetails: ["Is the EV charger supplied by the customer?", "Where is the panel located?"],
+            unknownDetails: ["Did the customer buy the EV charger?", "How far is the charger from the panel?"],
+            questions: [OpenQuestion(question: "Did the customer buy the EV charger?", choices: ["Yes", "No"]),
+                        OpenQuestion(question: "How far is the charger from the panel?", choices: ["25 ft", "50 ft", "85 ft", "100 ft"])],
             confidenceNotes: []))
     }
 
@@ -126,6 +134,10 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
         let references: [String: (Decimal, String)] = [
             "ELEC.PANEL.UPGRADE": (2100, "200A panel"), "ELEC.CIRCUIT.TRANSFER": (35, "Per circuit"),
             "ELEC.BREAKER.ONLY": (220, "100A two-pole breaker")]
+        // AI ballpark stand-ins (the real server computes these from AI cost inputs + the business markup).
+        let ballparks: [String: Decimal] = ["ELEC.CIRCUIT.NEW": 385, "ELEC.WIRE.RUN": Decimal(string: "4.25")!,
+                                            "ELEC.EV.CHARGER.INSTALL": 450]
+        let ballpark = request.aiBallpark && ballparkAvailable
         var subtotal: Decimal = 0
         let lines = request.tasks.map { task -> PricedLineDTO in
             let code = task.taskCode ?? ""
@@ -133,13 +145,15 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
             let (price, source, preliminary, name, applies): (Decimal?, String, Bool, String?, String?) =
                 if let own = contractorPrices[code] { (own, "contractor", false, "Your price book", nil) }
                 else if let ref = references[code] { (ref.0, "reference", true, "Pilot LA planning allowance (illustrative)", ref.1) }
+                else if ballpark { (ballparks[code] ?? 150, "ai_estimate", true, "AI ballpark", nil) }
                 else { (nil, "none", true, nil, nil) }
             let total = price.flatMap { p in qty.map { EstimateCalculator.lineTotal(qty: $0, unitPrice: p) } }
             subtotal += total ?? 0
             return PricedLineDTO(taskCode: task.taskCode, descriptionEn: task.descriptionEn, descriptionEs: task.descriptionEs,
                                  quantity: qty.map(DecimalValue.init), unit: task.unit, unitPrice: price.map(DecimalValue.init),
                                  lineTotal: total.map(DecimalValue.init), priceSource: source, preliminary: preliminary,
-                                 sourceName: name, appliesTo: applies, note: nil,
+                                 sourceName: name, appliesTo: applies,
+                                 note: source == "ai_estimate" ? "AI ballpark: typical local labor and materials. Check this price before sending." : nil,
                                  needs: (price == nil ? ["price"] : []) + (qty == nil ? ["quantity"] : []))
         }
         return PriceResponseDTO(regionCode: "US-CA-LA", lines: lines, subtotal: DecimalValue(subtotal),
@@ -179,7 +193,7 @@ actor FakeBackend: AccountClient, SyncTransport, EstimateService {
                               specifications: ["customer-supplied"], status: "included_now", evidence: "stated")],
             update: wire.map { [LineUpdateDTO(ref: $0.ref, quantity: 85, unit: nil, reasonEn: "Answer: the run is 85 ft")] } ?? [],
             exclusions: ["EV charger hardware supplied by the customer"],
-            remainingQuestions: []))
+            remainingQuestions: [], remaining: []))
     }
 
     // MARK: Private

@@ -15,7 +15,8 @@ from app.errors import ApiError
 from app.main import Services, create_app
 from app.pricing import ContractorPrice, Observation, OrgPricing, PricingInputs
 from app.ratelimit import RateLimiter
-from app.schemas import Interpretation, InterpretRequest, LineUpdate, Member, Refinement, RefineRequest, WorkItem
+from app.schemas import (Ballpark, BallparkItem, FriendlyQuestion, Interpretation, InterpretRequest, LineUpdate, Member,
+                         Refinement, RefineRequest, WorkItem)
 from app.ai import enforce_materials, enforce_refinement
 from app.schemas import Material, MaterialsList, MaterialsRequest
 
@@ -62,7 +63,7 @@ class FakeInterpreter:
                    WorkItem(category="panel", task_code=None, description_en="Possible grounding upgrade",
                             description_es="Posible mejora de tierra", quantity=None, unit=None, specifications=[],
                             status="included_now", evidence="photo")],
-            excluded_work=[], future_work=["Subpanel"], unknown_details=["Panel location?"], confidence_notes=[]))
+            excluded_work=[], future_work=["Subpanel"], questions=[FriendlyQuestion(question="Where is the panel?", choices=["Garage", "Outside", "Not sure", "Garage", ""])], confidence_notes=[]))
 
     async def materials(self, request: MaterialsRequest) -> MaterialsList:
         if self.error:
@@ -90,8 +91,19 @@ class FakeInterpreter:
             update=[LineUpdate(ref=1, quantity=80, unit="linear ft", reason_en="Answer: run is 80 ft"),
                     LineUpdate(ref=99, quantity=5, unit=None, reason_en="bogus ref"),
                     LineUpdate(ref=0, quantity=None, unit=None, reason_en="no-op")],
-            exclusions=["Charger hardware supplied by customer"], remaining_questions=["Where is the panel located?"])
+            exclusions=["Charger hardware supplied by customer"], remaining=[FriendlyQuestion(question="Where is the panel located?", choices=["Garage", "Outside"])])
         return enforce_refinement(raw, {l.ref for l in request.current_lines})
+
+
+    async def ballpark(self, lines, region_code, trade):
+        self.ballpark_calls = getattr(self, "ballpark_calls", []) + [(lines, region_code, trade)]
+        if self.error or getattr(self, "ballpark_error", None):
+            raise self.error or self.ballpark_error
+        # 6 h × $80 + $150 material = $630 direct; × 1.10 × 1.10 = $762.30. A second, out-of-bounds item is dropped.
+        return Ballpark(items=[BallparkItem(ref=l.ref, labor_hours_per_unit=6, labor_rate_per_hour=80, material_cost_per_unit=150,
+                                            equipment_cost_per_unit=0, basis_en="~6 h; materials ~$150") for l in lines[:1]]
+                        + [BallparkItem(ref=l.ref, labor_hours_per_unit=2, labor_rate_per_hour=9999, material_cost_per_unit=0,
+                                        equipment_cost_per_unit=0, basis_en="bad rate") for l in lines[1:2]])
 
 
 class FakePricing:

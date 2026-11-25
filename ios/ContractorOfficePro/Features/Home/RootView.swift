@@ -6,6 +6,7 @@ struct RootView: View {
     @Environment(SessionStore.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var splashFinished = ProcessInfo.processInfo.arguments.contains("-noSplash")
+    @AppStorage("biggerText") private var biggerText = false
 
     private var showSplash: Bool { !splashFinished || session.state == .loading }
 
@@ -21,6 +22,7 @@ struct RootView: View {
             }
         }
         .animation(.smooth(duration: 0.5), value: showSplash)
+        .dynamicTypeSize(biggerText ? .xLarge ... .accessibility3 : .xSmall ... .accessibility5)
         .task { await session.start() }
         .task {
             guard !splashFinished else { return }

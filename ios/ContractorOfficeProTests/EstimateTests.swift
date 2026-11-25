@@ -35,9 +35,10 @@ struct EstimateDraftingTests {
         #expect(lines.count == 5)
         #expect(lines.allSatisfy { $0.source == .ai })
         #expect(lines.filter { $0.priceSource == .reference }.count == 3)
-        #expect(lines.filter(\.needsPrice).map(\.taskCode) == ["ELEC.CIRCUIT.NEW", "ELEC.WIRE.RUN"])
-        #expect(lines.filter { $0.priceSource == .reference }.allSatisfy { $0.preliminary && $0.priceNote != nil })
-        #expect(estimate.subtotal == 3020)   // 2100 + 20 × 35 + 220; unpriced lines contribute 0
+        #expect(lines.filter(\.isAIBallpark).map(\.taskCode) == ["ELEC.CIRCUIT.NEW", "ELEC.WIRE.RUN"])
+        #expect(lines.filter(\.needsPrice).isEmpty)
+        #expect(lines.filter { $0.priceSource != .contractor }.allSatisfy { $0.preliminary && $0.priceNote != nil })
+        #expect(estimate.subtotal == 3830)   // 2100 + 20 × 35 + 220 references; AI ballparks 385 + 100 × 4.25
         #expect(estimate.status == .draft && estimate.language == .es)
     }
 
@@ -64,7 +65,7 @@ struct EstimateDraftingTests {
         try workspace.save(draft, to: wire, in: estimate)
 
         #expect(wire.priceSource == .manual && !wire.preliminary)
-        #expect(estimate.subtotal == 3370)   // + 100 × 3.50
+        #expect(estimate.subtotal == 3755)   // the 425 ballpark becomes 100 × 3.50
     }
 
     @Test func rememberedPricesLandInThePriceBookOnce() async throws {
@@ -92,8 +93,38 @@ struct EstimateDraftingTests {
         let estimate = try await draftEstimate()
         let panel = try #require(workspace.lines(for: estimate).first { $0.taskCode == "ELEC.PANEL.UPGRADE" })
         try workspace.delete(panel, from: estimate)
-        #expect(estimate.subtotal == 920)
+        #expect(estimate.subtotal == 1730)
         #expect(workspace.lines(for: estimate).count == 4)
+    }
+
+    @Test func withoutTheBallparkUnpricedLinesStillNeedAPrice() async throws {
+        await backend.setBallparkAvailable(false)
+        let estimate = try await draftEstimate()
+        #expect(workspace.lines(for: estimate).filter(\.needsPrice).map(\.taskCode) == ["ELEC.CIRCUIT.NEW", "ELEC.WIRE.RUN"])
+        #expect(estimate.subtotal == 3020)
+    }
+
+    @Test func confirmingABallparkMakesItYourPriceAndRemembersIt() async throws {
+        let estimate = try await draftEstimate()
+        let circuit = try #require(workspace.lines(for: estimate).first { $0.taskCode == "ELEC.CIRCUIT.NEW" })
+        #expect(circuit.isAIBallpark && circuit.preliminary)
+        try workspace.confirmPrice(of: circuit, in: estimate)
+        #expect(circuit.priceSource == .contractor && !circuit.preliminary && circuit.unitPrice == 385)
+        let book = try context.fetch(FetchDescriptor<PriceBookItem>()).filter { $0.taskCode == "ELEC.CIRCUIT.NEW" }
+        #expect(book.first?.unitPrice == 385, "next time this is your price")
+    }
+
+    @Test func savingABallparkLineUnchangedCountsAsChecked() async throws {
+        let estimate = try await draftEstimate()
+        let wire = try #require(workspace.lines(for: estimate).first { $0.taskCode == "ELEC.WIRE.RUN" })
+        try workspace.save(LineDraft(wire), to: wire, in: estimate)
+        #expect(wire.priceSource == .manual && !wire.preliminary && wire.unitPrice == Decimal(string: "4.25"))
+    }
+
+    @Test func questionsKeepTheirTapChoices() async throws {
+        let estimate = try await draftEstimate()
+        let questions = OpenQuestion.decode(estimate.openQuestions)
+        #expect(questions.map(\.choices) == [["Yes", "No"], ["25 ft", "50 ft", "85 ft", "100 ft"]])
     }
 
     @Test func offlineDraftFailsWithAClearError() async throws {
@@ -248,7 +279,7 @@ struct RefinementTests {
         let proposal = try await EstimateRefining.propose(notes: "", language: .es, lines: lines, answers: answers(), service: backend)
 
         #expect(proposal.adds.map(\.taskCode) == ["ELEC.EV.CHARGER.INSTALL"])
-        #expect(proposal.adds.first?.priceSource == "none", "uncataloged price → needs price, never invented")
+        #expect(proposal.adds.first?.priceSource == "ai_estimate", "no reference → labeled AI ballpark, never silent")
         #expect(proposal.updates.count == 1 && lines[proposal.updates[0].ref].taskCode == "ELEC.WIRE.RUN")
         #expect(workspace.lines(for: estimate).count == 5 && estimate.subtotal == before, "nothing applied yet")
     }
@@ -263,7 +294,7 @@ struct RefinementTests {
 
         let after = workspace.lines(for: estimate)
         #expect(after.count == 6)
-        #expect(after.last?.taskCode == "ELEC.EV.CHARGER.INSTALL" && after.last?.source == .ai && after.last?.needsPrice == true)
+        #expect(after.last?.taskCode == "ELEC.EV.CHARGER.INSTALL" && after.last?.source == .ai && after.last?.isAIBallpark == true)
         #expect(after.first { $0.taskCode == "ELEC.WIRE.RUN" }?.qty == 85)
         #expect(estimate.openQuestions == nil, "all questions answered")
         #expect(estimate.internalNotes?.contains("A: 85 feet") == true, "answers kept privately")

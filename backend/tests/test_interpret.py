@@ -80,3 +80,10 @@ def test_unknown_catalog_codes_are_rejected_by_schema():
 def test_openapi_docs_are_published(client):
     paths = client.get("/openapi.json").json()["paths"]
     assert "/v1/interpret" in paths and "/v1/transcribe" in paths
+
+
+def test_questions_come_with_tap_choices_and_no_filler(client, auth_headers):
+    i = client.post("/v1/interpret", json=BODY, headers=auth_headers).json()["interpretation"]
+    assert i["questions"] == [{"question": "Where is the panel?", "choices": ["Garage", "Outside"]}], \
+        "'Not sure', duplicates and blanks are removed (the app adds 'Not sure' itself)"
+    assert i["unknown_details"] == ["Where is the panel?"], "older clients still get plain questions"

@@ -58,6 +58,24 @@ struct LineEditor: View {
                 } footer: {
                     if let note = request.line?.priceNote { Text(note) }
                 }
+                if let line = request.line, line.isAIBallpark, !draft.priceChanged {
+                    Section {
+                        Button(action: { confirm(line) }) {
+                            Label { Text(.lineConfirmPrice) } icon: { Image(systemName: "checkmark.circle.fill") }
+                                .font(.title3.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .primaryActionStyle()
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                        .accessibilityIdentifier("line-confirm-price")
+                    } header: {
+                        Label { Text(.lineAiBallparkTitle) } icon: { Image(systemName: "sparkles") }
+                            .foregroundStyle(Theme.violet)
+                    } footer: {
+                        Text(.lineAiBallparkHint)
+                    }
+                }
                 if canRemember {
                     Section {
                         Toggle(isOn: $rememberPrice) { Text(.lineRememberPrice) }
@@ -82,6 +100,15 @@ struct LineEditor: View {
     /// Zero shows as an empty field with a placeholder, so typing doesn't append to "0".
     private func blankWhenZero(_ value: Binding<Decimal>) -> Binding<Decimal?> {
         Binding(get: { value.wrappedValue == 0 ? nil : value.wrappedValue }, set: { value.wrappedValue = $0 ?? 0 })
+    }
+
+    private func confirm(_ line: LineItem) {
+        do {
+            try workspace.confirmPrice(of: line, in: estimate)
+            dismiss()
+        } catch {
+            saveFailed = true
+        }
     }
 
     private func save() {

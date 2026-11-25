@@ -16,7 +16,7 @@ import httpx
 from .catalog import BY_CODE
 from .config import Settings
 from .errors import ApiError
-from .schemas import PricedLine, PriceResponse, PriceTaskInput
+from .schemas import Ballpark, BallparkLine, PricedLine, PriceResponse, PriceTaskInput
 
 CENT = Decimal("0.01")
 STALE_AFTER = timedelta(days=548)  # ~18 months
@@ -158,6 +158,57 @@ def price_tasks(tasks: list[PriceTaskInput], inputs: PricingInputs, today: date 
         preliminary=any(l.preliminary or l.needs for l in lines),
         disclaimer=DISCLAIMER,
     )
+
+
+# MARK: - AI ballpark (the model estimates cost inputs; code computes the price)
+
+# Sanity bounds on model-supplied inputs. Anything outside is dropped (the line stays "needs price").
+BALLPARK_LIMITS = {"hours": (Decimal(0), Decimal(500)), "rate": (Decimal(20), Decimal(250)),
+                   "material": (Decimal(0), Decimal(100_000)), "equipment": (Decimal(0), Decimal(50_000))}
+BALLPARK_SOURCE = "AI ballpark"
+
+
+def ballpark_requests(response: PriceResponse) -> list[BallparkLine]:
+    return [BallparkLine(ref=i, task_code=l.task_code, description_en=l.description_en, unit=l.unit)
+            for i, l in enumerate(response.lines) if l.unit_price is None]
+
+
+def _within(value: float, key: str) -> Decimal | None:
+    low, high = BALLPARK_LIMITS[key]
+    d = Decimal(str(value))
+    return d if low <= d <= high else None
+
+
+def apply_ballpark(response: PriceResponse, ballpark: Ballpark, org: OrgPricing) -> PriceResponse:
+    """Fills unpriced lines from AI cost inputs: (hours × rate + material + equipment) × overhead × profit.
+    Always preliminary, low confidence, and labeled so the contractor checks it before sending."""
+    markup = (1 + org.overhead) * (1 + org.profit)
+    for item in ballpark.items:
+        if not 0 <= item.ref < len(response.lines):
+            continue
+        line = response.lines[item.ref]
+        if line.unit_price is not None:
+            continue  # never overwrite a contractor or reference price
+        hours, rate = _within(item.labor_hours_per_unit, "hours"), _within(item.labor_rate_per_hour, "rate")
+        material, equipment = _within(item.material_cost_per_unit, "material"), _within(item.equipment_cost_per_unit, "equipment")
+        if None in (hours, rate, material, equipment):
+            continue
+        direct = hours * rate + material + equipment
+        if direct <= 0:
+            continue
+        line.unit_price = money(direct * markup)
+        line.line_total = money(line.quantity * line.unit_price) if line.quantity is not None else None
+        line.price_source, line.basis, line.preliminary, line.confidence = "ai_estimate", "ai_ballpark", True, "low"
+        line.source_name = BALLPARK_SOURCE
+        basis = " ".join(item.basis_en.split())[:160]
+        line.note = " ".join(filter(None, [f"AI ballpark: {basis}." if basis else "AI ballpark.",
+                                           "Check this price before sending.", line.note]))
+        line.needs = [n for n in line.needs if n != "price"]
+    response.subtotal = money(sum((l.line_total for l in response.lines if l.line_total is not None), Decimal(0)))
+    response.priced_lines = sum(l.line_total is not None for l in response.lines)
+    response.unpriced_lines = sum(l.line_total is None for l in response.lines)
+    response.preliminary = any(l.preliminary or l.needs for l in response.lines)
+    return response
 
 
 # MARK: - Data access
