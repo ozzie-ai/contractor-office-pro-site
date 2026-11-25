@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ContractorOfficePro
 
+@MainActor
 @Suite("Workspace writes")
 struct WorkspaceTests {
     let backend = FakeBackend()
@@ -91,6 +92,7 @@ struct WorkspaceTests {
     }
 }
 
+@MainActor
 @Suite("Editor drafts")
 struct DraftTests {
     @Test(arguments: ["", "   "]) func clientNeedsAName(name: String) {
@@ -137,6 +139,7 @@ struct DraftTests {
     }
 }
 
+@MainActor
 @Suite("Job list grouping")
 struct JobSectionTests {
     @Test func groupsByStatusInWorkOrderAndHidesEmptySections() {

@@ -3,6 +3,7 @@ import XCTest
 @testable import ContractorOfficePro
 
 final class PrivateEstimateReviewStoreTests: XCTestCase {
+    @MainActor
     func testUnapprovedContractorDraftSurvivesSaveAndReload() {
         let id = UUID()
         defer { PrivateEstimateReviewStore.clear(jobID: id) }
@@ -24,6 +25,7 @@ final class PrivateEstimateReviewStoreTests: XCTestCase {
         XCTAssertEqual(reopened?.unknowns, ["Check wiring"])
     }
 
+    @MainActor
     func testDeleteClearsPrivateReview() {
         let id = UUID()
         let review = EstimateReviewDraft(items: [], unknowns: [],
@@ -34,6 +36,7 @@ final class PrivateEstimateReviewStoreTests: XCTestCase {
         XCTAssertNil(PrivateEstimateReviewStore.load(jobID: id))
     }
 
+    @MainActor
     func testRefusesUnboundedWorkItems() {
         let id = UUID()
         defer { PrivateEstimateReviewStore.clear(jobID: id) }

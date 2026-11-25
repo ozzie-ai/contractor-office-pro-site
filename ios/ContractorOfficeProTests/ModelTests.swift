@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ContractorOfficePro
 
+@MainActor
 @Suite("Local models")
 struct ModelTests {
     let context: ModelContext
@@ -61,6 +62,7 @@ struct ModelTests {
     }
 }
 
+@MainActor
 @Suite("Estimate math")
 struct EstimateCalculatorTests {
     @Test func roundsPerLineAndTaxesOnlyTaxableLines() throws {

@@ -37,6 +37,7 @@ struct EstimateBuilderView: View {
     @State private var photoMessage: String?
     @State private var pendingPhotoInspection: URL?
     @State private var photoObservations: EstimatingAPIClient.PhotoInspectionResponse?
+    @State private var blueprintObservations: EstimatingAPIClient.PhotoInspectionResponse?
     @State private var showBlueprintImporter = false
     @State private var blueprintURL: URL?
     @State private var blueprintMessage: String?
@@ -94,6 +95,91 @@ struct EstimateBuilderView: View {
                     Text("estimate.private_notes_notice")
                 }
 
+                photoSection
+                blueprintSection
+
+                workItemReviewSection
+                customerResultSection
+
+                if busy {
+                    Section { ProgressView() }
+                }
+                if let message {
+                    Section { Text(message).foregroundStyle(.orange) }
+                }
+            }
+            .navigationTitle(Text("estimate.title"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("estimate.close") { voice.stop(); dismiss() }
+                }
+            }
+            .fileImporter(isPresented: $showBlueprintImporter, allowedContentTypes: [.pdf]) { result in
+                switch result {
+                case .success(let url): importBlueprint(url)
+                case .failure: blueprintMessage = "Blueprint selection failed."
+                }
+            }
+            .confirmationDialog("Send the first blueprint page to AI for review?",
+                                isPresented: $showBlueprintConsent,
+                                titleVisibility: .visible) {
+                Button("Send first blueprint page for AI observations") {
+                    if let blueprintURL { Task { await inspectBlueprintPage(blueprintURL) } }
+                }
+                Button("Keep blueprint private", role: .cancel) {}
+            } message: {
+                Text("Only a raster image of page 1 is uploaded when enabled; the PDF remains private. Printed dimensions and quantities must be independently checked.")
+            }
+            .confirmationDialog("Send this jobsite photo to AI for review?",
+                                isPresented: Binding(
+                                    get: { pendingPhotoInspection != nil },
+                                    set: { if !$0 { pendingPhotoInspection = nil } }
+                                ),
+                                titleVisibility: .visible) {
+                Button("Send selected photo for AI observations") {
+                    if let url = pendingPhotoInspection { Task { await inspectSelectedPhoto(url) } }
+                    pendingPhotoInspection = nil
+                }
+                Button("Keep photo private", role: .cancel) { pendingPhotoInspection = nil }
+            } message: {
+                Text("This uploads only the selected photo to an external AI provider. It may incur usage charges when enabled. All conclusions need verification.")
+            }
+            .onChange(of: photoSelection) { _, selected in
+                Task { await importPhotos(selected) }
+            }
+            .onChange(of: voice.transcript) { _, text in
+                // Partial recognition replaces ONLY this session's segment,
+                // never the earlier dictated/typed work.
+                if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
+            }
+            .onChange(of: notes) { _, newText in
+                guard !restoringDraft else { return }
+                PrivateJobDraftStore.save(newText, jobID: job.id)
+                // New dictation invalidates any previously extracted scope.
+                items = []
+                unknowns = []
+                resolvedUnknowns = []
+                exclusions = []
+                invalidatePrice()
+                persistReview()
+            }
+            .onChange(of: items) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: unknowns) { _, _ in persistReview() }
+            .onChange(of: resolvedUnknowns) { _, _ in persistReview() }
+            .onChange(of: exclusions) { _, _ in persistReview() }
+            .onChange(of: overhead) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
+            .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
+            .task { await restorePrivateDraft() }
+            .onDisappear { voice.stop() }
+        }
+    }
+
+    // Separate photo/blueprint SwiftUI builder expressions to keep Xcode
+    // typechecking within its limits as the native screen grows.
+    private var photoSection: some View {
                 Section {
                     PhotosPicker(selection: $photoSelection, maxSelectionCount: 8,
                                  matching: .images) {
@@ -103,8 +189,8 @@ struct EstimateBuilderView: View {
                     .disabled(busy || photoFiles.count >= PrivateJobPhotoStore.maximumPhotos)
                     if photoFiles.isEmpty {
                         Text(dictationLanguage == "es"
-                             ? "Las fotos permanecen privadas en este iPhone; todavía no se analizan con IA."
-                             : "Photos stay private on this iPhone; AI photo analysis is not enabled yet.")
+                             ? "Las fotos permanecen en este iPhone, salvo que autorices enviar una imagen seleccionada para revisión con IA."
+                             : "Photos stay on this iPhone unless you explicitly approve sending a selected image for AI review.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     ForEach(photoFiles, id: \.self) { url in
@@ -147,10 +233,13 @@ struct EstimateBuilderView: View {
                     Text(dictationLanguage == "es" ? "Fotos del trabajo" : "Jobsite photos")
                 } footer: {
                     Text(dictationLanguage == "es"
-                         ? "No se envían al servidor ni se incluyen en el presupuesto del cliente."
-                         : "Not uploaded to a server or included in the customer's PDF.")
+                         ? "Solo se envía la imagen que autorices para revisión con IA; no se incluye en el PDF del cliente."
+                         : "Only a photo you authorize for AI review is uploaded; images are excluded from the customer's PDF.")
                 }
 
+    }
+
+    private var blueprintSection: some View {
                 Section {
                     Button {
                         showBlueprintImporter = true
@@ -171,7 +260,7 @@ struct EstimateBuilderView: View {
                             Button(role: .destructive) {
                                 PrivateBlueprintStore.clear(jobID: job.id)
                                 self.blueprintURL = nil
-                                photoObservations = nil
+                                blueprintObservations = nil
                             } label: { Image(systemName: "trash") }
                         }
                         Text(blueprintURL.lastPathComponent)
@@ -179,6 +268,15 @@ struct EstimateBuilderView: View {
                     }
                     if let blueprintMessage {
                         Text(blueprintMessage).font(.caption).foregroundStyle(.orange)
+                    }
+                    if let insight = blueprintObservations {
+                        Text("AI BLUEPRINT OBSERVATIONS — NOT VERIFIED").font(.caption).bold()
+                        ForEach(insight.observations.visibleConditions, id: \.self) { Text("Printed or visible: " + $0) }
+                        ForEach(insight.observations.possibleWork, id: \.self) { Text("Possible: " + $0) }
+                        ForEach(insight.observations.missingInformation, id: \.self) { Text("Verify: " + $0) }
+                        ForEach(insight.observations.limitations, id: \.self) { Text("Limit: " + $0) }
+                        Text("No measurements or prices are approved automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 } header: {
                     Text(dictationLanguage == "es" ? "Planos" : "Blueprints")
@@ -188,6 +286,12 @@ struct EstimateBuilderView: View {
                          : "Stored locally. AI only reviews an image of the first page with your consent; this is not an accurate automatic takeoff.")
                 }
 
+    }
+
+    // Distinct builders reduce Xcode SwiftUI type-check complexity and keep
+    // review/approval isolated from voice and image capture presentation.
+    @ViewBuilder
+    private var workItemReviewSection: some View {
                 if !items.isEmpty {
                     Section {
                         Picker("estimate.customer_language", selection: $customerLanguage) {
@@ -292,6 +396,10 @@ struct EstimateBuilderView: View {
                     }
                 }
 
+    }
+
+    @ViewBuilder
+    private var customerResultSection: some View {
                 if let calculated = calculation {
                     Section {
                         ForEach(calculated.lines.indices, id: \.self) { index in
@@ -355,98 +463,26 @@ struct EstimateBuilderView: View {
                     }
                 }
 
-                if busy {
-                    Section { ProgressView() }
-                }
-                if let message {
-                    Section { Text(message).foregroundStyle(.orange) }
-                }
-            }
-            .navigationTitle(Text("estimate.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("estimate.close") { voice.stop(); dismiss() }
-                }
-            }
-            .fileImporter(isPresented: $showBlueprintImporter, allowedContentTypes: [.pdf]) { result in
-                switch result {
-                case .success(let url): importBlueprint(url)
-                case .failure: blueprintMessage = "Blueprint selection failed."
-                }
-            }
-            .confirmationDialog("Send the first blueprint page to AI for review?",
-                                isPresented: $showBlueprintConsent,
-                                titleVisibility: .visible) {
-                Button("Send first blueprint page for AI observations") {
-                    if let blueprintURL { Task { await inspectBlueprintPage(blueprintURL) } }
-                }
-                Button("Keep blueprint private", role: .cancel) {}
-            } message: {
-                Text("Only a raster image of page 1 is uploaded when enabled; the PDF remains private. Printed dimensions and quantities must be independently checked.")
-            }
-            .confirmationDialog("Send this jobsite photo to AI for review?",
-                                isPresented: Binding(
-                                    get: { pendingPhotoInspection != nil },
-                                    set: { if !$0 { pendingPhotoInspection = nil } }
-                                ),
-                                titleVisibility: .visible) {
-                Button("Send selected photo for AI observations") {
-                    if let url = pendingPhotoInspection { Task { await inspectSelectedPhoto(url) } }
-                    pendingPhotoInspection = nil
-                }
-                Button("Keep photo private", role: .cancel) { pendingPhotoInspection = nil }
-            } message: {
-                Text("This uploads only the selected photo to an external AI provider. It may incur usage charges when enabled. All conclusions need verification.")
-            }
-            .onChange(of: photoSelection) { _, selected in
-                Task { await importPhotos(selected) }
-            }
-            .onChange(of: voice.transcript) { _, text in
-                // Partial recognition replaces ONLY this session's segment,
-                // never the earlier dictated/typed work.
-                if !text.isEmpty { notes = SpeechNoteComposer.compose(existing: notesBeforeRecording, segment: text) }
-            }
-            .onChange(of: notes) { _, newText in
-                guard !restoringDraft else { return }
-                PrivateJobDraftStore.save(newText, jobID: job.id)
-                // New dictation invalidates any previously extracted scope.
-                items = []
-                unknowns = []
-                resolvedUnknowns = []
-                exclusions = []
-                invalidatePrice()
-                persistReview()
-            }
-            .onChange(of: items) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: unknowns) { _, _ in persistReview() }
-            .onChange(of: resolvedUnknowns) { _, _ in persistReview() }
-            .onChange(of: exclusions) { _, _ in persistReview() }
-            .onChange(of: overhead) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: profit) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: tripCost) { _, _ in invalidatePrice(); persistReview() }
-            .onChange(of: customerLanguage) { _, _ in invalidatePrice(); persistReview() }
-            .task {
-                restoringDraft = true
-                notes = PrivateJobDraftStore.load(jobID: job.id)
-                if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
-                    items = review.items.map(EditableEstimateTask.init)
-                    unknowns = review.unknowns
-                    resolvedUnknowns = Set(review.resolvedUnknowns)
-                    exclusions = review.exclusions
-                    overhead = review.overhead
-                    profit = review.profit
-                    tripCost = review.tripCost
-                    customerLanguage = review.customerLanguage == "es" ? "es" : "en"
-                }
-                photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
-                blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
-                await refreshRates()
-                await Task.yield()
-                restoringDraft = false
-            }
-            .onDisappear { voice.stop() }
+    }
+
+    private func restorePrivateDraft() async {
+        restoringDraft = true
+        notes = PrivateJobDraftStore.load(jobID: job.id)
+        if let review = PrivateEstimateReviewStore.load(jobID: job.id) {
+            items = review.items.map(EditableEstimateTask.init)
+            unknowns = review.unknowns
+            resolvedUnknowns = Set(review.resolvedUnknowns)
+            exclusions = review.exclusions
+            overhead = review.overhead
+            profit = review.profit
+            tripCost = review.tripCost
+            customerLanguage = review.customerLanguage == "es" ? "es" : "en"
         }
+        photoFiles = PrivateJobPhotoStore.files(jobID: job.id)
+        blueprintURL = PrivateBlueprintStore.load(jobID: job.id)
+        await refreshRates()
+        await Task.yield()
+        restoringDraft = false
     }
 
     private static let units = ["each", "job", "sq ft", "linear ft", "cu yd", "hr", "day"]
@@ -496,7 +532,7 @@ struct EstimateBuilderView: View {
                 return
             }
             blueprintURL = try PrivateBlueprintStore.save(data, jobID: job.id)
-            photoObservations = nil
+            blueprintObservations = nil
         } catch {
             blueprintMessage = "Could not save the blueprint. PDF limit: 15 MB."
         }
@@ -505,7 +541,7 @@ struct EstimateBuilderView: View {
     private func inspectBlueprintPage(_ url: URL) async {
         busy = true
         blueprintMessage = nil
-        photoObservations = nil
+        blueprintObservations = nil
         defer { busy = false }
         do {
             guard PrivateBlueprintStore.load(jobID: job.id) == url,
@@ -520,8 +556,15 @@ struct EstimateBuilderView: View {
                 blueprintMessage = "Could not prepare a blueprint preview."
                 return
             }
-            photoObservations = try await api().inspectPhoto(jpegData: jpeg,
+            let inspected = try await api().inspectPhoto(jpegData: jpeg,
                 context: "Raster preview of page 1 from blueprint PDF. Only printed dimensions may be quoted and must be verified; do not infer scale or prices.")
+            // A removed/replaced blueprint must never display observations from
+            // an earlier upload after the network request finishes.
+            guard PrivateBlueprintStore.load(jobID: job.id) == url, blueprintURL == url else {
+                blueprintMessage = "Blueprint changed while inspecting. Select the current file again."
+                return
+            }
+            blueprintObservations = inspected
         } catch {
             blueprintMessage = "AI blueprint review unavailable. The stored PDF is unchanged."
         }
@@ -540,7 +583,15 @@ struct EstimateBuilderView: View {
                 return
             }
             // Never upload private transcription or pricing with the photo.
-            photoObservations = try await api().inspectPhoto(jpegData: jpeg, context: "")
+            let inspected = try await api().inspectPhoto(jpegData: jpeg, context: "")
+            // Do not present analysis of a photo that was deleted or replaced
+            // during the network request.
+            guard PrivateJobPhotoStore.files(jobID: job.id).contains(url),
+                  photoFiles.contains(url) else {
+                photoMessage = "Photo changed during inspection. Choose the current photo again."
+                return
+            }
+            photoObservations = inspected
         } catch {
             photoMessage = "AI photo review is unavailable. The local photo and estimate are unchanged."
         }
@@ -609,6 +660,8 @@ struct EstimateBuilderView: View {
     private func calculate() async {
         busy = true
         message = nil
+        // Never leave a previous total on screen when a new request fails.
+        calculation = nil
         approved = false
         pdfURL = nil
         defer { busy = false }
@@ -768,7 +821,10 @@ private struct EditableEstimateTask: Identifiable, Equatable {
         descriptionEs = source.descriptionEs
         quantity = source.quantity ?? ""
         unit = normalizeUnit(source.unit)
+        // The AI may leave quantity/unit unknown. Such tasks cannot be
+        // treated as automatically confirmed, even if status says included.
         requiresConfirmation = source.status == "allowance_to_confirm"
-        confirmed = source.status != "allowance_to_confirm"
+            || source.quantity == nil || normalizeUnit(source.unit).isEmpty
+        confirmed = !requiresConfirmation
     }
 }

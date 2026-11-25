@@ -3,6 +3,7 @@ import XCTest
 @testable import ContractorOfficePro
 
 final class PrivateBlueprintStoreTests: XCTestCase {
+    @MainActor
     func testPrivateBlueprintSurvivesReopeningJobAndCanBeDeleted() throws {
         let jobID = UUID()
         defer { PrivateBlueprintStore.clear(jobID: jobID) }
@@ -14,10 +15,12 @@ final class PrivateBlueprintStoreTests: XCTestCase {
         XCTAssertNil(PrivateBlueprintStore.load(jobID: jobID))
     }
 
+    @MainActor
     func testRejectsNonPDFBytes() {
         XCTAssertThrowsError(try PrivateBlueprintStore.save(Data("not a PDF".utf8), jobID: UUID()))
     }
 
+    @MainActor
     func testRejectsOversizedBlueprint() {
         let id = UUID()
         defer { PrivateBlueprintStore.clear(jobID: id) }

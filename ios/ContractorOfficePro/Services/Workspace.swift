@@ -69,7 +69,10 @@ final class Workspace {
         approved: Bool
     ) throws -> Estimate {
         guard approved, result.status == "ready_for_contractor_review",
-              result.missing.isEmpty, let totalText = result.sellingTotal,
+              result.missing.isEmpty, !result.lines.isEmpty,
+              result.lines.allSatisfy({ $0.missing.isEmpty &&
+                  !$0.descriptionEn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+              let totalText = result.sellingTotal,
               let expected = Decimal(string: totalText) else {
             throw EstimateSaveError.notApproved
         }
